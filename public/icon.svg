@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#1c1f21"/>
+  <!-- Courbe de progression montante, ligne de base -->
+  <path d="M116 344 L200 268 L264 312 L396 168" fill="none" stroke="#3fb8ae" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="396" cy="168" r="30" fill="#edeeec"/>
+  <rect x="116" y="384" width="280" height="20" rx="10" fill="#3a4045"/>
+</svg>
