@@ -24,7 +24,8 @@ import {
 } from '../engine/programBuilder';
 import { weekStart } from '../engine/challenge';
 import type { Repository } from '../storage/db';
-import { loadKettlebells, loadPieces } from './equipment';
+import { loadKettlebells, loadOwned, loadPieces } from './equipment';
+import { adaptToEquipment } from '../engine/trip';
 import { fitPlanning } from './agenda';
 import { loadPlanning } from './Planning';
 import { loadOnboarding } from './profileStore';
@@ -437,13 +438,14 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
     const id = newId();
     const start = startNext ? shiftWeek(weekStart(today), 1) : weekStart(today);
     // Modèles du programme (les modèles personnels sont conservés).
+    const owned = await loadOwned(repo);
     const templates = await loadTemplates(repo);
     const tplId = (k: string) => `prog-${k}`;
     const progTemplates: SessionTemplate[] = program.templates.map((t) => ({
       id: tplId(t.key),
       title: t.title,
       updatedAt: Date.now(),
-      lines: t.lines.map((l) => ({ ...l, id: newId() })),
+      lines: adaptToEquipment(t.lines, owned).lines.map((l) => ({ ...l, id: newId() })),
     }));
     await saveTemplates(repo, [...templates.filter((t) => !t.id.startsWith('prog-')), ...progTemplates]);
     // Planning : on remplace les éléments futurs non démarrés de l'ancien programme.
@@ -669,6 +671,16 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       )}
+      <button className="ui-card list-row" onClick={() => go({ name: 'gear' })} style={{ marginTop: 10 }}>
+        <span className="icon-chip accent">
+          <Dumbbell size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Matériel</p>
+          <p className="row-title">Mon matériel et conseils d’achat</p>
+        </div>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
     </>
   );
 }

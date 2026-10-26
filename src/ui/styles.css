@@ -1127,3 +1127,14 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 .shop-qty { font-weight: 700; font-size: 0.85rem; }
 .shop .check { cursor: pointer; flex: none; }
 textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: 400 1rem var(--font-body); resize: vertical; }
+
+/* Matériel conseillé */
+.gear { margin-bottom: 10px; }
+.gear-verdict { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); }
+.gear.v-gc .gear-verdict { background: var(--accent); color: var(--on-accent); }
+.gear.v-gc { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.gear.v-ok .gear-verdict { background: var(--accent-soft); color: var(--accent); }
+.gear-score { font-weight: 800; font-size: 1.1rem; }
+.gear-for { margin: 0 0 6px; font-size: 0.85rem; }
+.gear-why { margin: 0 0 6px; font-size: 0.85rem; color: var(--text-2); line-height: 1.45; }
+.gear-unlocks { margin: 0 0 10px; padding-left: 18px; font-size: 0.8rem; }

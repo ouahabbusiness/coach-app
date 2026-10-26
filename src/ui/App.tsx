@@ -22,6 +22,7 @@ import { CoachHome, CoachProgram } from './CoachProgram';
 import { NutritionPage, NutritionSetup } from './Nutrition';
 import { AgendaPage } from './WeekSetup';
 import { KitchenPage } from './Kitchen';
+import { GearPage } from './Gear';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -43,6 +44,7 @@ export type Route =
   | { name: 'nutritionSetup' }
   | { name: 'agenda' }
   | { name: 'kitchen' }
+  | { name: 'gear' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -133,6 +135,7 @@ export function App() {
         {route.name === 'program' && <Program repo={repo} go={go} />}
         {route.name === 'nutrition' && <NutritionPage repo={repo} go={go} />}
         {route.name === 'kitchen' && <KitchenPage repo={repo} go={go} />}
+        {route.name === 'gear' && <GearPage repo={repo} go={go} />}
         {route.name === 'progress' && <Progress repo={repo} go={go} />}
         {route.name === 'coach' && <CoachHome repo={repo} go={go} />}
         {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}

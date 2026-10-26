@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { findVariant } from '../catalog/exercises';
 import { DEFAULT_KETTLEBELLS, DEFAULT_PIECES, loadsForEquipment } from '../engine/progression';
 import type { Repository } from '../storage/db';
+import { DEFAULT_OWNED } from '../engine/gear';
 
 const KEY = 'equipment.loadPieces';
 const KB = 'equipment.kettlebells';
@@ -41,4 +42,22 @@ export function useEquipment(repo: Repository): Equipment {
     loadEquipment(repo).then(setEq);
   }, [repo]);
   return eq;
+}
+
+const OWNED = 'equipment.owned';
+const GEAR = 'equipment.gear';
+
+/** Matériel possédé (noms du catalogue d'exercices), défaut = matériel déclaré. */
+export async function loadOwned(repo: Repository): Promise<string[]> {
+  return (await repo.getKv<string[]>(OWNED)) ?? DEFAULT_OWNED;
+}
+export async function saveOwned(repo: Repository, v: string[]): Promise<void> {
+  await repo.setKv(OWNED, v);
+}
+/** Accessoires conseillés déjà achetés (identifiants). */
+export async function loadBoughtGear(repo: Repository): Promise<string[]> {
+  return (await repo.getKv<string[]>(GEAR)) ?? [];
+}
+export async function saveBoughtGear(repo: Repository, v: string[]): Promise<void> {
+  await repo.setKv(GEAR, v);
 }
