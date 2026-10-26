@@ -11,15 +11,15 @@ Inspiration : captures « smart home » (monochrome + orange) et « habit tracke
 - Zéro paragraphe : chiffres, badges courts, jauges, coches. Explications derrière un « ? » ou un détail repliable.
 
 ## Couleurs (tokens dans `src/ui/styles.css`)
-| Rôle | Clair | Sombre / nuit |
-|---|---|---|
-| Fond | #F6F6F4 + halo chaud très léger | nuit : #EEF0F5 (reste clair) |
-| Carte | #FFFFFF | #1A1A1A |
-| Carte secondaire | #F3F3F1 | #242424 |
-| Texte | #111111 | #F2F2F0 |
-| Texte secondaire | #6E6E6B | #A3A3A0 |
-| Accent (actif) | #FF5A1F | #FF5A1F |
-| Danger | #D92D20 | #FF6B5E |
+| Rôle | Valeur |
+|---|---|
+| Fond | #F6F6F4 + halo chaud léger (nuit : #EEF0F5 bleuté) |
+| Carte | #FFFFFF, bordure #EBEBE8 |
+| Carte secondaire | #F3F3F1 |
+| Texte | #111111 |
+| Texte secondaire | #6E6E6B |
+| Accent (actif) | #FF5A1F |
+| Danger | #D92D20 |
 
 ## Typographie
 Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). Chrono compris.
