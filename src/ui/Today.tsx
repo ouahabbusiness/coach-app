@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
+import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
 import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
 import { addWater, challengeValues, dailyKey, daysUntil, type DailyMetrics } from '../engine/daily';
@@ -78,13 +79,26 @@ function Kpi({
   );
 }
 
+/** Flocons : [position %, délai s, durée s, taille px] — fixes pour un rendu stable. */
+const SNOW: [number, number, number, number][] = [
+  [6, 0, 9, 4], [18, 3, 11, 6], [29, 1.5, 8, 3], [41, 5, 12, 5], [52, 2, 10, 4], [63, 6, 9, 6],
+  [74, 0.5, 13, 3], [85, 4, 10, 5], [93, 2.5, 8, 4], [12, 7, 12, 3], [47, 8, 9, 5], [70, 9, 11, 4],
+];
+
 /** En-tête héro : dégradé chaud, formes organiques animées, anneau « Journée » (habitudes réellement cochées). */
-function HeroHeader({ date, greeting, score, done, total, chips }: { date: string; greeting: string; score: number; done: number; total: number; chips: { icon: ReactNode; text: string }[] }) {
+function HeroHeader({ date, greeting, score, done, total, chips, winter }: { date: string; greeting: string; score: number; done: number; total: number; chips: { icon: ReactNode; text: string }[]; winter?: WinterInfo }) {
   const r = 34;
   const c = 2 * Math.PI * r;
   const ringStyle = { strokeDashoffset: c * (1 - Math.min(1, score)), '--ring-c': `${c}` } as CSSProperties;
   return (
-    <header className="hero">
+    <header className={`hero ${winter?.active ? 'winter' : ''}`}>
+      {winter?.active && (
+        <div className="snow" aria-hidden="true">
+          {SNOW.map(([left, delay, dur, size], i) => (
+            <span key={i} style={{ left: `${left}%`, animationDelay: `${delay}s`, animationDuration: `${dur}s`, width: size, height: size }} />
+          ))}
+        </div>
+      )}
       <svg className="hero-blobs" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <defs>
           <filter id="hero-blur" x="-30%" y="-30%" width="160%" height="160%">
@@ -100,10 +114,16 @@ function HeroHeader({ date, greeting, score, done, total, chips }: { date: strin
         <path className="shape s2" d="M-20,170 C30,140 90,160 110,200 C125,230 60,260 10,245 C-30,232 -50,190 -20,170 Z" />
       </svg>
       <svg className="hero-wave" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0,40 C80,10 160,60 240,35 C300,16 350,24 400,32 L400,60 L0,60 Z" />
+        <path className="back" d="M0,30 C70,8 150,52 230,30 C300,10 350,18 400,26 L400,60 L0,60 Z" />
+        <path d="M0,42 C80,18 170,62 250,40 C310,24 360,30 400,36 L400,60 L0,60 Z" />
       </svg>
       <div className="hero-content">
         <div className="hero-text">
+          {winter?.active && (
+            <span className="winter-tag">
+              ❄ Winter Arc · {winter.day ? `Jour ${winter.day}/${winter.total}` : `J−${winter.daysLeft ?? 0}`}
+            </span>
+          )}
           <p className="hero-date">{date}</p>
           <h1 className="hero-greet">{greeting}</h1>
           <div className="hero-chips">
@@ -117,8 +137,8 @@ function HeroHeader({ date, greeting, score, done, total, chips }: { date: strin
         </div>
         <div className="hero-ring" role="img" aria-label={`Journée : ${done} habitudes sur ${total}`}>
           <svg width="88" height="88" viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r={r} fill="none" stroke="rgb(255 255 255 / 0.28)" strokeWidth="8" />
-            <circle className="hero-ring-fill" cx="44" cy="44" r={r} fill="none" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" strokeDasharray={c} style={ringStyle} transform="rotate(-90 44 44)" />
+            <circle cx="44" cy="44" r={r} fill="none" stroke={winter?.active ? "rgb(29 78 216 / 0.14)" : "rgb(226 73 15 / 0.14)"} strokeWidth="8" />
+            <circle className="hero-ring-fill" cx="44" cy="44" r={r} fill="none" stroke={winter?.active ? "#1d4ed8" : "#e2490f"} strokeWidth="8" strokeLinecap="round" strokeDasharray={c} style={ringStyle} transform="rotate(-90 44 44)" />
           </svg>
           <span className="hero-ring-value num">
             {Math.round(score * 100)}
@@ -181,6 +201,12 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState('');
   const { entries, update } = useChallengeEntries(repo);
+  const { mode: winterMode } = useWinterMode(repo);
+  const winter = winterInfo(winterMode, today, winterForced());
+  useEffect(() => {
+    if (winter.active) document.documentElement.dataset.theme = 'winter';
+    else delete document.documentElement.dataset.theme;
+  }, [winter.active]);
   const weight = useWeightLog(repo);
   const lastWeight = weight.days[weight.days.length - 1];
   const weightTrend = trend(weight.days, today);
@@ -258,6 +284,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           { icon: <Droplet size={13} aria-hidden="true" />, text: `${((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L` },
           { icon: <Footprints size={13} aria-hidden="true" />, text: daily?.steps !== undefined ? fmtNum(daily.steps) : '—' },
         ]}
+        winter={winter}
       />
 
       {night.pastBed && night.bedtime && (

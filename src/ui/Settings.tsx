@@ -5,6 +5,7 @@ import { Notice } from './common';
 import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
 import { STEPS } from './Onboarding';
 import { useBackgrounds, type BgSlot } from './backgrounds';
+import { useWinterMode, type WinterMode } from './winterArc';
 import { loadGoals, loadOnboarding } from './profileStore';
 
 type Status = 'testé' | 'non testé sur iPhone' | 'non implémenté' | 'à valider';
@@ -70,6 +71,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
       <ProfileCard repo={repo} onEdit={onEditProfile} />
 
       <BackgroundCard />
+
+      <WinterCard repo={repo} />
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
@@ -229,6 +232,27 @@ function BackgroundCard() {
         </div>
       ))}
       {error && <Notice tone="danger">{error}</Notice>}
+    </div>
+  );
+}
+
+function WinterCard({ repo }: { repo: Repository }) {
+  const { mode, setMode } = useWinterMode(repo);
+  const options: { v: WinterMode; l: string }[] = [
+    { v: 'auto', l: 'Auto (novembre)' },
+    { v: 'on', l: 'Activé' },
+    { v: 'off', l: 'Désactivé' },
+  ];
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>❄ Winter Arc</h2>
+      <div className="chips" role="group" aria-label="Thème Winter Arc">
+        {options.map((o) => (
+          <button key={o.v} className="chip" aria-pressed={mode === o.v} onClick={() => setMode(o.v)}>
+            {o.l}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

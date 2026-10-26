@@ -87,7 +87,7 @@ export function App() {
           <SettingsIcon size={20} aria-hidden="true" />
         </button>
       </header>
-      <main className="content">
+      <main className="content" key={route.name}>
         {route.name === 'today' && <Today repo={repo} go={go} night={day} />}
         {route.name === 'program' && <Program repo={repo} go={go} />}
         {route.name === 'nutrition' && (
@@ -120,7 +120,7 @@ export function App() {
               aria-current={route.name === name || (name === 'program' && route.name === 'planning') ? 'page' : undefined}
               onClick={() => go(name === 'program' ? { name: 'planning' } : { name })}
             >
-              <Icon size={22} aria-hidden="true" />
+              <Icon size={19} aria-hidden="true" />
             </button>
           ))}
         </div>

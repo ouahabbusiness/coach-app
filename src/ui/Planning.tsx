@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, Car, ChevronLeft, ChevronRight, CloudLightning, Moon, Play, Plus } from 'lucide-react';
+import { Briefcase, ChevronLeft, ChevronRight, CloudLightning, Moon, MoreHorizontal, Play, Plus } from 'lucide-react';
 import { weekStart as mondayOf } from '../engine/challenge';
 import { localDay } from '../engine/derive';
 import {
@@ -42,8 +42,6 @@ export async function startPlanned(repo: Repository, item: PlannedItem, tpl: Ses
 }
 
 const KIND_LABEL: Record<ItemKind, string> = { seance: 'Séance', course: 'Course', marche: 'Marche' };
-const STATUS_TONE: Record<ItemStatus, string> = { prévu: '', réalisé: 'ok', adapté: 'ok', partiel: 'warn', annulé: '', suspendu: 'warn', 'non confirmé': '' };
-const FIXED_ICON = { travail: Briefcase, trajet: Car, sommeil: Moon, autre: Briefcase };
 
 function fmtDate(day: string, opts: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('fr-BE', { ...opts, timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
@@ -70,6 +68,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
   const [sessions, setSessions] = useState<SessionSummaryRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [disrupting, setDisrupting] = useState<PlannedItem | null>(null);
+  const [menu, setMenu] = useState<PlannedItem | null>(null);
 
   useEffect(() => {
     loadPlanning(repo).then(setItems);
@@ -150,140 +149,151 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
         </button>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="grid2 num">
-          <div>
-            <div className="muted" style={{ fontSize: '0.85rem' }}>Séances et courses prévues</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 600 }}>{planned}</div>
-          </div>
-          <div>
-            <div className="muted" style={{ fontSize: '0.85rem' }}>Réalisées (enregistrées)</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 600 }}>{realized}</div>
-          </div>
-        </div>
-      </div>
-
-      {fixed && fixed.length === 0 && (
-        <Notice tone="warn">
-          ⏰ Horaires inconnus{' '}
-          <button className="btn ghost" style={{ minHeight: 32, padding: '0 4px' }} onClick={() => go({ name: 'onboarding' })}>
-            Compléter
+      <div className="week-sum">
+        <span className="pill num">📅 {planned} prévues</span>
+        <span className="pill num">✅ {realized} faites</span>
+        {fixed && fixed.length === 0 && (
+          <button className="pill" onClick={() => go({ name: 'onboarding' })}>
+            ⏰ Horaires ?
           </button>
-        </Notice>
-      )}
+        )}
+      </div>
 
       {DAY_NAMES.map((name, day) => {
         const date = dateOf(week, day);
-        const dayFixed = (fixed ?? [])
-          .flatMap((ev) => spansOf(ev).filter((s) => s.day === day && s.start > 0).map(() => ev))
-          .sort((a, b) => toMin(a.start) - toMin(b.start));
+        const work = (fixed ?? []).find((ev) => ev.kind === 'travail' && ev.days.includes(day));
+        const sleep = (fixed ?? []).find((ev) => ev.kind === 'sommeil');
         const dayItems = weekItems.filter((i) => i.day === day).sort((a, b) => toMin(a.start) - toMin(b.start));
         const daySessions = sessionsByDate.get(date) ?? [];
         const unplanned = daySessions.filter((s) => s.outcome !== 'in_progress' && !dayItems.some((i) => (i.sessionId ? i.sessionId === s.id : i.title === s.title)));
+        const isToday = date === today;
         return (
-          <section key={day} className="card" aria-label={`${name} ${fmtDate(date, { day: 'numeric', month: 'long' })}`} style={date === today ? { borderColor: 'var(--accent)', borderWidth: 2 } : undefined}>
-            <div className="spread">
-              <h2 style={{ margin: 0, fontSize: '1.05rem' }}>
-                {name} {fmtDate(date, { day: 'numeric' })}
-                {date === today && <span className="badge ok" style={{ marginLeft: 8 }}>Aujourd’hui</span>}
-              </h2>
-              <button className="btn ghost" onClick={() => setDraft({ kind: 'seance', templateId: templates[0]?.id, day, start: '18:00', durationMin: 45 })}>
-                <Plus size={18} aria-hidden="true" /> Ajouter
+          <section key={day} className={`day ${isToday ? 'today' : ''}`} aria-label={`${name} ${fmtDate(date, { day: 'numeric', month: 'long' })}`}>
+            <div className="day-head">
+              <div className="day-date">
+                <span className="day-name">{name.slice(0, 3)}</span>
+                <span className="day-num num">{fmtDate(date, { day: 'numeric' })}</span>
+              </div>
+              <div className="day-meta">
+                {isToday && <span className="pill accent">Aujourd’hui</span>}
+                {work && (
+                  <span className="meta-ico num" title="Travail">
+                    <Briefcase size={12} aria-hidden="true" /> {work.start.slice(0, 2)}–{work.end.slice(0, 2)}
+                  </span>
+                )}
+                {sleep && (
+                  <span className="meta-ico num" title="Coucher">
+                    <Moon size={12} aria-hidden="true" /> {sleep.start}
+                  </span>
+                )}
+              </div>
+              <button className="icon-btn" aria-label={`Ajouter le ${name}`} onClick={() => setDraft({ kind: 'seance', templateId: templates[0]?.id, day, start: '18:00', durationMin: 45 })}>
+                <Plus size={16} aria-hidden="true" />
               </button>
             </div>
 
-            {dayFixed.length > 0 && (
-              <div className="row" style={{ gap: 6, marginTop: 6 }}>
-                {dayFixed.map((ev) => {
-                  const Icon = FIXED_ICON[ev.kind];
+            {(dayItems.length > 0 || unplanned.length > 0) && (
+              <ul className="slots">
+                {dayItems.map((i) => {
+                  const st = itemStatus(i, date, today, daySessions);
+                  const tpl = templates.find((t) => t.id === i.templateId);
                   return (
-                    <span key={ev.id} className="badge" title="Événement fixe">
-                      <Icon size={13} aria-hidden="true" /> {ev.label} {ev.start}–{ev.end}
-                    </span>
+                    <li key={i.id} className={`slot st-${st.replace(' ', '-')}`}>
+                      <span className="slot-time num">{i.start}</span>
+                      <span className="slot-title">
+                        {i.title}
+                        {i.adapted && <span className="slot-flag" title="Version adaptée">⚡</span>}
+                        {i.moves.length > 0 && <span className="slot-flag" title="Déplacé">↻</span>}
+                      </span>
+                      {st !== 'prévu' && <span className="slot-status">{st}</span>}
+                      {isToday && st === 'prévu' && tpl && (
+                        <button className="icon-btn primary" aria-label={`Commencer ${i.title}`} onClick={() => startFromItem(i, tpl)}>
+                          <Play size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                      <button className="icon-btn ghost" aria-label={`Options pour ${i.title}`} onClick={() => setMenu(i)}>
+                        <MoreHorizontal size={16} aria-hidden="true" />
+                      </button>
+                    </li>
                   );
                 })}
-              </div>
+                {unplanned.map((s) => (
+                  <li key={s.id} className="slot">
+                    <span className="slot-time num">—</span>
+                    <span className="slot-title">{s.title}</span>
+                    <OutcomeBadge outcome={s.outcome} />
+                  </li>
+                ))}
+              </ul>
             )}
-
-            <div className="stack" style={{ marginTop: 10 }}>
-              {dayItems.map((i) => {
-                const st = itemStatus(i, date, today, daySessions);
-                const tpl = templates.find((t) => t.id === i.templateId);
-                return (
-                  <div key={i.id} className="card soft" style={{ margin: 0, padding: 12 }}>
-                    <div className="spread">
-                      <div>
-                        <div className="num" style={{ fontWeight: 600 }}>
-                          {i.start} · {i.title}
-                        </div>
-                        <div className="muted" style={{ fontSize: '0.85rem' }}>
-                          {KIND_LABEL[i.kind]} · {i.durationMin} min{i.adapted ? ` · version adaptée ≈ ${i.adapted.estimatedMin} min (estimation)` : ''}
-                          {i.moves.length > 0 ? ` · déplacé ${i.moves.length}×` : ''}
-                        </div>
-                      </div>
-                      <span className={`badge ${STATUS_TONE[st]}`}>{st}</span>
-                    </div>
-                    {i.adjustment && (
-                      <div className="muted" style={{ fontSize: '0.85rem', marginTop: 6 }}>
-                        Imprévu : {REASON_LABELS[i.adjustment.reason]} → {i.adjustment.decision === 'adaptée' ? 'version adaptée' : i.adjustment.decision}
-                        {i.adjustment.note ? ` (${i.adjustment.note})` : ''}
-                        {i.adapted && i.adapted.removed.length > 0 ? ` · retiré : ${i.adapted.removed.join(' ; ')}` : ''}
-                      </div>
-                    )}
-                    {i.moves.some((m) => m.reason) && (
-                      <div className="muted" style={{ fontSize: '0.85rem', marginTop: 4 }}>
-                        Reporté pour : {[...new Set(i.moves.filter((m) => m.reason).map((m) => REASON_LABELS[m.reason!]))].join(', ')}
-                      </div>
-                    )}
-                    <div className="row" style={{ marginTop: 8, gap: 6 }}>
-                      {date === today && st === 'prévu' && tpl && (
-                        <button className="btn primary" onClick={() => startFromItem(i, tpl)}>
-                          <Play size={16} aria-hidden="true" /> {i.adapted ? 'Commencer (adaptée)' : 'Commencer'}
-                        </button>
-                      )}
-                      {st === 'prévu' && date >= today && (
-                        <button className="btn" onClick={() => setDisrupting(i)}>
-                          <CloudLightning size={16} aria-hidden="true" /> Imprévu
-                        </button>
-                      )}
-                      {(st === 'annulé' || st === 'suspendu' || (st === 'prévu' && i.adapted)) && i.adjustment?.decision !== 'remplacée' && (
-                        <button className="btn ghost" onClick={() => replaceItem({ ...i, adjustment: undefined, adapted: undefined })}>
-                          Rétablir
-                        </button>
-                      )}
-                      {st === 'prévu' && (
-                        <button className="btn" onClick={() => setDraft({ id: i.id, kind: i.kind, templateId: i.templateId, day: i.day, start: i.start, durationMin: i.durationMin })}>
-                          Déplacer
-                        </button>
-                      )}
-                      {st !== 'réalisé' && st !== 'partiel' && (
-                        <button
-                          className="btn ghost"
-                          onClick={() => {
-                            if (window.confirm(`Retirer « ${i.title} » du planning ?`)) persist(items.filter((x) => x.id !== i.id));
-                          }}
-                        >
-                          Retirer
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              {unplanned.map((s) => (
-                <div key={s.id} className="spread card soft" style={{ margin: 0, padding: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{s.title}</div>
-                    <div className="muted" style={{ fontSize: '0.85rem' }}>Séance hors planning</div>
-                  </div>
-                  <OutcomeBadge outcome={s.outcome} />
-                </div>
-              ))}
-              {dayItems.length === 0 && unplanned.length === 0 && <p className="muted" style={{ margin: 0 }}>Rien de prévu.</p>}
-            </div>
+            {dayItems.length === 0 && unplanned.length === 0 && <span className="day-free">Libre</span>}
           </section>
         );
       })}
+
+      <Modal open={!!menu} onClose={() => setMenu(null)} title={menu?.title ?? ''}>
+        {menu &&
+          (() => {
+            const date = dateOf(week, menu.day);
+            const st = itemStatus(menu, date, today, sessionsByDate.get(date) ?? []);
+            const tpl = templates.find((t) => t.id === menu.templateId);
+            const close = () => setMenu(null);
+            return (
+              <div className="stack">
+                <div className="row" style={{ gap: 6 }}>
+                  <span className="pill num">🕒 {menu.start}</span>
+                  <span className="pill num">⏱ {menu.adapted ? `≈ ${menu.adapted.estimatedMin}` : menu.durationMin} min</span>
+                  <span className="pill">{st}</span>
+                </div>
+                {menu.adjustment && (
+                  <ul className="mini-list">
+                    <li>⚡ {REASON_LABELS[menu.adjustment.reason]} → {menu.adjustment.decision === 'adaptée' ? 'version adaptée' : menu.adjustment.decision}</li>
+                    {menu.adapted?.removed.map((r) => <li key={r}>− {r}</li>)}
+                  </ul>
+                )}
+                {menu.moves.some((m) => m.reason) && (
+                  <ul className="mini-list">
+                    <li>↻ Reporté : {[...new Set(menu.moves.filter((m) => m.reason).map((m) => REASON_LABELS[m.reason!]))].join(', ')}</li>
+                  </ul>
+                )}
+                {date === today && st === 'prévu' && tpl && (
+                  <button className="btn primary block" onClick={() => { close(); startFromItem(menu, tpl); }}>
+                    <Play size={16} aria-hidden="true" /> Commencer
+                  </button>
+                )}
+                {st === 'prévu' && date >= today && (
+                  <button className="btn block" onClick={() => { close(); setDisrupting(menu); }}>
+                    <CloudLightning size={16} aria-hidden="true" /> Imprévu
+                  </button>
+                )}
+                {st === 'prévu' && (
+                  <button className="btn block" onClick={() => { close(); setDraft({ id: menu.id, kind: menu.kind, templateId: menu.templateId, day: menu.day, start: menu.start, durationMin: menu.durationMin }); }}>
+                    Déplacer
+                  </button>
+                )}
+                {(st === 'annulé' || st === 'suspendu' || (st === 'prévu' && menu.adapted)) && menu.adjustment?.decision !== 'remplacée' && (
+                  <button className="btn block" onClick={() => { replaceItem({ ...menu, adjustment: undefined, adapted: undefined }); close(); }}>
+                    Rétablir
+                  </button>
+                )}
+                {st !== 'réalisé' && st !== 'partiel' && st !== 'adapté' && (
+                  <button
+                    className="btn ghost block"
+                    style={{ color: 'var(--danger)' }}
+                    onClick={() => {
+                      if (window.confirm(`Retirer « ${menu.title} » ?`)) {
+                        persist(items.filter((x) => x.id !== menu.id));
+                        close();
+                      }
+                    }}
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+      </Modal>
 
       <Modal open={!!draft} onClose={() => setDraft(null)} title={draft?.id ? 'Déplacer' : 'Ajouter au planning'}>
         {draft && (

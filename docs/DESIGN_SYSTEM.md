@@ -25,8 +25,10 @@ Inspiration : captures « smart home » (monochrome + orange) et « habit tracke
 Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). Chrono compris.
 
 ## Composants
-- En-tête héro (accueil) : seule zone en dégradé (orange → corail), formes organiques floues et translucides animées lentement, vague, anneau « Journée » (habitudes cochées / 6), pastilles séance/eau/pas. Animations coupées si mouvement réduit.
-- Navigation : pilule noire flottante, icônes seules (accueil, programme, nutrition, progrès, coach), rond orange sur l'actif.
+- En-tête héro (accueil) : pleine largeur, passe sous la barre d'état, fondu dans la page par une vague. Dégradé clair pêche + texte sombre (contraste ≥ 10:1 titre, ≥ 5:1 date). Formes organiques floues animées, anneau « Journée », pastilles. Variante Winter Arc glacée (auto du 1er au 30/11, réglable) avec flocons.
+- Planning : carte jour minimaliste (date empilée, 2 icônes travail/coucher, une ligne par séance, statut en petit badge) ; détails et actions derrière « ⋯ ».
+- Navigation : pilule compacte (42 px), translucide.
+- Animations : apparition décalée des blocs sur toutes les pages, jauges qui se remplissent, coches qui rebondissent ; coupées si mouvement réduit.
 - Barre de séance : même pilule noire, action principale orange.
 - Icônes Lucide, trait fin (1,6).
 - Habitudes : barre en segments + ronds à cocher orange.
