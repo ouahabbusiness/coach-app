@@ -75,3 +75,17 @@ describe('sommeil dans le plan du jour', () => {
     expect(p.find((e) => e.id === 'lumiere')!.time).toBe('07:15');
   });
 });
+
+describe('liste de courses', () => {
+  it('7 jours de plan → œufs par boîtes de 6, riz en poids cru, rangés par rayon', async () => {
+    const { shoppingList } = await import('../src/engine/dayPlan');
+    const plans = Array.from({ length: 7 }, (_, d) => buildDayPlan({ answers, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: d }));
+    const list = shoppingList(plans);
+    const eggs = list.find((l) => l.foodId === 'oeuf')!;
+    expect(eggs.buy).toMatch(/^\d+ œufs \(\d+ boîtes? de 6\)$/);
+    expect(Number(eggs.buy.split(' ')[0]) % 6).toBe(0);
+    expect(list.find((l) => l.foodId === 'riz')?.buy).toContain('(cru)');
+    expect(list[0]!.aisle).toBe('Frais : viandes, poissons, œufs, laitiers');
+    expect(list.some((l) => l.foodId === 'legumes')).toBe(true);
+  });
+});

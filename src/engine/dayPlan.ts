@@ -85,6 +85,8 @@ export interface PlanEntry {
   kcal?: number;
   protein?: number;
   waterMl?: number;
+  /** Aliments du repas en grammes (pour la liste de courses). */
+  parts?: { foodId: string; grams: number }[];
   /** Repas remplacé par un imprévu (valeurs estimées). */
   unplanned?: boolean;
   /** Repas recalculé après un imprévu. */
@@ -152,11 +154,13 @@ function portion(f: Food, grams: number): { label: string; g: number } {
 /** Construit un repas : protéine pour la part de protéines, puis glucides et lipides pour compléter les calories. */
 function meal(kcal: number, protein: number, foods: { p: Food; c: Food; f?: Food; fruit?: Food; veg: boolean }, supplementProtein = 0) {
   const items: string[] = [];
+  const parts: { foodId: string; grams: number }[] = [];
   let k = 0;
   let pr = 0;
   const add = (f: Food, grams: number) => {
     const p = portion(f, grams);
     items.push(f.unitG ? `${p.label}` : p.label);
+    parts.push({ foodId: f.id, grams: p.g });
     k += (f.kcal * p.g) / 100;
     pr += (f.protein * p.g) / 100;
   };
@@ -167,7 +171,7 @@ function meal(kcal: number, protein: number, foods: { p: Food; c: Food; f?: Food
   const rest = Math.max(0, kcal - k);
   if (rest > 0) add(foods.c, ((foods.f ? rest * 0.75 : rest) / foods.c.kcal) * 100);
   if (foods.f) add(foods.f, ((rest * 0.25) / foods.f.kcal) * 100);
-  return { items, kcal: Math.round(k), protein: Math.round(pr) };
+  return { items, parts, kcal: Math.round(k), protein: Math.round(pr) };
 }
 
 function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }>): PlanEntry[] {
@@ -295,7 +299,7 @@ export function buildDayPlan(i: DayPlanInput): PlanEntry[] {
   const scale = Object.fromEntries(adjustable.map((e) => [e.id, { k, p }]));
   return rawPlan(i, scale).map((e) =>
     ids.includes(e.id)
-      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true }
+      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, parts: undefined }
       : adjustable.some((x) => x.id === e.id) && Math.abs(k - 1) > 0.05
         ? { ...e, adjusted: k < 1 ? 'allégé' : 'renforcé' }
         : e,
@@ -305,4 +309,46 @@ export function buildDayPlan(i: DayPlanInput): PlanEntry[] {
 /** Totaux du plan (pour comparer à la cible). */
 export function planTotals(plan: PlanEntry[]) {
   return plan.reduce((t, e) => ({ kcal: t.kcal + (e.kcal ?? 0), protein: t.protein + (e.protein ?? 0), waterMl: t.waterMl + (e.waterMl ?? 0) }), { kcal: 0, protein: 0, waterMl: 0 });
+}
+
+export type Aisle = 'Frais : viandes, poissons, œufs, laitiers' | 'Épicerie' | 'Fruits et légumes';
+
+export interface ShoppingLine {
+  foodId: string;
+  name: string;
+  aisle: Aisle;
+  /** Quantité totale prévue. */
+  grams: number;
+  /** Ce qu'il faut acheter, arrondi à ce qui se vend. */
+  buy: string;
+}
+
+const AISLE: Record<FoodGroup, Aisle> = { proteine: 'Frais : viandes, poissons, œufs, laitiers', glucide: 'Épicerie', lipide: 'Épicerie', legume: 'Fruits et légumes', fruit: 'Fruits et légumes' };
+
+/** Liste de courses : somme des repas des plans, arrondie à des quantités achetables (estimation). */
+export function shoppingList(plans: PlanEntry[][]): ShoppingLine[] {
+  const total = new Map<string, number>();
+  for (const plan of plans) for (const e of plan) for (const p of e.parts ?? []) total.set(p.foodId, (total.get(p.foodId) ?? 0) + p.grams);
+  const lines: ShoppingLine[] = [];
+  for (const [id, grams] of total) {
+    const f = food(id);
+    if (!f) continue;
+    let buy: string;
+    if (f.id === 'oeuf') {
+      const n = Math.ceil(grams / (f.unitG ?? 60));
+      buy = `${Math.ceil(n / 6) * 6} œufs (${Math.ceil(n / 6)} boîte${Math.ceil(n / 6) > 1 ? 's' : ''} de 6)`;
+    } else if (f.unitG) {
+      const n = Math.ceil(grams / f.unitG);
+      buy = `${n} ${f.unitName}${n > 1 ? 's' : ''}`;
+    } else if (f.group === 'lipide' && f.id === 'huile_olive') {
+      buy = `${Math.ceil(grams / 10) * 10} ml (vérifie la bouteille)`;
+    } else {
+      // Cuits → poids cru approximatif pour riz et pâtes (×0,4) ; arrondi à 100 g.
+      const raw = f.id === 'riz' || f.id === 'pates' ? grams * 0.4 : grams;
+      buy = `${Math.ceil(raw / 100) * 100} g${f.id === 'riz' || f.id === 'pates' ? ' (cru)' : ''}`;
+    }
+    lines.push({ foodId: id, name: f.name, aisle: AISLE[f.group], grams: Math.round(grams), buy });
+  }
+  const order: Aisle[] = ['Frais : viandes, poissons, œufs, laitiers', 'Fruits et légumes', 'Épicerie'];
+  return lines.sort((a, b) => order.indexOf(a.aisle) - order.indexOf(b.aisle) || a.name.localeCompare(b.name));
 }

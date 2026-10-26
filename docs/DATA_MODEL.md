@@ -30,6 +30,7 @@ Chaque événement : `id` (UUID, clé d'idempotence), `sessionId`, `at` (UTC ms)
 - `proof.<jour>` : photos-preuves `{ habitId, photo (data URL réduite), takenAt, savedAt }`.
 - `reading.books`, `reading.current`, `reading.log` (`fromPage → toPage`), `run.log` (`km, minutes?, effort?`), `measures.log`.
 - `agenda.recurring` (événements récurrents), `planning.oneoffs` (indisponibilités datées), `agenda.trips` (`from, to, label, equipment[]`).
+- `kitchen.foods` (produits : kcal/protéines pour 100 g, unité, code-barres, source), `kitchen.dishes` (ingrédients en g, portions), `shopping.<jour>` (articles cochés).
 - `targets.sex` (repli ; la formule est dans `onboarding.answers.body.formulaSex`).
 
 ## À concevoir (phases suivantes)

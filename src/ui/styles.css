@@ -1112,3 +1112,18 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 .ob .gapbar { background: repeating-linear-gradient(90deg, #050505 0 6px, #1c1c1a 6px 7px); border-color: #2c2b28; }
 .ob .gb-busy { background: #8f8b82; opacity: 0.45; }
 .ob .gb-free-txt { color: var(--text); }
+
+/* Ma cuisine, J'ai mangé, courses */
+.kit-list { list-style: none; margin: 0; padding: 0; }
+.kit-list li { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--border); }
+.kit-list li:first-child { border-top: 0; }
+.kit-row { display: flex; align-items: center; gap: 8px; flex: 1; min-height: 52px; background: none; border: 0; padding: 6px 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.kit-row .grow { display: flex; flex-direction: column; }
+.kit-row small { color: var(--text-2); font-size: 0.75rem; }
+.ate-list { margin: 0; padding-left: 18px; font-size: 0.88rem; }
+.shop { list-style: none; margin: 0 0 8px; padding: 0; }
+.shop li { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px dashed var(--border); }
+.shop li.got .grow { text-decoration: line-through; opacity: 0.55; }
+.shop-qty { font-weight: 700; font-size: 0.85rem; }
+.shop .check { cursor: pointer; flex: none; }
+textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font: 400 1rem var(--font-body); resize: vertical; }

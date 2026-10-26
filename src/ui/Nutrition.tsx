@@ -2,10 +2,13 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Moon, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
 import { Modal } from './common';
+import { parseMeal, totalOf } from '../engine/kitchen';
+import { useKitchen } from './Kitchen';
+import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
-import { buildDayPlan, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -290,11 +293,24 @@ export function useDayPlan(repo: Repository) {
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const next = plan?.find((e) => !done.includes(e.id) && toMin(e.time) >= nowMin - 60);
-  return { answers, plan, done, toggle, targets, next, setEaten };
+  /** Plans des 7 prochains jours (mêmes cibles, sans imprévu) pour la liste de courses. */
+  const week = useMemo(() => {
+    if (!answers || !targets.calories.value || !targets.water.value) return [];
+    const d0 = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
+    return Array.from({ length: 7 }, (_, k) => buildDayPlan({ answers, kcal: targets.calories.value!.kcal, proteinG: targets.calories.value!.proteinG, waterMl: targets.water.value!, dayIndex: (d0 + k) % 7 }));
+  }, [answers, targets.calories.value, targets.water.value, today]);
+
+  return { answers, plan, done, toggle, targets, next, setEaten, week, today };
 }
 
 export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const { answers, plan, done, toggle, targets, next, setEaten } = useDayPlan(repo);
+  const { answers, plan, done, toggle, targets, next, setEaten, week, today } = useDayPlan(repo);
+  const kitchen = useKitchen(repo);
+  const [ate, setAte] = useState<PlanEntry | null>(null);
+  const [text, setText] = useState('');
+  const [shot, setShot] = useState<File | undefined>();
+  const [shopping, setShopping] = useState(false);
+  const [got, setGot] = useState<string[]>([]);
   const [unplanned, setUnplanned] = useState<PlanEntry | null>(null);
   const [uk, setUk] = useState<UnplannedKind>('maison');
   const [us, setUs] = useState<UnplannedSize>('normale');
@@ -317,6 +333,17 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
         </div>
       </div>
 
+      <div className="row" style={{ gap: 8, marginBottom: 10 }}>
+          <button className="btn sm" onClick={() => go({ name: 'kitchen' })}>
+            <ChefHat size={14} aria-hidden="true" /> Ma cuisine
+          </button>
+          {plan && (
+          <button className="btn sm" onClick={async () => (setGot((await repo.getKv<string[]>(`shopping.${today}`)) ?? []), setShopping(true))}>
+            <ShoppingCart size={14} aria-hidden="true" /> Courses de la semaine
+          </button>
+          )}
+        </div>
+
       {!answers ? (
         <button className="ui-card list-row" onClick={() => go({ name: 'nutritionSetup' })}>
           <span className="icon-chip accent">
@@ -332,7 +359,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
         <section className="ui-card stack">
           <p className="row-title">Il manque des données pour calculer tes quantités</p>
           <div className="row" style={{ gap: 6 }}>
-            {[...targets.calories.missing, ...targets.water.missing].map((m) => (
+            {[...new Set([...targets.calories.missing, ...targets.water.missing])].map((m) => (
               <span key={m} className="pill">
                 {m}
               </span>
@@ -343,6 +370,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
           </button>
         </section>
       ) : (
+        <>
         <section className="ui-card" aria-label="Plan du jour">
           <div className="spread">
             <p className="eyebrow" style={{ margin: 0 }}>Plan du jour</p>
@@ -367,6 +395,18 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                     <p className="tl-items">{e.items.join(' · ')}</p>
                     {e.unplanned && <span className="pill">imprévu · estimation</span>}
                     {e.adjusted && <span className="pill">{e.adjusted} après imprévu</span>}
+                    {e.kind === 'repas' && !e.unplanned && (
+                      <button
+                        className="tl-alt"
+                        onClick={() => {
+                          setText('');
+                          setShot(undefined);
+                          setAte(e);
+                        }}
+                      >
+                        <Utensils size={12} aria-hidden="true" /> J’ai mangé
+                      </button>
+                    )}
                     {e.kind === 'repas' && (
                       <button className="tl-alt" onClick={() => (e.unplanned ? setEaten(e.id, undefined) : setUnplanned(e))}>
                         <Shuffle size={12} aria-hidden="true" /> {e.unplanned ? 'Revenir au plan' : 'Imprévu'}
@@ -382,6 +422,92 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
               );
             })}
           </ol>
+          <Modal open={!!ate} onClose={() => setAte(null)} title={`J’ai mangé · ${ate?.title ?? ''}`}>
+            {ate &&
+              (() => {
+                const r = parseMeal(text, kitchen.foods, kitchen.dishes);
+                const t = totalOf(r.items, kitchen.foods, kitchen.dishes);
+                const favs = [...kitchen.dishes.map((d) => ({ id: d.id, label: `1 portion ${d.name}` })), ...kitchen.mine.map((f) => ({ id: f.id, label: f.unitG ? `1 ${f.unitName ?? 'portion'} ${f.name}` : `100 g ${f.name}` }))];
+                return (
+                  <div className="stack">
+                    <textarea aria-label="Ce que tu as mangé" placeholder="ex. 3 œufs, 80 g d’avoine, 1 banane" value={text} onChange={(e) => setText(e.target.value)} />
+                    {favs.length > 0 && (
+                      <div className="chips">
+                        {favs.slice(0, 10).map((f) => (
+                          <button key={f.id} className="chip" onClick={() => setText(text.trim() ? `${text.trim()}, ${f.label}` : f.label)}>
+                            + {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {r.items.length > 0 && (
+                      <ul className="ate-list">
+                        {r.items.map((i, k) => (
+                          <li key={k} className="num">
+                            {i.label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {r.unknown.length > 0 && (
+                      <p className="hs-err" style={{ color: 'var(--warn)' }}>
+                        Inconnu : {r.unknown.join(' · ')} → ajoute-le dans Ma cuisine
+                      </p>
+                    )}
+                    <p className="num" style={{ margin: 0, fontWeight: 800, fontSize: '1.2rem' }}>
+                      ≈ {t.kcal} kcal · {t.protein} g P
+                    </p>
+                    <label className={`chip ${shot ? 'on' : ''}`} style={{ alignSelf: 'flex-start', cursor: 'pointer' }}>
+                      {shot ? <Check size={14} aria-hidden="true" /> : <Camera size={14} aria-hidden="true" />} Photo de l’assiette
+                      <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => setShot(e.target.files?.[0])} />
+                    </label>
+                    <button
+                      className="btn primary block"
+                      disabled={!r.items.length || r.unknown.length > 0}
+                      onClick={async () => {
+                        if (shot) await saveProof(repo, today, `repas-${ate.id}`, shot);
+                        await setEaten(ate.id, { label: r.items.map((i) => i.label).join(', '), kcal: t.kcal, protein: t.protein });
+                        setAte(null);
+                      }}
+                    >
+                      Enregistrer et recalculer ma journée
+                    </button>
+                  </div>
+                );
+              })()}
+          </Modal>
+          <Modal open={shopping} onClose={() => setShopping(false)} title="Courses · 7 jours">
+            {(() => {
+              const list = shoppingList(week);
+              const aisles = [...new Set(list.map((l) => l.aisle))];
+              const toggleGot = async (id: string) => {
+                const next = got.includes(id) ? got.filter((x) => x !== id) : [...got, id];
+                setGot(next);
+                await repo.setKv(`shopping.${today}`, next);
+              };
+              return (
+                <div className="stack">
+                  {aisles.map((a) => (
+                    <div key={a}>
+                      <p className="eyebrow" style={{ margin: '0 0 4px' }}>{a}</p>
+                      <ul className="shop">
+                        {list.filter((l) => l.aisle === a).map((l) => (
+                          <li key={l.foodId} className={got.includes(l.foodId) ? 'got' : ''}>
+                            <button className={`check ${got.includes(l.foodId) ? 'on' : ''}`} aria-pressed={got.includes(l.foodId)} aria-label={`${l.name} pris`} onClick={() => toggleGot(l.foodId)}>
+                              {got.includes(l.foodId) ? <Check size={14} aria-hidden="true" /> : null}
+                            </button>
+                            <span className="grow">{l.name}</span>
+                            <span className="num shop-qty">{l.buy}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Calculé sur ton plan des 7 prochains jours (estimation). Compléments non inclus.</p>
+                </div>
+              );
+            })()}
+          </Modal>
           <Modal open={!!unplanned} onClose={() => setUnplanned(null)} title={`Imprévu · ${unplanned?.title ?? ''}`}>
             <div className="stack">
               <div className="chips" role="group" aria-label="Type de repas">
@@ -419,6 +545,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
             Quantités estimées (valeurs moyennes des aliments). Compléments : seulement ceux que tu déclares, jamais recommandés.
           </p>
         </section>
+        </>
       )}
     </>
   );

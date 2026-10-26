@@ -34,6 +34,7 @@ Fixtures fictives uniquement (jamais présentées comme performances réelles).
 | — | Rigueur : strict / militaire / maladie | Automatisé ✔ | tests/disruption.test.ts |
 | — | Plan du jour, imprévu de repas, sommeil | Automatisé ✔ | tests/dayPlan.test.ts |
 | — | Indisponibilité → replacement même jour ; séjour → exercices adaptés | Automatisé ✔ | tests/availability.test.ts, tests/trip.test.ts |
+| — | Repas écrit → kcal ; plat maison ; Open Food Facts ; courses | Automatisé ✔ (+ Open Food Facts réel ✔ dans le navigateur) | tests/kitchen.test.ts, tests/dayPlan.test.ts |
 | — | Caméra des preuves sur iPhone | **Non testé** | nécessite l'iPhone |
 
-Dernière exécution : 124 tests passés (`npm test`), 26/10/2026.
+Dernière exécution : 130 tests passés (`npm test`), 26/10/2026.

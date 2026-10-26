@@ -25,6 +25,12 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
   lumière du matin, dernier café, écrans coupés, coucher conseillé pour 8 h. Cocher l'eau remplit le compteur.
 - Imprévu de repas (plat préparé par quelqu'un, resto, fast-food, sandwich, sauté) : estimation + repas suivants recalculés.
 
+**Ma cuisine et courses**
+- Produits personnels : photo du code-barres (lu dans le téléphone, ZXing) → valeurs Open Food Facts (seul le code est envoyé), ou étiquette recopiée ; alias (« prot », « shaker »).
+- Plats maison : ingrédients + portions → valeurs par portion.
+- « J'ai mangé » : texte libre (« 3 œufs, 80 g d'avoine, 1 portion riz-poulet ») ou favoris → kcal/protéines, photo de l'assiette en option ; inconnu jamais deviné ; la journée se recalcule.
+- Liste de courses des 7 prochains jours depuis le plan (boîtes de 6 œufs, riz/pâtes en poids cru), par rayon, à cocher.
+
 **Agenda**
 - « Ma semaine » : travail, trajet, lever/coucher, engagements récurrents (ex. analyse Amazon), soirées, séjours avec matériel sur place.
 - Indisponibilité ponctuelle → séance/course replacée le même jour sur le créneau libre le plus proche.
@@ -36,12 +42,12 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Onboarding 13 étapes (zone sombre) ; formule de calcul dans le profil ; objectifs versionnés ; export/import complet.
 
 ## Testé
-- 124 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
+- 130 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
 - Navigateur de bureau (vue mobile) : accueil bleu, entretien programme complet → planning rempli, entretien nutrition jusqu'aux compléments,
   configuration sombre, fenêtre Calories.
 
 ## Non testé
-- Sur iPhone : caméra des preuves photo, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran.
+- Sur iPhone : caméra des preuves photo, lecture d'un vrai code-barres photographié, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran.
 - Plan du jour et « Ma semaine » affichés avec un vrai profil complet (testés par le moteur, pas encore à l'écran).
 
 ## Limites
