@@ -11,6 +11,9 @@ import {
   buildProgram,
   recDays,
   recIntensity,
+  recPriority,
+  ZONE_LABELS,
+  type Zone,
   recRuns,
   recStrictness,
   recWeeks,
@@ -119,7 +122,36 @@ const PAINS: Choice<Pain>[] = [
   { v: 'genoux', l: 'Genoux' },
 ];
 
+function ZonePick({ value, onChange }: { value: Zone[]; onChange: (v: Zone[]) => void }) {
+  return (
+    <div className="cq-grid">
+      {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
+        <button key={z} className="cq-opt" aria-pressed={value.includes(z)} onClick={() => onChange(value.includes(z) ? value.filter((x) => x !== z) : [...value, z])}>
+          <span className="cq-opt-l">{ZONE_LABELS[z]}</span>
+        </button>
+      ))}
+      <button className="cq-opt" aria-pressed={value.length === 0} onClick={() => onChange([])}>
+        <span className="cq-opt-l">Aucune</span>
+      </button>
+    </div>
+  );
+}
+
 const STEPS: Step[] = [
+  {
+    id: 'fat',
+    calm: 'Où le gras te gêne-t-il ?',
+    say: 'Ton corps, sans filtre. Où le gras te gêne ? Je te dirai la vérité sur ce qu’on peut faire.',
+    done: () => true,
+    render: (a, set) => <ZonePick value={a.fatZones ?? []} onChange={(v) => set({ fatZones: v })} />,
+  },
+  {
+    id: 'muscle',
+    calm: 'Quelles zones veux-tu muscler en priorité ?',
+    say: 'Et là où tu veux du muscle en plus ?',
+    done: () => true,
+    render: (a, set) => <ZonePick value={a.muscleZones ?? []} onChange={(v) => set({ muscleZones: v })} />,
+  },
   {
     id: 'priority',
     calm: 'Choisis une priorité pour ce bloc : c’est elle qui guide le programme.',
@@ -129,6 +161,7 @@ const STEPS: Step[] = [
       <Choices
         value={a.priority}
         onPick={(v) => set({ priority: v })}
+        rec={recPriority(a)}
         options={[
           { v: 'force', l: 'Force', sub: 'Tractions et dips lestés plus lourds' },
           { v: 'muscle', l: 'Muscle', sub: 'Prendre du volume' },
@@ -617,7 +650,7 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
             <Dumbbell size={16} aria-hidden="true" />
           </span>
           <div className="grow">
-            <p className="eyebrow">Entretien · 18 questions</p>
+            <p className="eyebrow">Entretien · {STEPS.length} questions</p>
             <p className="row-title">Construire mon programme</p>
           </div>
           <ChevronRight size={18} aria-hidden="true" />

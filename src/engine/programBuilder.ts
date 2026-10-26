@@ -11,8 +11,25 @@ export type Pain = 'epaules' | 'coudes' | 'poignets' | 'dos' | 'genoux';
 export type Slot = 'matin' | 'midi' | 'soir';
 export type QuitReason = 'ennui' | 'fatigue' | 'temps' | 'douleur' | 'motivation';
 export type RunGoal = 'base' | '5k' | '10k';
+export type Zone = 'ventre' | 'hanches' | 'cuisses' | 'fessiers' | 'bras' | 'poitrine' | 'dos' | 'epaules_z';
+
+export const ZONE_LABELS: Record<Zone, string> = {
+  ventre: 'Ventre',
+  hanches: 'Hanches / poignées',
+  cuisses: 'Cuisses',
+  fessiers: 'Fessiers',
+  bras: 'Bras',
+  poitrine: 'Pectoraux',
+  dos: 'Dos',
+  epaules_z: 'Épaules',
+};
+const LOWER: Zone[] = ['cuisses', 'fessiers', 'hanches'];
 
 export interface ProgramAnswers {
+  /** Zones où le gras gêne (perte globale, jamais localisée). */
+  fatZones?: Zone[];
+  /** Zones à muscler en priorité. */
+  muscleZones?: Zone[];
   priority?: Priority;
   /** Tests : null = « je ne sais pas » (testé en semaine 1). */
   maxPullups?: number | null;
@@ -40,6 +57,16 @@ export interface Rec<T> {
 }
 
 const poorRecovery = (a: ProgramAnswers) => (a.sleepH !== undefined && a.sleepH < 6.5) || a.stress === 'eleve' || a.physicalJob === true;
+
+/** Priorité conseillée d'après les zones déclarées. Pas de perte localisée : on agit sur le gras global + le muscle de la zone. */
+export function recPriority(a: ProgramAnswers): Rec<Priority> | undefined {
+  const fat = a.fatZones ?? [];
+  const muscle = a.muscleZones ?? [];
+  if (fat.length && muscle.length) return { value: 'hybride', why: 'Tu veux perdre du gras ET construire du muscle : force + course + léger déficit. La graisse ne part pas d’une zone précise, elle baisse partout ; le muscle, lui, se construit là où tu travailles.' };
+  if (fat.length) return { value: 'seche', why: 'Le gras des cuisses ou du ventre ne fond pas en travaillant la zone : il baisse partout grâce au déficit, aux pas et à la course. On garde la force pour que la zone se redessine.' };
+  if (muscle.length) return { value: 'muscle', why: 'Construire du muscle sur tes zones : volume, progression de charge et assez de calories.' };
+  return undefined;
+}
 
 export function recIntensity(a: ProgramAnswers): Rec<Intensity> {
   if (poorRecovery(a)) {
@@ -200,6 +227,9 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   const kbs = [...kettlebells].sort((x, y) => x - y);
   const kb = kbs[kbs.length - 1] ?? 12; // la plus lourde pour les jambes et le tirage
   if (!legsOk) notes.push('Genoux : pas de squat bulgare ni de fentes.');
+  const lowerFocus = [...(a.fatZones ?? []), ...(a.muscleZones ?? [])].some((z) => LOWER.includes(z));
+  if ((a.fatZones ?? []).length) notes.push('Gras localisé : la perte se fait partout (déficit + pas + course), jamais sur une seule zone. Mesure le tour de la zone chaque semaine.');
+  if (lowerFocus) notes.push('Bas du corps prioritaire : pont fessier et swings ajoutés à la séance Jambes.');
   if (!backOk) notes.push('Dos : pas de swing ni de soulevé de terre.');
 
   const A: GenTemplate = {
@@ -214,6 +244,8 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
       main('squat-goblet-kb', { loadKg: kb, targetReps: Math.max(s.main.reps, 8) }),
       ...(legsOk ? [acc('split-squat-bulgarian', { cue: 'Par jambe' })] : []),
       ...(backOk ? [acc(a.priority === 'seche' ? 'kb-swing-2h' : 'kb-rdl', { loadKg: kb, targetReps: a.priority === 'seche' ? 15 : 10 })] : []),
+      ...(lowerFocus && backOk ? [acc('glute-bridge-kb', { loadKg: kb, targetReps: 12, cue: 'Pause 1 s en haut' })] : []),
+      ...(lowerFocus && backOk && a.priority !== 'seche' ? [acc('kb-swing-2h', { loadKg: kb, targetReps: 15, sets: 4, restSeconds: 45, cue: 'Explosif, cardio' })] : []),
       { variantId: 'hollow-hold', kind: 'hold', role: 'work', sets: 3, targetSeconds: 30, restSeconds: 45 },
     ],
   };

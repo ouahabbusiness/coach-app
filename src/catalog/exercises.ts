@@ -382,6 +382,24 @@ export const EXERCISES: Exercise[] = [
       },
     ],
   },
+  {
+    id: 'glute-bridge',
+    name: 'Pont fessier',
+    category: 'jambes',
+    reviewStatus: 'non_relu',
+    variants: [
+      {
+        id: 'glute-bridge-kb',
+        name: 'Pont fessier avec kettlebell',
+        kind: 'reps',
+        level: 1,
+        equipment: ['kettlebell', 'tapis'],
+        cues: ['Kettlebell sur les hanches, tenue à deux mains', 'Pousser par les talons, serrer les fessiers en haut 1 s'],
+        commonErrors: ['Cambrer le bas du dos au lieu de monter avec les hanches'],
+        media: [],
+      },
+    ],
+  },
 ];
 
 export function findVariant(variantId: string): { exercise: Exercise; variant: Variant } | undefined {

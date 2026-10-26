@@ -1,7 +1,7 @@
 // Données de test fictives.
 import { describe, expect, it } from 'vitest';
 import { availableLoads, DEFAULT_PIECES } from '../src/engine/progression';
-import { buildProgram, recDays, recIntensity, recStrictness, type ProgramAnswers } from '../src/engine/programBuilder';
+import { buildProgram, recDays, recIntensity, recPriority, recStrictness, type ProgramAnswers } from '../src/engine/programBuilder';
 import { findVariant } from '../src/catalog/exercises';
 
 const loads = availableLoads(DEFAULT_PIECES);
@@ -61,5 +61,15 @@ describe('programme', () => {
     expect(last.some((x) => x.templateKey === 'T')).toBe(true);
     expect(last.some((x) => x.title.includes('test 5 km chrono'))).toBe(true);
     expect(p.templates.some((t) => t.key === 'T')).toBe(true);
+  });
+
+  it('gras sur cuisses/fessiers : sèche conseillée sans promettre de perte localisée, bas du corps renforcé', () => {
+    const a = { ...base, fatZones: ['cuisses' as const, 'fessiers' as const] };
+    expect(recPriority(a)).toMatchObject({ value: 'seche' });
+    expect(recPriority(a)!.why).toContain('ne fond pas');
+    const p = buildProgram({ ...a, priority: 'seche', minutes: 75 }, loads);
+    const b = p.templates.find((t) => t.key === 'B')!;
+    expect(b.lines.some((l) => l.variantId === 'glute-bridge-kb')).toBe(true);
+    expect(p.notes.join(' ')).toContain('jamais sur une seule zone');
   });
 });

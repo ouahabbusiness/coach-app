@@ -11,6 +11,7 @@ import { addWater, daysUntil } from '../engine/daily';
 import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
 import { RunModal, WhyModal, useTargets } from './Targets';
+import { NextStepCard } from './Nutrition';
 import { useReading } from './Reading';
 import { localDay } from '../engine/derive';
 import { estimateMinutes } from '../engine/disruption';
@@ -343,6 +344,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           </button>
         )}
       </section>
+
+      <NextStepCard repo={repo} go={go} />
 
       <section className={`ui-card list-row run-row ${targets.ranToday ? 'done' : ''}`} aria-label="Course">
         <button className="icon-chip accent" onClick={() => setWhy('run')} aria-label="Pourquoi cette distance">

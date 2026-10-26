@@ -7,6 +7,7 @@ import { SessionScreen } from './SessionScreen';
 import { Settings } from './Settings';
 import { Challenge } from './Challenge';
 import { WeightCard } from './Weight';
+import { MeasuresCard } from './Measures';
 import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
@@ -18,6 +19,7 @@ import { BootOverlay } from './BootOverlay';
 import { ArcPage } from './ArcPage';
 import { Reading } from './Reading';
 import { CoachHome, CoachProgram } from './CoachProgram';
+import { NutritionPage, NutritionSetup } from './Nutrition';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -36,6 +38,7 @@ export type Route =
   | { name: 'arc' }
   | { name: 'reading' }
   | { name: 'coachProgram' }
+  | { name: 'nutritionSetup' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -55,7 +58,7 @@ export function App() {
   const { mode: winterMode } = useWinterMode(repo);
   const winterOn = winterInfo(winterMode, localDay(Date.now(), deviceTimeZone()), winterForced()).active;
   // Zone sombre uniquement pendant l'entraînement (et sur la page Winter Arc) ; ailleurs, thème clair (bleu en novembre).
-  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding' || route.name === 'coachProgram';
+  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding' || route.name === 'coachProgram' || route.name === 'nutritionSetup';
   useEffect(() => {
     if (zone) document.documentElement.dataset.theme = 'zone';
     else if (winterOn) document.documentElement.dataset.theme = 'winter';
@@ -94,6 +97,7 @@ export function App() {
   if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;
   if (route.name === 'reading') return <Reading repo={repo} go={go} />;
   if (route.name === 'coachProgram') return <CoachProgram repo={repo} go={go} />;
+  if (route.name === 'nutritionSetup') return <NutritionSetup repo={repo} go={go} />;
 
   if (route.name === 'session') {
     const id = route.id;
@@ -122,13 +126,7 @@ export function App() {
       <main className="content" key={route.name}>
         {route.name === 'today' && <Today repo={repo} go={go} night={day} />}
         {route.name === 'program' && <Program repo={repo} go={go} />}
-        {route.name === 'nutrition' && (
-          <>
-            <h1>Nutrition</h1>
-            <NotBuilt title="Journal alimentaire" phase="phase 2">
-            </NotBuilt>
-          </>
-        )}
+        {route.name === 'nutrition' && <NutritionPage repo={repo} go={go} />}
         {route.name === 'progress' && <Progress repo={repo} go={go} />}
         {route.name === 'coach' && <CoachHome repo={repo} go={go} />}
         {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}
@@ -165,6 +163,7 @@ function Progress({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
     <>
       <h1>Progression</h1>
       <WeightCard repo={repo} />
+      <MeasuresCard repo={repo} />
       <div className="card">
         <h2>Historique des séances</h2>
         {rows === null && <p>Chargement…</p>}

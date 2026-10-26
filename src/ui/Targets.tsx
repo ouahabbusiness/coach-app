@@ -14,6 +14,16 @@ import { deviceTimeZone, newId } from './support';
 const SEX = 'targets.sex';
 const RUNS = 'run.log';
 
+/** Objectif calorique déduit du programme validé avec le coach (sèche → déficit, muscle → surplus, gras + muscle → recomposition). */
+function programGoal(p?: { answers: { priority?: string; fatZones?: string[] } }): Parameters<typeof calorieTarget>[0]['goal'] {
+  const pr = p?.answers.priority;
+  if (!pr) return undefined;
+  if (pr === 'seche') return 'perte_de_graisse';
+  if (pr === 'muscle') return 'muscle';
+  if ((p.answers.fatZones ?? []).length) return 'recomposition';
+  return undefined;
+}
+
 export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: number) {
   const today = localDay(Date.now(), deviceTimeZone());
   const [sex, setSexState] = useState<FormulaSex | undefined>();
@@ -32,7 +42,7 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
         heightCm: a.body.heightCm.value,
         weightKg: a.body.weightKg.value,
         spw: a.sleep.sessionsPerWeek,
-        goal: goals[goals.length - 1]?.main ?? a.goal.main,
+        goal: programGoal(await repo.getKv<{ answers: { priority?: string; fatZones?: string[] } }>('program.current')) ?? goals[goals.length - 1]?.main ?? a.goal.main,
       });
     })();
   }, [repo]);
