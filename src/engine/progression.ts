@@ -130,3 +130,29 @@ export function liveLoad(st: SessionState, set: PlannedSet, loads: number[] = []
   if (base !== undefined && base !== set.loadKg) return { loadKg: base, reason: 'suite' };
   return undefined;
 }
+
+export interface LightLoad {
+  variantId: string;
+  loadKg?: number;
+  reps: number;
+  /** Charge réalisable au-dessus, si elle existe. */
+  next?: number;
+  why: string;
+}
+
+/**
+ * Charge trop légère pour l'objectif muscle/force, d'après les séries de travail réalisées.
+ * Repère : une charge légère construit du muscle seulement si on va très près de l'échec ;
+ * ≥ 20 répétitions avec ≥ 2 de réserve = endurance ; ≥ 30 répétitions = inefficace dans tous les cas.
+ */
+export function lightLoad(variantId: string, results: SetResult[], loads: number[]): LightLoad | undefined {
+  const reps = results.map((r) => r.reps ?? 0);
+  if (!reps.length) return undefined;
+  const avg = Math.round(reps.reduce((a, b) => a + b, 0) / reps.length);
+  const reserve = results.every((r) => (r.rir ?? 2) >= 2);
+  if (avg < 20 || (avg < 30 && !reserve)) return undefined;
+  const load = results.reduce<number | undefined>((m, r) => (r.loadKg !== undefined ? Math.max(m ?? 0, r.loadKg) : m), undefined);
+  const next = load !== undefined ? loadUp(load, loads) : loads.find((l) => l > 0);
+  const where = next !== undefined ? `Passe à ${next.toLocaleString('fr-BE')} kg.` : 'Tu es au maximum de ton matériel : regarde le matériel conseillé.';
+  return { variantId, loadKg: load, reps: avg, next, why: `${avg} répétitions${reserve ? ' avec de la réserve' : ''} : c’est de l’endurance, pas du muscle. Vise 6 à 15 répétitions difficiles. ${where}` };
+}

@@ -89,3 +89,15 @@ describe('liste de courses', () => {
     expect(list.some((l) => l.foodId === 'legumes')).toBe(true);
   });
 });
+
+describe('routine calée sur les prières', () => {
+  it('lever 10 min avant Fajr, 5 prières dans la frise, aucun repas à l’heure d’une prière', () => {
+    const times = { fajr: '05:35', sunrise: '07:25', dhuhr: '12:29', asr: '14:59', maghrib: '17:29', isha: '19:14' };
+    const p = buildDayPlan({ answers: { ...answers, bedtime: '22:30' }, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 0, prayers: { times, wakeAtFajr: true } });
+    expect(p.find((e) => e.id === 'reveil')!.time).toBe('05:25');
+    expect(p.filter((e) => e.kind === 'priere')).toHaveLength(5);
+    const meals = p.filter((e) => e.kind === 'repas').map((e) => e.time);
+    for (const t of Object.values(times)) for (const m of meals) expect(m === t).toBe(false);
+    expect(p.find((e) => e.id === 'dejeuner')!.time).toBe('12:44');
+  });
+});

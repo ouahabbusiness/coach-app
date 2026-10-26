@@ -7,6 +7,8 @@ export interface DailyMetrics {
   waterMl?: number;
   /** Calories actives affichées par la montre. Jamais converties en « crédit » alimentaire. */
   activeKcal?: number;
+  /** Pas du tapis de marche (affichés par le tapis), en plus de la montre qui les compte mal mains posées. */
+  treadmillSteps?: number;
   /** Pages lues ce jour, calculées depuis le journal de lecture. */
   readPages?: number;
   updatedAt: number;
@@ -29,7 +31,7 @@ export function challengeValues(
 ): Record<string, boolean | number> {
   const v = { ...(entryValues ?? {}) };
   if (daily?.sleepH !== undefined) v.sleep = daily.sleepH;
-  if (daily?.steps !== undefined) v.steps = daily.steps;
+  if (daily?.steps !== undefined || daily?.treadmillSteps !== undefined) v.steps = (daily?.steps ?? 0) + (daily?.treadmillSteps ?? 0);
   // Lecture : coche automatique à partir de 10 pages notées ; ne décoche jamais une case cochée à la main.
   if ((daily?.readPages ?? 0) >= 10) v.read = true;
   return v;

@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Download, Upload, X } from 'lucide-react';
 import { availableLoads } from '../engine/progression';
 import { loadKettlebells, loadPieces, saveKettlebells, savePieces } from './equipment';
+import { timesFor, usePrayer } from './prayerStore';
+import { deviceTimeZone } from './support';
+import { localDay } from '../engine/derive';
+import { DEFAULT_PRAYER, PRAYER_LABELS } from '../engine/prayer';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
 import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
@@ -77,6 +81,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
       <WinterCard repo={repo} />
 
       <LoadCard repo={repo} />
+
+      <PrayerCard repo={repo} />
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
@@ -310,6 +316,67 @@ function LoadCard({ repo }: { repo: Repository }) {
         Lest possible : {loads.map((l) => l.toLocaleString('fr-BE')).join(' · ')} kg
       </p>
       <WeightsEditor label="Kettlebells" values={kbs} onSave={async (v) => (await saveKettlebells(repo, v), setKbs(v))} />
+    </div>
+  );
+}
+
+/** Prières : heures calculées sur le téléphone, routine et planning calés dessus. */
+function PrayerCard({ repo }: { repo: Repository }) {
+  const { settings: s, save } = usePrayer(repo);
+  const [locating, setLocating] = useState(false);
+  if (!s) return null;
+  const today = localDay(Date.now(), deviceTimeZone());
+  const t = timesFor(today, s);
+  const keys = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+  return (
+    <div className="card stack">
+      <div className="spread">
+        <h2 style={{ margin: 0 }}>Prières</h2>
+        <button className="chip" aria-pressed={s.enabled} onClick={() => save({ ...s, enabled: !s.enabled })}>
+          {s.enabled ? 'Activé' : 'Désactivé'}
+        </button>
+      </div>
+      <div className="prayer-grid num">
+        {keys.map((k) => (
+          <div key={k} className="prayer-cell">
+            <span className="kpi-label">{PRAYER_LABELS[k]}</span>
+            <strong>{t[k]}</strong>
+            <div className="prayer-adj">
+              <button aria-label={`${PRAYER_LABELS[k]} −1 min`} onClick={() => save({ ...s, adjust: { ...s.adjust, [k]: (s.adjust[k] ?? 0) - 1 } })}>−</button>
+              <small>{(s.adjust[k] ?? 0) > 0 ? '+' : ''}{s.adjust[k] ?? 0}</small>
+              <button aria-label={`${PRAYER_LABELS[k]} +1 min`} onClick={() => save({ ...s, adjust: { ...s.adjust, [k]: (s.adjust[k] ?? 0) + 1 } })}>+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+        {s.place} · Ligue islamique mondiale · ajuste ± 1 min pour coller à l’app de ta mosquée
+      </p>
+      <div className="row" style={{ gap: 6 }}>
+        <button
+          className="btn sm"
+          disabled={locating}
+          onClick={() => {
+            setLocating(true);
+            navigator.geolocation?.getCurrentPosition(
+              (p) => {
+                save({ ...s, lat: Math.round(p.coords.latitude * 1000) / 1000, lon: Math.round(p.coords.longitude * 1000) / 1000, place: 'Ma position' });
+                setLocating(false);
+              },
+              () => setLocating(false),
+            );
+          }}
+        >
+          {locating ? 'Localisation…' : 'Utiliser ma position (vacances)'}
+        </button>
+        <button className="btn sm ghost" onClick={() => save({ ...s, lat: DEFAULT_PRAYER.lat, lon: DEFAULT_PRAYER.lon, place: DEFAULT_PRAYER.place })}>
+          Alost
+        </button>
+      </div>
+      <button className="chip" aria-pressed={s.wakeAtFajr} onClick={() => save({ ...s, wakeAtFajr: !s.wakeAtFajr })} style={{ alignSelf: 'flex-start' }}>
+        Lever 10 min avant Fajr
+      </button>
+      <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Calcul sur le téléphone (aucune donnée envoyée). Chaque prière bloque {s.blockMin} min dans le planning.</p>
     </div>
   );
 }

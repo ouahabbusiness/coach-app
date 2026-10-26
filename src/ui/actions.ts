@@ -1,6 +1,6 @@
 import { decide, project } from '../engine/session';
 import { currentResult } from '../engine/derive';
-import { nextSessionAdjust } from '../engine/progression';
+import { lightLoad, nextSessionAdjust, type LightLoad } from '../engine/progression';
 import { loadEquipment, loadsFor } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
 import { EXERCISES } from '../catalog/exercises';
@@ -58,4 +58,12 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       return { ...set, loadKg: a.loadKg ?? set.loadKg, targetReps: a.targetReps ?? set.targetReps, progression: a.note };
     }),
   };
+}
+
+/** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */
+export async function lightLoadsReport(repo: Repository): Promise<LightLoad[]> {
+  const states = [...(await repo.allSessionEvents()).values()].map((ev) => project(ev)).filter((s): s is SessionState => s !== null);
+  const eq = await loadEquipment(repo);
+  const variants = [...new Set(states.flatMap((s) => s.sets.filter((x) => x.planned.role === 'work' && x.planned.kind === 'reps').map((x) => x.planned.variantId)))];
+  return variants.map((v) => lightLoad(v, lastWork(states, v) ?? [], loadsFor(v, eq))).filter((x): x is LightLoad => !!x);
 }

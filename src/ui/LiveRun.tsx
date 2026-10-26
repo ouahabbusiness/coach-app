@@ -289,6 +289,12 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
                 {voice ? <Volume2 size={14} aria-hidden="true" /> : <VolumeX size={14} aria-hidden="true" />} Annonces vocales
               </span>
             </button>
+            <button className="cq-opt" onClick={() => go({ name: 'spots' })}>
+              <span className="cq-opt-l">
+                <MapPin size={14} aria-hidden="true" /> Spots autour de moi
+              </span>
+              <span className="cq-opt-sub">Parcs, pistes, street workout</span>
+            </button>
             <p className="cq-warn">
               <MapPin size={14} aria-hidden="true" /> L’écran reste allumé : sur iPhone, une app web perd le GPS écran verrouillé.
             </p>

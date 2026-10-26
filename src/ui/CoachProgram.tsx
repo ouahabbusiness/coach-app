@@ -2,7 +2,7 @@
 // Ton ferme « Winter Arc » ; le coach n'est pas une vraie personne et ne se présente pas comme telle.
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CalendarCheck, ChevronLeft, ChevronRight, Dumbbell, Footprints, ShieldAlert } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Dumbbell, Footprints, MapPin, ShieldAlert } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { localDay } from '../engine/derive';
 import { DAY_NAMES, shiftWeek, type PlannedItem } from '../engine/planning';
@@ -27,6 +27,8 @@ import type { Repository } from '../storage/db';
 import { loadKettlebells, loadOwned, loadPieces } from './equipment';
 import { adaptToEquipment } from '../engine/trip';
 import { fitPlanning } from './agenda';
+import { lightLoadsReport } from './actions';
+import type { LightLoad } from '../engine/progression';
 import { loadPlanning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { deviceTimeZone, newId } from './support';
@@ -632,6 +634,10 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   useEffect(() => {
     loadProgram(repo).then((v) => setP(v ?? null));
   }, [repo]);
+  const [light, setLight] = useState<LightLoad[]>([]);
+  useEffect(() => {
+    lightLoadsReport(repo).then(setLight);
+  }, [repo]);
   if (p === undefined) return null;
   return (
     <>
@@ -671,6 +677,35 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       )}
+      {light.length > 0 && (
+        <section className="ui-card stack light-card" aria-label="Charges trop légères" style={{ marginTop: 10 }}>
+          <p className="eyebrow" style={{ margin: 0 }}>Coach · charges trop légères</p>
+          {light.map((l) => (
+            <div key={l.variantId}>
+              <p className="row-title" style={{ margin: 0 }}>
+                {findVariant(l.variantId)?.variant.name ?? l.variantId}
+                {l.loadKg ? ` · ${l.loadKg} kg` : ''}
+              </p>
+              <p className="muted" style={{ margin: '2px 0 0', fontSize: '0.85rem' }}>{l.why}</p>
+            </div>
+          ))}
+          {light.some((l) => l.next === undefined) && (
+            <button className="btn primary sm" onClick={() => go({ name: 'gear' })} style={{ alignSelf: 'flex-start' }}>
+              Matériel conseillé
+            </button>
+          )}
+        </section>
+      )}
+      <button className="ui-card list-row" onClick={() => go({ name: 'spots' })} style={{ marginTop: 10 }}>
+        <span className="icon-chip accent">
+          <MapPin size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Autour de moi · vacances</p>
+          <p className="row-title">Spots : street workout, pistes, parcs</p>
+        </div>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
       <button className="ui-card list-row" onClick={() => go({ name: 'gear' })} style={{ marginTop: 10 }}>
         <span className="icon-chip accent">
           <Dumbbell size={16} aria-hidden="true" />

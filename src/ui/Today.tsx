@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Pencil, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Sunset, Pencil, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -12,6 +12,8 @@ import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
 import { RunModal, WhyModal, useTargets } from './Targets';
 import { NextStepCard } from './Nutrition';
+import { timesFor, usePrayer } from './prayerStore';
+import { nextPrayer, PRAYER_LABELS } from '../engine/prayer';
 import { useReading } from './Reading';
 import { localDay } from '../engine/derive';
 import { estimateMinutes } from '../engine/disruption';
@@ -29,7 +31,7 @@ import type { Route } from './App';
 
 const STEPS_GOAL = 10000; // objectif du défi de novembre (choisi par Hmidou)
 
-type Field = 'sleepH' | 'steps' | 'activeKcal';
+type Field = 'sleepH' | 'steps' | 'activeKcal' | 'treadmillSteps';
 
 function Kpi({
   icon,
@@ -184,6 +186,7 @@ const fmtHours = (h: number) => `${Math.floor(h)}h${String(Math.round((h % 1) * 
 const EDIT_META: Record<Field, { title: string; unit: string; hint: string; step: string }> = {
   sleepH: { title: 'Sommeil', unit: 'h', hint: 'Lu sur ta montre ou estimé par toi.', step: '0.25' },
   steps: { title: 'Pas', unit: 'pas', hint: 'Lu sur ta montre.', step: '100' },
+  treadmillSteps: { title: 'Tapis de marche', unit: 'pas', hint: 'Les pas affichés par le tapis (TicSports). La montre les compte mal quand tes mains sont sur le bureau.', step: '100' },
   activeKcal: { title: 'Calories actives', unit: 'kcal', hint: 'Lues sur ta montre. Ce n’est pas un crédit alimentaire.', step: '10' },
 };
 
@@ -255,6 +258,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   const challengeOn = today >= NOVEMBER_2026.start && today <= NOVEMBER_2026.end;
   const habitsDone = habits.done;
+  const { settings: prayer } = usePrayer(repo);
+  const nextP = prayer?.enabled ? nextPrayer(timesFor(today, prayer), new Date().toTimeString().slice(0, 5)) : undefined;
   const trainingMin = hero?.kind === 'planned' && hero.tpl ? hero.item.adapted?.estimatedMin ?? estimateMinutes(hero.tpl.lines) : hero?.kind === 'open' ? 60 : 0;
   const targets = useTargets(repo, weight.days, trainingMin);
   const waterL = targets.water.value;
@@ -275,6 +280,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           { icon: <Dumbbell size={13} aria-hidden="true" />, text: hero?.kind === 'open' ? 'En cours' : hero?.kind === 'planned' ? hero.item.start : 'Repos' },
           { icon: <Droplet size={13} aria-hidden="true" />, text: `${((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L` },
           { icon: <Footprints size={13} aria-hidden="true" />, text: daily?.steps !== undefined ? fmtNum(daily.steps) : '—' },
+          ...(nextP ? [{ icon: <Sunset size={13} aria-hidden="true" />, text: `${PRAYER_LABELS[nextP.name]} ${nextP.time}` }] : []),
         ]}
         winter={winter}
       />
@@ -386,11 +392,19 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         <Kpi
           icon={<Footprints size={16} aria-hidden="true" />}
           label="Pas"
-          onClick={() => openEditor('steps')}
-          value={daily?.steps !== undefined ? fmtNum(daily.steps) : '—'}
+          onLabel={() => openEditor('steps')}
+          value={daily?.steps !== undefined || daily?.treadmillSteps !== undefined ? fmtNum((daily?.steps ?? 0) + (daily?.treadmillSteps ?? 0)) : '—'}
           sub={`/ ${fmtNum(STEPS_GOAL)}`}
         >
-          <Meter value={(daily?.steps ?? 0) / STEPS_GOAL} />
+          <Meter value={((daily?.steps ?? 0) + (daily?.treadmillSteps ?? 0)) / STEPS_GOAL} />
+          <div className="row" style={{ gap: 6 }}>
+            <button className="pill" onClick={() => openEditor('steps')}>
+              <Watch size={12} aria-hidden="true" /> {daily?.steps !== undefined ? fmtNum(daily.steps) : 'montre'}
+            </button>
+            <button className="pill" onClick={() => openEditor('treadmillSteps')}>
+              + tapis{daily?.treadmillSteps ? ` ${fmtNum(daily.treadmillSteps)}` : ''}
+            </button>
+          </div>
         </Kpi>
 
         <Kpi

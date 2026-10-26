@@ -2,10 +2,11 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Moon, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
 import { Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
+import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
 import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
@@ -232,6 +233,7 @@ const ICON: Record<PlanEntry['kind'], React.ReactNode> = {
   complement: <Pill size={15} aria-hidden="true" />,
   seance: <Dumbbell size={15} aria-hidden="true" />,
   sommeil: <Moon size={15} aria-hidden="true" />,
+  priere: <Sunset size={15} aria-hidden="true" />,
   coucher: <Bed size={15} aria-hidden="true" />,
 };
 
@@ -244,6 +246,8 @@ export function useDayPlan(repo: Repository) {
   const [done, setDone] = useState<string[]>([]);
   const [eaten, setEatenState] = useState<Record<string, EatenMeal>>({});
   const targets = useTargets(repo, weight.days, workout?.durationMin ?? 0);
+  const { settings: prayer } = usePrayer(repo);
+  const prayers = prayer?.enabled ? { times: timesFor(today, prayer), wakeAtFajr: prayer.wakeAtFajr } : undefined;
 
   useEffect(() => {
     (async () => {
@@ -260,8 +264,8 @@ export function useDayPlan(repo: Repository) {
   const plan = useMemo(() => {
     if (!answers || !targets.calories.value || !targets.water.value) return undefined;
     const dayIndex = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
-    return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten });
-  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten]);
+    return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers });
+  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Imprévu : un repas remplacé par autre chose (estimation), les suivants sont recalculés. */
   const setEaten = useCallback(
@@ -413,7 +417,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       </button>
                     )}
                   </div>
-                  {e.kind !== 'seance' && e.kind !== 'coucher' && (
+                  {e.kind !== 'seance' && e.kind !== 'coucher' && e.kind !== 'priere' && (
                     <button className={`check ${isDone ? 'on' : ''}`} aria-pressed={isDone} aria-label={`${e.title} fait`} onClick={() => toggle(e)}>
                       {isDone ? <Check size={14} aria-hidden="true" /> : null}
                     </button>
@@ -566,7 +570,7 @@ export function NextStepCard({ repo, go }: { repo: Repository; go: (r: Route) =>
         </p>
         <p className="row-title">{next.items.join(' · ')}</p>
       </div>
-      {next.kind !== 'seance' && next.kind !== 'coucher' && (
+      {next.kind !== 'seance' && next.kind !== 'coucher' && next.kind !== 'priere' && (
         <button className="check" aria-label={`${next.title} fait`} onClick={() => toggle(next)} />
       )}
     </section>

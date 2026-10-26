@@ -37,6 +37,13 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Course GPS = preuve pour le défi (sans photo) ; saisie manuelle : photo facultative, sinon « déclarée ».
 - Matériel : inventaire, conseils d'achat notés pour toi (Game changer / Utile / Bonus, muscles, exercices débloqués, prix indicatifs), programme adapté au matériel possédé.
 
+**Journée, prières, spots**
+- Pesée du matin : plein écran à la première ouverture de la journée (« pas de balance aujourd'hui » avec raison).
+- Prières : calcul sur le téléphone (adhan, Ligue islamique mondiale, Alost par défaut ou position actuelle), ± minutes par prière pour coller à l'app de la mosquée ; créneaux bloqués dans le planning ; lever 10 min avant Fajr ; repas jamais sur une prière ; prochaine prière sur l'accueil.
+- Spots autour de moi (chez soi ou en vacances) : street workout, pistes, parcs (OpenStreetMap/Overpass, plan B Photon pour les parcs), itinéraire à pied dans Plans, « Courir ».
+- Charges trop légères signalées par le coach (≥ 20 rép. avec réserve, ≥ 30 rép.) avec la charge suivante ou le matériel conseillé.
+- Tapis de marche : pas du tapis ajoutés aux pas de la montre.
+
 **Agenda**
 - « Ma semaine » : travail, trajet, lever/coucher, engagements récurrents (ex. analyse Amazon), soirées, séjours avec matériel sur place.
 - Indisponibilité ponctuelle → séance/course replacée le même jour sur le créneau libre le plus proche.
@@ -48,7 +55,7 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Onboarding 13 étapes (zone sombre) ; formule de calcul dans le profil ; objectifs versionnés ; export/import complet.
 
 ## Testé
-- 141 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
+- 150 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
 - Navigateur de bureau (vue mobile) : accueil bleu, entretien programme complet → planning rempli, entretien nutrition jusqu'aux compléments,
   configuration sombre, fenêtre Calories.
 
@@ -57,6 +64,8 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Plan du jour et « Ma semaine » affichés avec un vrai profil complet (testés par le moteur, pas encore à l'écran).
 
 ## Limites
+- Notifications du matin : impossibles en web sans serveur ; prévues dans l'app native (notifications locales).
+- Serveurs publics Overpass parfois saturés : seuls les parcs s'affichent alors.
 - Valeurs nutritionnelles moyennes, imprévus de repas = ordres de grandeur. Aucune recommandation de complément.
 - Règles d'entraînement générales, **non relues par un professionnel** ; catalogue sans média.
 - Pas d'accès Apple Santé (fréquence cardiaque, Watch, balance) : nécessite l'app native (prochaine étape, xtool).

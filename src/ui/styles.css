@@ -1179,3 +1179,41 @@ textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid 
 body:has(.run-live.full) { background-image: none; }
 .run-live.full .run-board { min-height: calc(100dvh - 200px); }
 .run-live.full .run-board > .card { margin-top: auto; }
+
+/* Pesée du matin : plein écran */
+.weigh-gate { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  background: radial-gradient(700px 420px at 50% 0%, #dbe7ff 0%, rgb(246 246 244 / 0) 70%), var(--bg); animation: rise 360ms cubic-bezier(.2,.8,.2,1) both; }
+.weigh-eyebrow { margin: 0; display: inline-flex; gap: 6px; align-items: center; color: var(--text-2); font-weight: 600; text-transform: capitalize; }
+.weigh-title { margin: 0; font-size: 2.6rem; font-weight: 800; letter-spacing: -0.04em; }
+.weigh-input { display: flex; align-items: baseline; gap: 8px; }
+.weigh-input input { width: 220px; min-height: 110px; font-size: 5rem; font-weight: 800; text-align: center; letter-spacing: -0.04em; border: 2px solid var(--accent); border-radius: 22px; box-shadow: 0 0 0 6px var(--accent-soft); }
+.weigh-input span { font-size: 1.4rem; font-weight: 700; color: var(--text-2); }
+.weigh-last { margin: 0; color: var(--text-2); }
+.weigh-save { max-width: 320px; }
+.weigh-skip { border: 0; background: none; color: var(--text-2); font: 600 0.85rem var(--font-body); text-decoration: underline; cursor: pointer; min-height: 44px; }
+
+.prayer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.prayer-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.prayer-cell strong { font-size: 1.15rem; }
+.prayer-adj { display: flex; align-items: center; gap: 6px; }
+.prayer-adj button { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; cursor: pointer; }
+.prayer-adj small { min-width: 18px; text-align: center; color: var(--text-2); }
+
+.light-card { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+
+/* Spots : carte plein écran, liste en panneau */
+.spots { position: fixed; inset: 0; }
+.spots-map { position: absolute; inset: 0; z-index: 0; background: #e8edf5; }
+.spots-top { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; gap: 8px; align-items: center; padding: calc(env(safe-area-inset-top) + 10px) 12px 10px; }
+.spots-top .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.spots-top .chip, .spots-top .icon-btn { box-shadow: 0 2px 8px rgb(0 0 0 / 0.15); flex: none; }
+.spots-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; max-height: 46dvh; overflow-y: auto; background: var(--surface); border-radius: 20px 20px 0 0; padding: 14px 14px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 30px rgb(0 0 0 / 0.18); display: flex; flex-direction: column; gap: 8px; }
+.spots-list { list-style: none; margin: 0; padding: 0; }
+.spots-list li { display: flex; align-items: center; gap: 10px; min-height: 58px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.spots-list .grow { display: flex; flex-direction: column; }
+.spots-list small { color: var(--text-2); font-size: 0.75rem; }
+.spots-list small::first-letter { text-transform: uppercase; }
+.spot-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; color: #fff; }
+.spot-ico.k-street-workout { background: #f59e0b; }
+.spot-ico.k-piste { background: #ef4444; }
+.spot-ico.k-parc { background: #22c55e; }

@@ -6,7 +6,7 @@ import { Program } from './Program';
 import { SessionScreen } from './SessionScreen';
 import { Settings } from './Settings';
 import { Challenge } from './Challenge';
-import { WeightCard } from './Weight';
+import { WeighInGate, WeightCard } from './Weight';
 import { MeasuresCard } from './Measures';
 import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
@@ -24,6 +24,7 @@ import { AgendaPage } from './WeekSetup';
 import { KitchenPage } from './Kitchen';
 import { GearPage } from './Gear';
 import { LiveRun } from './LiveRun';
+import { SpotsPage } from './Spots';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -47,6 +48,7 @@ export type Route =
   | { name: 'kitchen' }
   | { name: 'gear' }
   | { name: 'run' }
+  | { name: 'spots' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -96,6 +98,7 @@ export function App() {
     <BackgroundProvider repo={repo}>
       <AppBackground phase={day.phase} />
       {render()}
+      {route.name !== 'session' && route.name !== 'onboarding' && route.name !== 'run' && <WeighInGate repo={repo} />}
     </BackgroundProvider>
   );
 
@@ -108,6 +111,7 @@ export function App() {
   if (route.name === 'nutritionSetup') return <NutritionSetup repo={repo} go={go} />;
   if (route.name === 'agenda') return <AgendaPage repo={repo} go={go} />;
   if (route.name === 'run') return <LiveRun repo={repo} go={go} />;
+  if (route.name === 'spots') return <SpotsPage go={go} />;
 
   if (route.name === 'session') {
     const id = route.id;

@@ -6,6 +6,7 @@ import { dateOf, fixedEventsFromAnswers, type FixedEvent, type PlannedItem } fro
 import { loadTemplates } from './templates';
 import type { Repository } from '../storage/db';
 import { loadOnboarding } from './profileStore';
+import { loadPrayer, withPrayers } from './prayerStore';
 
 const RECURRING = 'agenda.recurring';
 const ONE_OFFS = 'planning.oneoffs';
@@ -37,7 +38,8 @@ export async function loadTrips(repo: Repository): Promise<Trip[]> {
  * puis séances et courses replacées dans les trous (même jour). Retourne ce qui a changé.
  */
 export async function fitPlanning(repo: Repository, items: PlannedItem[], today: string): Promise<{ items: PlannedItem[]; notes: string[] }> {
-  const [templates, trips, fixed, oneOffs] = await Promise.all([loadTemplates(repo), loadTrips(repo), loadAllFixed(repo), loadOneOffs(repo)]);
+  const [templates, trips, fixed, baseOneOffs, prayer] = await Promise.all([loadTemplates(repo), loadTrips(repo), loadAllFixed(repo), loadOneOffs(repo), loadPrayer(repo)]);
+  const oneOffs = withPrayers(baseOneOffs, [...new Set(items.map((i) => dateOf(i.weekStart, i.day)))], prayer);
   const notes: string[] = [];
   let out = items.map((i) => {
     const date = dateOf(i.weekStart, i.day);

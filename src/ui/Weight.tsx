@@ -157,3 +157,64 @@ export function WeightCard({ repo }: { repo: Repository }) {
     </section>
   );
 }
+
+const SKIP = (day: string) => `weighin.skip.${day}`;
+
+/**
+ * Pesée du matin : à la première ouverture d'une nouvelle journée, l'écran entier demande le poids.
+ * On peut seulement dire « pas de balance aujourd'hui » avec une raison : rien n'est inventé, rien n'est puni.
+ */
+export function WeighInGate({ repo }: { repo: Repository }) {
+  const { days, add } = useWeightLog(repo);
+  const today = localDay(Date.now(), deviceTimeZone());
+  const [ready, setReady] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [fasting, setFasting] = useState(true);
+  const [why, setWhy] = useState(false);
+  useEffect(() => {
+    repo.getKv<string>(SKIP(today)).then((v) => {
+      setSkipped(!!v);
+      setReady(true);
+    });
+  }, [repo, today]);
+  const last = days[days.length - 1];
+  useEffect(() => {
+    if (last && !draft) setDraft(String(last.kg).replace('.', ','));
+  }, [last]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!ready || skipped || days.some((d) => d.day === today)) return null;
+  const kg = Number(draft.replace(',', '.'));
+  const valid = draft.trim() !== '' && isValidKg(kg);
+  return (
+    <div className="weigh-gate" role="dialog" aria-modal="true" aria-label="Pesée du matin">
+      <p className="weigh-eyebrow">
+        <Sunrise size={16} aria-hidden="true" /> {new Date().toLocaleDateString('fr-BE', { weekday: 'long', day: 'numeric', month: 'long' })}
+      </p>
+      <h1 className="weigh-title">Ton poids</h1>
+      <div className="weigh-input">
+        <input aria-label="Poids en kg" type="text" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus />
+        <span>kg</span>
+      </div>
+      {last && <p className="weigh-last num">Dernière pesée : {fmtKg(last.kg)} kg</p>}
+      <button className={`chip ${fasting ? 'on' : ''}`} aria-pressed={fasting} onClick={() => setFasting(!fasting)}>
+        <Sunrise size={14} aria-hidden="true" /> À jeun
+      </button>
+      <button className="btn primary big block weigh-save" disabled={!valid} onClick={() => valid && add(Math.round(kg * 10) / 10, 'mesuré', today, fasting)}>
+        Valider
+      </button>
+      {!why ? (
+        <button className="weigh-skip" onClick={() => setWhy(true)}>
+          Pas de balance aujourd’hui
+        </button>
+      ) : (
+        <div className="chips" style={{ justifyContent: 'center' }}>
+          {['Déplacement', 'Pas à jeun', 'Balance indisponible'].map((r) => (
+            <button key={r} className="chip" onClick={async () => (await repo.setKv(SKIP(today), r), setSkipped(true))}>
+              {r}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

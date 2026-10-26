@@ -74,7 +74,7 @@ export interface NutritionAnswers {
   cooking?: 'rapide' | 'normal';
 }
 
-export type PlanKind = 'eau' | 'repas' | 'complement' | 'seance' | 'sommeil' | 'coucher';
+export type PlanKind = 'eau' | 'repas' | 'complement' | 'seance' | 'sommeil' | 'coucher' | 'priere';
 
 export interface PlanEntry {
   id: string;
@@ -102,6 +102,8 @@ export interface DayPlanInput {
   workout?: { start: string; durationMin: number; title: string };
   /** Index du jour (0 = lundi) : fait tourner les aliments pour éviter la lassitude. */
   dayIndex: number;
+  /** Heures de prière du jour ; la routine du matin peut partir de Fajr. */
+  prayers?: { times: Record<'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha', string>; wakeAtFajr: boolean };
   /** Imprévus : repas réellement mangés à la place du plan (estimation). */
   eaten?: Record<string, EatenMeal>;
 }
@@ -179,7 +181,8 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const sp = (id: string) => scale[id]?.p ?? 1;
   const a = i.answers;
   const ok = (ids: string[]) => ids.filter((x) => !a.exclude.includes(x));
-  const wake = toMin(a.wake ?? '07:00');
+  // Lever : 10 min avant Fajr si la routine est calée sur la prière, sinon l'heure déclarée.
+  const wake = i.prayers?.wakeAtFajr ? toMin(i.prayers.times.fajr) - 10 : toMin(a.wake ?? '07:00');
   // Coucher après minuit : compté sur le lendemain (ex. 00:30 → 24:30).
   const bedRaw = toMin(a.bedtime ?? '23:00');
   const bed = bedRaw <= wake ? bedRaw + 1440 : bedRaw;
@@ -193,6 +196,10 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const proteinPer = i.proteinG / meals;
 
   out.push({ id: 'reveil', time: fromMin(wake), kind: 'eau', title: 'Réveil', items: ['Grand verre d’eau'], waterMl: 400 });
+  if (i.prayers) {
+    const L = { fajr: 'Fajr', dhuhr: 'Dohr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha' } as const;
+    for (const k of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const) out.push({ id: `priere-${k}`, time: i.prayers.times[k], kind: 'priere', title: L[k], items: ['Prière'] });
+  }
 
   const bfTime = wake + 30;
   const bf = meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
@@ -270,6 +277,15 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   out.push({ id: 'cafe', time: fromMin(Math.max(wake, bedTarget - 8 * 60)), kind: 'sommeil', title: 'Dernier café', items: ['Plus de caféine après : elle reste des heures dans le corps'] });
   out.push({ id: 'ecrans', time: fromMin(bedTarget - 45), kind: 'sommeil', title: 'Écrans coupés', items: ['Lumière tamisée, chambre fraîche (~18 °C) et sombre'] });
   out.push({ id: 'coucher', time: fromMin(bedTarget), kind: 'coucher', title: 'Au lit', items: [bedTarget < bed ? `Pour 8 h de sommeil (au lieu de ${a.bedtime})` : 'Même heure chaque soir, week-end compris'] });
+  // Repas qui tombent sur une prière : décalés juste après (15 min).
+  if (i.prayers) {
+    const pr = (['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map((k) => toMin(i.prayers!.times[k]));
+    for (const e of out) if (e.kind === 'repas') {
+      const t = toMin(e.time);
+      const hit = pr.find((p) => t >= p && t < p + 15);
+      if (hit !== undefined) e.time = fromMin(hit + 15);
+    }
+  }
   // Ordre de la journée : ce qui tombe après minuit passe à la fin.
   const key = (t: string) => (toMin(t) < wake - 60 ? toMin(t) + 1440 : toMin(t));
   return out.sort((x, y) => key(x.time) - key(y.time));

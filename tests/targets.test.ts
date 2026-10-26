@@ -102,3 +102,15 @@ describe('lest', () => {
     expect(nextSessionAdjust([{ reps: 12, rir: 3, loadKg: 6 }], { targetReps: 10, loadKg: 6 }, kbLoads)).toMatchObject({ loadKg: 12, targetReps: 10 });
   });
 });
+
+describe('charge trop légère', () => {
+  it('25 rép. avec réserve à 12 kg (KB max) → trop léger, renvoie au matériel ; 25 rép. à l’échec → OK', async () => {
+    const { lightLoad } = await import('../src/engine/progression');
+    const l = lightLoad('squat-goblet-kb', [{ reps: 25, rir: 3, loadKg: 12 }, { reps: 24, rir: 3, loadKg: 12 }], [6, 12]);
+    expect(l?.next).toBeUndefined();
+    expect(l?.why).toContain('matériel conseillé');
+    expect(lightLoad('squat-goblet-kb', [{ reps: 25, rir: 0, loadKg: 12 }], [6, 12])).toBeUndefined();
+    expect(lightLoad('pullup-weighted', [{ reps: 22, rir: 3, loadKg: 5 }], [0, 5, 6, 10, 11])?.next).toBe(6);
+    expect(lightLoad('x', [{ reps: 32, rir: 0 }], [])?.reps).toBe(32);
+  });
+});

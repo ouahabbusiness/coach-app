@@ -25,6 +25,7 @@ import { startSessionFromTemplate } from './actions';
 import { DisruptionPanel } from './Disruption';
 import { busy, replanDay, ONE_OFF_LABELS, type Move, type OneOff, type OneOffKind } from '../engine/availability';
 import { loadAllFixed, loadOneOffs, saveOneOffs } from './agenda';
+import { usePrayer, withPrayers } from './prayerStore';
 import { REASON_LABELS, type DisruptionReason } from '../engine/disruption';
 import type { Strictness } from '../engine/programBuilder';
 import type { Route } from './App';
@@ -70,6 +71,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
   const [oneOffs, setOneOffs] = useState<OneOff[]>([]);
   const [busyDraft, setBusyDraft] = useState<OneOff | null>(null);
   const [moved, setMoved] = useState<Move[]>([]);
+  const { settings: prayer } = usePrayer(repo);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
   const [sessions, setSessions] = useState<SessionSummaryRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -132,7 +134,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
     const list = [...oneOffs.filter((x) => x.id !== o.id), o];
     await saveOneOffs(repo, list);
     setOneOffs(list);
-    const r = replanDay(items, o.date, fixed ?? [], list, Date.now());
+    const r = replanDay(items, o.date, fixed ?? [], withPrayers(list, [o.date], prayer), Date.now());
     if (r.moves.length) await persist(r.items);
     setMoved(r.moves);
     setBusyDraft(null);
@@ -236,7 +238,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
               </button>
             </div>
 
-            <GapBar spans={busy(date, day, fixed ?? [], oneOffs)} items={dayItems} />
+            <GapBar spans={busy(date, day, fixed ?? [], withPrayers(oneOffs, [date], prayer))} items={dayItems} />
             {oneOffs.filter((o) => o.date === date).map((o) => (
               <button key={o.id} className="busy-chip" onClick={() => window.confirm(`Retirer « ${o.label} » ?`) && removeOneOff(o.id)}>
                 <CalendarX size={12} aria-hidden="true" /> {o.start}–{o.end} · {o.label}

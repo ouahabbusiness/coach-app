@@ -19,3 +19,11 @@ describe('données du jour', () => {
     expect(daysUntil('2026-11-02', '2026-11-01')).toBe(-1);
   });
 });
+
+describe('tapis de marche', () => {
+  it('pas du tapis ajoutés aux pas de la montre pour le défi', async () => {
+    const { challengeValues } = await import('../src/engine/daily');
+    expect(challengeValues({}, { steps: 6200, treadmillSteps: 4500, updatedAt: 0 }).steps).toBe(10700);
+    expect(challengeValues({}, { treadmillSteps: 3000, updatedAt: 0 }).steps).toBe(3000);
+  });
+});
