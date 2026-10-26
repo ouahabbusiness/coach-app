@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Camera, Check, Info, UserRound } from 'lucide-react';
 import { localDay } from '../engine/derive';
-import { calorieTarget, runTarget, waterTarget, type Computed, type FormulaSex, type RunEntry } from '../engine/targets';
-import { trend, type WeighIn } from '../engine/weight';
+import { calorieTarget, reviewCalories, runTarget, waterTarget, type CalorieAdjust, type Computed, type FormulaSex, type RunEntry, type Strategy } from '../engine/targets';
+import type { WeighIn } from '../engine/weight';
 import type { Repository } from '../storage/db';
 import { Modal } from './common';
 import { saveProof } from './Habits';
@@ -15,20 +15,25 @@ const SEX = 'targets.sex';
 const RUNS = 'run.log';
 
 /** Objectif calorique déduit du programme validé avec le coach (sèche → déficit, muscle → surplus, gras + muscle → recomposition). */
-function programGoal(p?: { answers: { priority?: string; fatZones?: string[] } }): Parameters<typeof calorieTarget>[0]['goal'] {
+/** Stratégie issue du programme validé avec le coach : muscle → développement, sèche → réduction, le reste → maintien (observation). */
+function programStrategy(p?: { answers: { priority?: string } }): Strategy | undefined {
   const pr = p?.answers.priority;
   if (!pr) return undefined;
-  if (pr === 'seche') return 'perte_de_graisse';
-  if (pr === 'muscle') return 'muscle';
-  if ((p.answers.fatZones ?? []).length) return 'recomposition';
-  return undefined;
+  return pr === 'muscle' ? 'développement' : pr === 'seche' ? 'réduction' : 'maintien';
 }
+
+const ADJUST = 'nutrition.adjust';
+const REVIEWED = 'nutrition.reviewedOn';
+/** Un seul bilan à la fois, même si plusieurs écrans utilisent les cibles. */
+let reviewLock: Promise<void> | null = null;
 
 export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: number) {
   const today = localDay(Date.now(), deviceTimeZone());
   const [sex, setSexState] = useState<FormulaSex | undefined>();
   const [runs, setRuns] = useState<RunEntry[]>([]);
-  const [profile, setProfile] = useState<{ age?: number; heightCm?: number; weightKg?: number; spw?: number; goal?: Parameters<typeof calorieTarget>[0]['goal'] }>({});
+  const [profile, setProfile] = useState<{ age?: number; heightCm?: number; weightKg?: number; spw?: number; goal?: Parameters<typeof calorieTarget>[0]['goal']; strategy?: Strategy }>({});
+  const [adjustments, setAdjustments] = useState<CalorieAdjust[]>([]);
+  const [review, setReview] = useState<{ reason: string; uncertain: boolean } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -42,8 +47,10 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
         heightCm: a.body.heightCm.value,
         weightKg: a.body.weightKg.value,
         spw: a.sleep.sessionsPerWeek,
-        goal: programGoal(await repo.getKv<{ answers: { priority?: string; fatZones?: string[] } }>('program.current')) ?? goals[goals.length - 1]?.main ?? a.goal.main,
+        goal: goals[goals.length - 1]?.main ?? a.goal.main,
+        strategy: programStrategy(await repo.getKv<{ answers: { priority?: string } }>('program.current')),
       });
+      setAdjustments((await repo.getKv<CalorieAdjust[]>(ADJUST)) ?? []);
     })();
   }, [repo]);
 
@@ -68,10 +75,31 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   // Poids : dernière pesée, sinon celui déclaré à l'onboarding.
   const weightKg = weights[weights.length - 1]?.kg ?? profile.weightKg;
   const water = waterTarget(weightKg, trainingMin);
-  const calories = calorieTarget({ sex, age: profile.age, heightCm: profile.heightCm, weightKg, sessionsPerWeek: profile.spw, goal: profile.goal, trend: trend(weights, today).status });
+  const calories = calorieTarget({ sex, age: profile.age, heightCm: profile.heightCm, weightKg, sessionsPerWeek: profile.spw, goal: profile.goal, strategy: profile.strategy, adjustments });
+
+  // Bilan calorique : une fois par jour ; un ajustement est SAUVEGARDÉ avant d'être affiché.
+  useEffect(() => {
+    const strat = calories.value?.strategy;
+    if (!strat || weights.length === 0) return;
+    if (reviewLock) return;
+    reviewLock = (async () => {
+      if ((await repo.getKv<string>(REVIEWED)) === today) return;
+      const last = adjustments[adjustments.length - 1]?.at;
+      const r = reviewCalories(strat, weights, today, last);
+      if (r.delta) {
+        const next = [...adjustments, { at: today, delta: r.delta, reason: r.reason }];
+        await repo.setKv(ADJUST, next);
+        setAdjustments(next);
+      }
+      await repo.setKv(REVIEWED, today);
+      setReview({ reason: r.reason, uncertain: r.uncertain });
+    })().finally(() => {
+      reviewLock = null;
+    });
+  }, [calories.value?.strategy, weights.length, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const run = runTarget(runs, today);
   const ranToday = runs.some((r) => r.day === today);
-  return { today, water, calories, run, runs, ranToday, sex, setSex, addRun };
+  return { today, water, calories, run, runs, ranToday, sex, setSex, addRun, review };
 }
 
 export type Targets = ReturnType<typeof useTargets>;

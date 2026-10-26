@@ -35,12 +35,30 @@ export interface CalorieInput {
   sessionsPerWeek?: number;
   goal?: GoalCategory;
   trend?: TrendStatus;
+  /** Stratégie issue du programme validé (prioritaire sur l'objectif de configuration). */
+  strategy?: Strategy;
+  /** Ajustements décidés par les bilans précédents. */
+  adjustments?: CalorieAdjust[];
 }
 
 export interface CalorieTarget {
   kcal: number;
   proteinG: number;
+  fatG: number;
+  carbG: number;
   maintenance: number;
+  strategy: Strategy;
+  /** Ajustements cumulés issus des bilans (kcal). */
+  adjusted: number;
+}
+
+/** Stratégie validée : développement (surplus), réduction (déficit), maintien (observation). */
+export type Strategy = 'développement' | 'réduction' | 'maintien';
+
+export interface CalorieAdjust {
+  at: string;
+  delta: number;
+  reason: string;
 }
 
 /** Facteur d'activité selon les séances par semaine (barème classique Harris-Benedict / Mifflin). */
@@ -51,7 +69,16 @@ export function activityFactor(sessionsPerWeek = 0): number {
   return 1.2;
 }
 
-/** Calories du jour : Mifflin-St Jeor × activité, ajustées à l'objectif puis à la tendance du poids. */
+const strategyOf = (i: CalorieInput): Strategy =>
+  i.strategy ?? (i.goal === 'perte_de_graisse' ? 'réduction' : i.goal === 'muscle' ? 'développement' : 'maintien');
+
+/**
+ * Cible du jour = estimation provisoire, puis corrigée par les bilans (jamais par une pesée isolée).
+ * Réglages de départ (choix de conception à valider, pas des prescriptions) :
+ *  développement +5 % du maintien estimé ; réduction −12 % ; maintien = observation.
+ * Protéines : 1,8 g/kg (2,0 en réduction pour protéger le muscle), dans la plage 1,6–2,2 g/kg.
+ * Lipides ≥ 0,8 g/kg ; glucides = le reste.
+ */
 export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   const missing: string[] = [];
   if (!i.sex) missing.push('formule');
@@ -62,26 +89,49 @@ export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   const bmr = 10 * i.weightKg! + 6.25 * i.heightCm! - 5 * i.age! + (i.sex === 'homme' ? 5 : -161);
   const factor = activityFactor(i.sessionsPerWeek);
   const maintenance = bmr * factor;
-  const why = [`Mifflin-St Jeor ${Math.round(bmr)} kcal`, `× ${fmt(factor, 3)} (${i.sessionsPerWeek ?? 0} séances/sem.)`];
+  const strategy = strategyOf(i);
+  const why = [`Mifflin-St Jeor ${Math.round(bmr)} kcal`, `× ${fmt(factor, 3)} (${i.sessionsPerWeek ?? 0} séances/sem.) = maintien estimé`];
+  const pct = strategy === 'développement' ? 0.05 : strategy === 'réduction' ? -0.12 : 0;
+  if (pct) why.push(`${strategy} : ${pct > 0 ? '+' : '−'}${Math.round(Math.abs(pct) * 100)} %`);
+  else why.push('maintien : observation avant de décider');
+  const adjusted = (i.adjustments ?? []).reduce((t, a) => t + a.delta, 0);
+  for (const a of i.adjustments ?? []) why.push(`${a.delta > 0 ? '+' : '−'} ${Math.abs(a.delta)} kcal (${a.at}) : ${a.reason}`);
+  const kcal = roundTo(maintenance * (1 + pct) + adjusted, 50);
+  const perKg = strategy === 'réduction' ? 2.0 : 1.8;
+  const proteinG = Math.round(perKg * i.weightKg!);
+  const fatG = Math.round(Math.max(0.8 * i.weightKg!, (kcal * 0.25) / 9));
+  const carbG = Math.max(0, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
+  why.push(`protéines ${fmt(perKg, 1)} g/kg = ${proteinG} g · lipides ${fatG} g · glucides ${carbG} g`);
+  return { value: { kcal, proteinG, fatG, carbG, maintenance: roundTo(maintenance, 50), strategy, adjusted }, why, missing: [] };
+}
 
-  let adjust = 0;
-  if (i.goal === 'perte_de_graisse') adjust = -Math.min(500, maintenance * 0.2);
-  else if (i.goal === 'recomposition') adjust = -maintenance * 0.1;
-  else if (i.goal === 'muscle') adjust = Math.min(300, maintenance * 0.1);
-  if (adjust) why.push(`${adjust > 0 ? '+' : '−'} ${Math.round(Math.abs(adjust))} kcal objectif`);
-
-  // Les données réelles corrigent la formule : le poids ne bouge pas dans le sens voulu → on ajuste.
-  if ((i.goal === 'perte_de_graisse' || i.goal === 'recomposition') && (i.trend === 'stable' || i.trend === 'hausse')) {
-    adjust -= 150;
-    why.push(`− 150 kcal : poids ${i.trend} sur 7 j`);
-  } else if (i.goal === 'muscle' && i.trend === 'baisse') {
-    adjust += 150;
-    why.push('+ 150 kcal : poids en baisse sur 7 j');
+/**
+ * Bilan calorique : seulement après ≥ 14 jours depuis le dernier changement et ≥ 3 pesées par semaine sur 2 semaines.
+ * Fourchettes de rythme (choix de conception) : réduction −0,25 à −1 %/sem. ; développement +0,1 à +0,35 kg/sem. ;
+ * maintien ±0,25 kg/sem. Pas de 125 kcal. Données insuffisantes → aucun changement, « bilan incertain ».
+ */
+export function reviewCalories(strategy: Strategy, weights: { day: string; kg: number }[], today: string, lastChange?: string): { delta: number; reason: string; uncertain: boolean } {
+  const since = (d: string) => Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${d}T12:00:00Z`)) / 86_400_000);
+  if (lastChange && since(lastChange) < 14) return { delta: 0, reason: 'Dernier changement il y a moins de 2 semaines : on observe.', uncertain: false };
+  const recent = weights.filter((w) => since(w.day) <= 13 && since(w.day) >= 0);
+  const wk1 = recent.filter((w) => since(w.day) <= 6);
+  const wk2 = recent.filter((w) => since(w.day) >= 7);
+  if (wk1.length < 3 || wk2.length < 3) return { delta: 0, reason: 'Bilan incertain : moins de 3 pesées par semaine sur 2 semaines.', uncertain: true };
+  const avg = (a: { kg: number }[]) => a.reduce((t, w) => t + w.kg, 0) / a.length;
+  const change = avg(wk1) - avg(wk2);
+  const pct = (change / avg(wk2)) * 100;
+  const kg = Math.round(change * 100) / 100;
+  const sign = kg >= 0 ? '+' : '';
+  if (strategy === 'réduction') {
+    if (pct > -0.25) return { delta: -125, reason: `Poids ${sign}${fmt(kg)} kg/sem. : la baisse est trop lente.`, uncertain: false };
+    if (pct < -1) return { delta: 125, reason: `Poids ${fmt(kg)} kg/sem. : la baisse est trop rapide (muscle à protéger).`, uncertain: false };
+  } else if (strategy === 'développement') {
+    if (kg < 0.1) return { delta: 125, reason: `Poids ${sign}${fmt(kg)} kg/sem. : pas assez d’énergie pour construire.`, uncertain: false };
+    if (kg > 0.35) return { delta: -125, reason: `Poids +${fmt(kg)} kg/sem. : prise trop rapide.`, uncertain: false };
+  } else if (Math.abs(kg) > 0.25) {
+    return { delta: kg > 0 ? -125 : 125, reason: `Poids ${sign}${fmt(kg)} kg/sem. alors que l’objectif est le maintien.`, uncertain: false };
   }
-
-  const proteinG = Math.round(1.8 * i.weightKg!);
-  why.push(`protéines 1,8 g/kg = ${proteinG} g`);
-  return { value: { kcal: roundTo(maintenance + adjust, 50), proteinG, maintenance: roundTo(maintenance, 50) }, why, missing: [] };
+  return { delta: 0, reason: `Rythme ${sign}${fmt(kg)} kg/sem. conforme : on ne change rien.`, uncertain: false };
 }
 
 export interface RunEntry {

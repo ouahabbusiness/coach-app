@@ -23,9 +23,16 @@ describe('calories', () => {
     expect(calorieTarget(base).value?.maintenance).toBe(2750);
     expect(calorieTarget(base).value?.proteinG).toBe(139);
   });
-  it('perte de graisse : déficit plafonné à 500, puis −150 si le poids ne baisse pas', () => {
-    expect(calorieTarget({ ...base, goal: 'perte_de_graisse' }).value?.kcal).toBe(2250);
-    expect(calorieTarget({ ...base, goal: 'perte_de_graisse', trend: 'stable' }).value?.kcal).toBe(2100);
+  it('réduction −12 %, développement +5 %, mixte = maintien ; protéines 2,0 g/kg en réduction ; lipides ≥ 0,8 g/kg', () => {
+    expect(calorieTarget({ ...base, strategy: 'réduction' }).value).toMatchObject({ kcal: 2400, proteinG: 154 });
+    expect(calorieTarget({ ...base, strategy: 'développement' }).value?.kcal).toBe(2850);
+    expect(calorieTarget({ ...base, goal: 'recomposition' }).value?.kcal).toBe(2750);
+    expect(calorieTarget(base).value!.fatG).toBeGreaterThanOrEqual(62);
+  });
+
+  it('une pesée isolée ne change rien : ajustements seulement issus des bilans', () => {
+    expect(calorieTarget({ ...base, strategy: 'réduction', trend: 'hausse' }).value?.kcal).toBe(2400);
+    expect(calorieTarget({ ...base, strategy: 'réduction', adjustments: [{ at: '2026-11-15', delta: -125, reason: 'baisse trop lente' }] }).value?.kcal).toBe(2300);
   });
   it('données manquantes listées, aucune valeur', () => {
     const c = calorieTarget({ weightKg: 77 });
@@ -112,5 +119,19 @@ describe('charge trop légère', () => {
     expect(lightLoad('squat-goblet-kb', [{ reps: 25, rir: 0, loadKg: 12 }], [6, 12])).toBeUndefined();
     expect(lightLoad('pullup-weighted', [{ reps: 22, rir: 3, loadKg: 5 }], [0, 5, 6, 10, 11])?.next).toBe(6);
     expect(lightLoad('x', [{ reps: 32, rir: 0 }], [])?.reps).toBe(32);
+  });
+});
+
+describe('bilan calorique sur 2 semaines', () => {
+  const w = (daysAgo: number, kg: number) => ({ day: new Date(Date.parse('2026-11-20T12:00:00Z') - daysAgo * 864e5).toISOString().slice(0, 10), kg });
+  it('données insuffisantes → bilan incertain, aucun changement', async () => {
+    const { reviewCalories } = await import('../src/engine/targets');
+    expect(reviewCalories('réduction', [w(1, 77), w(9, 77.3)], '2026-11-20')).toMatchObject({ delta: 0, uncertain: true });
+  });
+  it('réduction trop lente → −125 ; changement récent → on observe', async () => {
+    const { reviewCalories } = await import('../src/engine/targets');
+    const ws = [w(1, 77), w(3, 77.1), w(5, 77), w(8, 77.1), w(10, 77), w(12, 77.1)];
+    expect(reviewCalories('réduction', ws, '2026-11-20').delta).toBe(-125);
+    expect(reviewCalories('réduction', ws, '2026-11-20', '2026-11-12').delta).toBe(0);
   });
 });

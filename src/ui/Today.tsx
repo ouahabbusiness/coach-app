@@ -531,6 +531,16 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         onComplete={() => go({ name: 'onboarding', step: 'body' })}
         result={kcal ? <>{fmtNum(kcal.kcal)} <small>kcal</small> <span className="pill num">P {kcal.proteinG} g</span></> : undefined}
       >
+        {kcal && (
+          <section className="why-card">
+            <span className="why-label">Stratégie : {kcal.strategy}</span>
+            <p className="why-missing num" style={{ margin: 0 }}>
+              P {kcal.proteinG} g · L {kcal.fatG} g · G {kcal.carbG} g
+            </p>
+            {targets.review && <p className="why-missing" style={{ margin: 0 }}>Dernier bilan : {targets.review.reason}</p>}
+            <p className="why-missing" style={{ margin: 0 }}>Estimation provisoire, corrigée seulement sur une tendance de 2 semaines (± 125 kcal).</p>
+          </section>
+        )}
         <section className={`why-card ${targets.sex ? '' : 'need'}`}>
           <span className="why-label">Formule</span>
           <div className="seg2" role="group" aria-label="Formule de calcul">
