@@ -8,6 +8,8 @@ import { challengeValues, dailyKey, type DailyMetrics } from '../engine/daily';
 import { localDay } from '../engine/derive';
 import type { Repository } from '../storage/db';
 import { useChallengeEntries } from './Challenge';
+import { useProofMap } from './Habits';
+import { withProofs } from '../engine/proof';
 import { deviceTimeZone } from './support';
 import type { Route } from './App';
 
@@ -33,6 +35,8 @@ function trailPoints(n: number): [number, number][] {
   return out;
 }
 
+const ARC_DAYS = dayRange(NOVEMBER_2026.start, NOVEMBER_2026.end);
+
 const LABEL: Record<ArcDay, string> = { tenu: 'tenu', excusé: 'excusé', manqué: 'non tenu', 'à venir': 'à venir', 'aujourd’hui': 'aujourd’hui' };
 
 export function ArcPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
@@ -56,14 +60,15 @@ export function ArcPage({ repo, go }: { repo: Repository; go: (r: Route) => void
   }, [repo, tz]);
 
   // Mêmes valeurs que le défi : sommeil et pas viennent des données du jour (une seule saisie).
+  const proofs = useProofMap(repo, ARC_DAYS);
   const merged = useMemo(() => {
     const out: typeof entries = {};
     for (const d of dayRange(NOVEMBER_2026.start, NOVEMBER_2026.end)) {
       if (!entries[d] && !dailies[d]) continue;
-      out[d] = { ...(entries[d] ?? { updatedAt: 0 }), values: challengeValues(entries[d]?.values, dailies[d]) };
+      out[d] = { ...(entries[d] ?? { updatedAt: 0 }), values: withProofs(challengeValues(entries[d]?.values, dailies[d]), proofs[d]) };
     }
     return out;
-  }, [entries, dailies]);
+  }, [entries, dailies, proofs]);
 
   const stats = arcStats(merged, appDays, today);
   const pts = trailPoints(stats.days.length);

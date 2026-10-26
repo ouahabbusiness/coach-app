@@ -16,6 +16,7 @@ import { localDay } from '../engine/derive';
 import { AppBackground } from './AppBackground';
 import { BootOverlay } from './BootOverlay';
 import { ArcPage } from './ArcPage';
+import { Reading } from './Reading';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -32,6 +33,7 @@ export type Route =
   | { name: 'onboarding' }
   | { name: 'planning' }
   | { name: 'arc' }
+  | { name: 'reading' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -88,6 +90,7 @@ export function App() {
   if (route.name === 'onboarding') return <Onboarding repo={repo} onExit={() => go({ name: 'today' })} />;
 
   if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;
+  if (route.name === 'reading') return <Reading repo={repo} go={go} />;
 
   if (route.name === 'session') {
     const id = route.id;
@@ -133,7 +136,7 @@ export function App() {
           </>
         )}
         {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}
-        {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} onStatus={() => go({ name: 'arc' })} />}
+        {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} onStatus={() => go({ name: 'arc' })} onReading={() => go({ name: 'reading' })} />}
         {route.name === 'planning' && <Planning repo={repo} go={go} />}
         {route.name === 'summary' && <Summary repo={repo} sessionId={route.id} onBack={() => go({ name: 'progress' })} onHome={() => go({ name: 'today' })} />}
       </main>

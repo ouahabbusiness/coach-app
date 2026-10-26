@@ -7,6 +7,8 @@ export interface DailyMetrics {
   waterMl?: number;
   /** Calories actives affichées par la montre. Jamais converties en « crédit » alimentaire. */
   activeKcal?: number;
+  /** Pages lues ce jour, calculées depuis le journal de lecture. */
+  readPages?: number;
   updatedAt: number;
 }
 
@@ -28,6 +30,8 @@ export function challengeValues(
   const v = { ...(entryValues ?? {}) };
   if (daily?.sleepH !== undefined) v.sleep = daily.sleepH;
   if (daily?.steps !== undefined) v.steps = daily.steps;
+  // Lecture : coche automatique à partir de 10 pages notées ; ne décoche jamais une case cochée à la main.
+  if ((daily?.readPages ?? 0) >= 10) v.read = true;
   return v;
 }
 

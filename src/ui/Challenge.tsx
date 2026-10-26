@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Mountain } from 'lucide-react';
+import { Camera, ChevronLeft, Mountain } from 'lucide-react';
 import {
   NOVEMBER_2026,
   dayRange,
@@ -14,6 +14,8 @@ import { localDay } from '../engine/derive';
 import { challengeValues, dailyKey, type DailyMetrics } from '../engine/daily';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
+import { HabitsSheet, ShotButton, saveProof, useDayHabits, useProofMap } from './Habits';
+import { withProofs } from '../engine/proof';
 import { deviceTimeZone } from './support';
 
 const DEF = NOVEMBER_2026;
@@ -27,11 +29,11 @@ const STATUS_LABEL: Record<HabitStatus, string> = {
 };
 const STATUS_TONE: Record<HabitStatus, string> = { done: 'ok', not_done: 'warn', unknown: '', excused: '' };
 
-export function useChallengeEntries(repo: Repository) {
+export function useChallengeEntries(repo: Repository, version = 0) {
   const [entries, setEntries] = useState<Entries>({});
   useEffect(() => {
     repo.getKv<Entries>(KEY).then((e) => e && setEntries(e));
-  }, [repo]);
+  }, [repo, version]);
   const update = async (day: string, patch: (e: DayEntry) => DayEntry) => {
     const current = entries[day] ?? { values: {}, updatedAt: 0 };
     const next = { ...entries, [day]: { ...patch(current), updatedAt: Date.now() } };
@@ -45,13 +47,17 @@ function fmtDay(day: string, opts: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('fr-BE', { ...opts, timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
 }
 
-export function Challenge({ repo, onBack, onStatus }: { repo: Repository; onBack: () => void; onStatus?: () => void }) {
+export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Repository; onBack: () => void; onStatus?: () => void; onReading?: () => void }) {
   const tz = deviceTimeZone();
   const today = localDay(Date.now(), tz);
   const days = useMemo(() => dayRange(DEF.start, DEF.end), []);
   const started = today >= DEF.start;
   const [day, setDay] = useState(() => (today < DEF.start ? DEF.start : today > DEF.end ? DEF.end : today));
-  const { entries, update } = useChallengeEntries(repo);
+  const [version, setVersion] = useState(0);
+  const [sheet, setSheet] = useState(false);
+  const { entries, update } = useChallengeEntries(repo, version);
+  const proofMap = useProofMap(repo, days, version);
+  const dayHabits = useDayHabits(repo, day);
   const [appDays, setAppDays] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -70,15 +76,20 @@ export function Challenge({ repo, onBack, onStatus }: { repo: Repository; onBack
       }
       setDailyMap(m);
     })();
-  }, [repo, days]);
+  }, [repo, days, version]);
 
   const editable = day <= today;
   const merged = (d: string): DayEntry | undefined => {
     if (!entries[d] && !dailyMap[d]) return undefined;
-    return { ...(entries[d] ?? { updatedAt: 0 }), values: challengeValues(entries[d]?.values, dailyMap[d]) };
+    return { ...(entries[d] ?? { updatedAt: 0 }), values: withProofs(challengeValues(entries[d]?.values, dailyMap[d]), proofMap[d]) };
   };
   const entry = merged(day);
-  const weeks = summarizeWeeks(DEF, entries, appDays);
+  const mergedAll: Entries = {};
+  for (const d of days) {
+    const m = merged(d);
+    if (m) mergedAll[d] = m;
+  }
+  const weeks = summarizeWeeks(DEF, mergedAll, appDays);
   const week = weeks.find((w) => w.weekStart === weekStart(day));
 
   const setValue = async (id: string, v: boolean | number | undefined) => {
@@ -181,65 +192,65 @@ export function Challenge({ repo, onBack, onStatus }: { repo: Repository; onBack
           Jour excusé (maladie, blessure, repos prescrit)
         </label>
 
-        {DEF.daily.map((h) => {
-          const st = habitStatus(h, entry);
-          const v = entry?.values[h.id];
-          return (
-            <div key={h.id} className="card soft" style={{ margin: 0 }}>
-              <div className="spread">
-                <strong>{h.label}</strong>
+        <ul className="habits">
+          {DEF.daily.map((h) => {
+            const st = habitStatus(h, entry);
+            return (
+              <li key={h.id} className="spread" style={{ minHeight: 40 }}>
+                <span>{h.label}</span>
                 <span className={`badge ${STATUS_TONE[st]}`}>{STATUS_LABEL[st]}</span>
-              </div>
-              {h.hint && <div className="muted" style={{ fontSize: '0.85rem' }}>{h.hint}</div>}
-              <div className="row" style={{ marginTop: 8 }}>
-                {h.kind === 'check' ? (
-                  <>
-                    <button className="chip" disabled={!editable} aria-pressed={v === true} onClick={() => setValue(h.id, true)}>Fait</button>
-                    <button className="chip" disabled={!editable} aria-pressed={v === false} onClick={() => setValue(h.id, false)}>Pas fait</button>
-                  </>
-                ) : (
-                  <label className="row" style={{ flex: 1 }}>
-                    <span className="sr-only">{h.label} ({h.unit})</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step={h.unit === 'h' ? 0.25 : 100}
-                      disabled={!editable}
-                      value={typeof v === 'number' ? v : ''}
-                      onChange={(e) => setValue(h.id, e.target.value === '' ? undefined : Number(e.target.value))}
-                      style={{ maxWidth: 160 }}
-                    />
-                    <span className="muted">{h.unit} · objectif ≥ {h.min?.toLocaleString('fr-BE')}</span>
-                  </label>
-                )}
-                {v !== undefined && (
-                  <button className="btn ghost" disabled={!editable} onClick={() => setValue(h.id, undefined)}>Effacer</button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+              </li>
+            );
+          })}
+        </ul>
+        {day === today ? (
+          <button className="btn primary" onClick={() => setSheet(true)}>
+            <Camera size={16} aria-hidden="true" /> Objectifs du jour
+          </button>
+        ) : (
+          editable && <span className="badge">📷 Preuve = photo du jour même</span>
+        )}
+        <HabitsSheet
+          open={sheet}
+          onClose={() => {
+            setSheet(false);
+            setVersion((v) => v + 1);
+          }}
+          h={dayHabits}
+          onReading={onReading ?? (() => undefined)}
+        />
 
         <h3 style={{ margin: '8px 0 0' }}>Objectifs de la semaine</h3>
         {DEF.weekly.map((g) => {
           const fromApp = g.id === 'gym' && appDays.has(day);
-          const v = entry?.values[g.id] === true;
+          const proof = proofMap[day]?.[g.id];
+          const ok = fromApp || (entry?.values[g.id] === true && !!proof);
           return (
-            <label key={g.id} className="row" style={{ minHeight: 44 }}>
-              <input
-                type="checkbox"
-                style={{ width: 24, height: 24, minHeight: 0 }}
-                disabled={!editable || fromApp}
-                checked={v || fromApp}
-                onChange={(e) => setValue(g.id, e.target.checked ? true : undefined)}
-              />
-              {g.label} faite ce jour
-              {fromApp && <span className="badge ok">séance enregistrée dans l’app</span>}
-            </label>
+            <div key={g.id} className="spread" style={{ minHeight: 48 }}>
+              <span>
+                {g.label} {ok && '✓'}
+              </span>
+              {fromApp ? (
+                <span className="badge ok">séance app</span>
+              ) : proof ? (
+                <img className="hs-thumb" src={proof.photo} alt={`Preuve : ${g.label}`} />
+              ) : day === today ? (
+                <ShotButton
+                  label="Preuve"
+                  onFile={async (f) => {
+                    const err = await saveProof(repo, day, g.id, f);
+                    if (err) return window.alert(err);
+                    await setValue(g.id, true);
+                    setVersion((v) => v + 1);
+                  }}
+                />
+              ) : (
+                <span className="muted">—</span>
+              )}
+            </div>
           );
         })}
-        <span className="badge" style={{ alignSelf: 'flex-start' }}>✍️ Déclaré (pas de lien montre)</span>
+        <span className="badge" style={{ alignSelf: 'flex-start' }}>📷 Compté seulement avec photo</span>
       </div>
     </>
   );

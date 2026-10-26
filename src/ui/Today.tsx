@@ -2,12 +2,15 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
 import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
-import { addWater, challengeValues, dailyKey, daysUntil, type DailyMetrics } from '../engine/daily';
+import { addWater, daysUntil } from '../engine/daily';
+import { DAILY_PAGES, currentPage } from '../engine/reading';
+import { HabitsSheet, useDayHabits } from './Habits';
+import { useReading } from './Reading';
 import { localDay } from '../engine/derive';
 import { estimateMinutes } from '../engine/disruption';
 import { itemStatus, toMin, type PlannedItem } from '../engine/planning';
@@ -193,14 +196,16 @@ type Hero =
 export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) => void; night: { phase: string; pastBed: boolean; bedtime?: string; now: Date } }) {
   const tz = deviceTimeZone();
   const today = localDay(Date.now(), tz);
-  const [daily, setDaily] = useState<DailyMetrics | undefined>();
   const [waterGoal, setWaterGoal] = useState<number | undefined>();
   const [goal, setGoal] = useState<GoalVersion | undefined>();
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
   const [hero, setHero] = useState<Hero | null>(null);
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState('');
-  const { entries, update } = useChallengeEntries(repo);
+  const habits = useDayHabits(repo, today);
+  const { daily, saveDaily } = habits;
+  const [sheet, setSheet] = useState(false);
+  const reading = useReading(repo);
   const { mode: winterMode } = useWinterMode(repo);
   const winter = winterInfo(winterMode, today, winterForced());
 
@@ -211,7 +216,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   useEffect(() => {
     (async () => {
-      setDaily(await repo.getKv<DailyMetrics>(dailyKey(today)));
       setWaterGoal(await repo.getKv<number>(WATER_GOAL_KEY));
       const goals = await loadGoals(repo);
       setGoal(goals[goals.length - 1]);
@@ -235,14 +239,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
     })();
   }, [repo, today, tz]);
 
-  const saveDaily = useCallback(
-    async (next: DailyMetrics) => {
-      await repo.setKv(dailyKey(today), next);
-      setDaily(next);
-    },
-    [repo, today],
-  );
-
   const openEditor = (field: Field) => {
     const current = field === 'waterGoal' ? (waterGoal === undefined ? undefined : waterGoal / 1000) : daily?.[field];
     setDraft(current === undefined ? '' : String(current));
@@ -264,8 +260,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   };
 
   const challengeOn = today >= NOVEMBER_2026.start && today <= NOVEMBER_2026.end;
-  const dayEntry = { values: challengeValues(entries[today]?.values, daily), excused: entries[today]?.excused, updatedAt: 0 };
-  const habitsDone = NOVEMBER_2026.daily.filter((h) => habitStatus(h, dayEntry) === 'done').length;
+  const habitsDone = habits.done;
+  const pageNow = reading.book ? currentPage(reading.log, reading.book.id) : undefined;
   const sleepBars = Math.min(8, Math.round(daily?.sleepH ?? 0));
 
   return (
@@ -441,51 +437,26 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         {goal?.targetDate && <span className="pill num">J−{Math.max(0, daysUntil(today, goal.targetDate))}</span>}
       </button>
 
-      <section className="ui-card" aria-label="Habitudes du jour">
-        <div className="spread">
-          <button className="tile-hit eyebrow-btn" onClick={() => go({ name: 'challenge' })}>
-            <Trophy size={14} aria-hidden="true" /> Habitudes{!challengeOn ? ` · défi J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}` : ''}
-          </button>
-          <span className="pill num">
-            {habitsDone}/{NOVEMBER_2026.daily.length}
-          </span>
-        </div>
-        <div className="segments" aria-hidden="true">
-          {NOVEMBER_2026.daily.map((h, i) => (
-            <span key={h.id} className={i < habitsDone ? 'on' : ''} />
-          ))}
-        </div>
-        <ul className="habits">
-          {NOVEMBER_2026.daily.map((h) => {
-            const st = habitStatus(h, dayEntry);
-            const value = dayEntry.values[h.id];
-            const toggle = () =>
-              h.kind === 'check'
-                ? update(today, (e) => {
-                    const values = { ...e.values };
-                    if (values[h.id] === true) delete values[h.id];
-                    else values[h.id] = true;
-                    return { ...e, values };
-                  })
-                : openEditor(h.id === 'sleep' ? 'sleepH' : 'steps');
-            return (
-              <li key={h.id}>
-                <button className="habit" onClick={toggle} aria-pressed={st === 'done'}>
-                  <span className="habit-name">{h.label}</span>
-                  {h.kind === 'number' && (
-                    <span className="muted num" style={{ fontSize: '0.8rem' }}>
-                      {typeof value !== 'number' ? '—' : h.id === 'sleep' ? fmtHours(value) : fmtNum(value)}
-                    </span>
-                  )}
-                  <span className={`check ${st === 'done' ? 'on' : ''}`} aria-hidden="true">
-                    {st === 'done' ? '✓' : ''}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <div className="kpi-grid">
+        <Kpi icon={<Trophy size={16} aria-hidden="true" />} label={challengeOn ? 'Objectifs' : `Objectifs · J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}`} onClick={() => setSheet(true)} value={`${habitsDone}/${NOVEMBER_2026.daily.length}`}>
+          <div className="segments" aria-hidden="true">
+            {NOVEMBER_2026.daily.map((h, i) => (
+              <span key={h.id} className={i < habitsDone ? 'on' : ''} />
+            ))}
+          </div>
+        </Kpi>
+        <Kpi
+          icon={<BookOpen size={16} aria-hidden="true" />}
+          label={reading.book ? reading.book.title : 'Lecture'}
+          onClick={() => go({ name: 'reading' })}
+          value={pageNow !== undefined ? `p. ${pageNow}` : '—'}
+          sub={daily?.readPages ? `+${daily.readPages} auj.` : undefined}
+        >
+          <Meter value={(daily?.readPages ?? 0) / DAILY_PAGES} />
+        </Kpi>
+      </div>
+
+      <HabitsSheet open={sheet} onClose={() => setSheet(false)} h={habits} onReading={() => go({ name: 'reading' })} />
 
       <WeightModal
         open={weighing}
