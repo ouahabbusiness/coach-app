@@ -1244,3 +1244,25 @@ body:has(.run-live.full) { background-image: none; }
 .free-decision strong { text-transform: capitalize; }
 .free-decision span { font-size: 0.85rem; }
 .coach-note { margin: 0; font-size: 0.82rem; color: #c9c2b2; }
+
+/* Contrôle avant séance */
+.rc { max-width: 560px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 20px) 16px 32px; display: flex; flex-direction: column; gap: 12px; }
+.rc-q { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+.rc .seg2, .rc .seg3 { background: #050505; border-color: #2c2b28; }
+.rc .seg2 button, .rc .seg3 button { color: var(--text); }
+.rc .seg2 button[aria-pressed='true'], .rc .seg3 button[aria-pressed='true'] { background: #f3ecdc; color: #0a0a0a; }
+.rc-red { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 10px 12px; border-radius: 12px; border: 1px dashed #f87171; background: transparent; color: #f87171; font: 600 0.85rem var(--font-body); text-align: left; cursor: pointer; }
+.rc-red.on { background: #f87171; color: #1a0505; border-style: solid; }
+.rc-decision { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid #2c2b28; background: #0c0c0b; }
+.rc-decision strong { text-transform: capitalize; font-size: 1.1rem; }
+.rc-decision span { font-size: 0.88rem; color: #c9c2b2; }
+.rc-decision.d-arrêt, .rc-decision.d-reporter { border-color: #f87171; }
+
+.post-fb { margin-bottom: 12px; }
+.pf-row { padding: 8px 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.pf-row:first-of-type { border-top: 0; }
+.pf-line { margin: 0; font-size: 0.85rem; }
+.pf-tag { display: inline-block; font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 6px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); margin-right: 4px; }
+.pf-tag.ok { background: var(--accent); color: var(--on-accent); }
+.hud-order.prog strong { font-size: 0.88rem; font-weight: 600; line-height: 1.35; letter-spacing: 0; }
+.hud-order.prog { align-items: flex-start; }

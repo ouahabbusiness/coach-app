@@ -2,6 +2,7 @@
 // Durée et séries viennent du journal ; calories et fréquence cardiaque sont déclarées (lues sur la montre).
 
 import { useEffect, useState } from 'react';
+import { PostFeedback } from './PostFeedback';
 import { ChevronLeft, Dumbbell, Flame, Heart, Timer, TriangleAlert, Trophy } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { NOVEMBER_2026, habitStatus } from '../engine/challenge';
@@ -90,6 +91,8 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
       {safety && (
         <Notice tone="danger">Arrêt suite à une douleur signalée. Pas de diagnostic : demande un avis médical si elle persiste.</Notice>
       )}
+
+      <PostFeedback repo={repo} st={st} />
 
       <div className="tiles">
         <div className="tile">

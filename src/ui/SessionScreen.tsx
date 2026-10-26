@@ -4,6 +4,8 @@ import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
 import { liveLoad } from '../engine/progression';
+import type { ReadinessDecision, ReadinessInput } from '../engine/readiness';
+import { ReadinessCheck } from './ReadinessCheck';
 import { loadsFor, useEquipment } from './equipment';
 import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
@@ -51,6 +53,10 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | 'menu' | null>(null);
   const [live, setLive] = useState('');
   const [flash, setFlash] = useState(0);
+  const [check, setCheck] = useState<{ d: ReadinessDecision } | null | undefined>(undefined);
+  useEffect(() => {
+    repo.getKv<{ d: ReadinessDecision }>(`readiness.${sessionId}`).then((v) => setCheck(v ?? null));
+  }, [repo, sessionId]);
 
   useEffect(() => {
     repo.allSessionEvents().then((map) => {
@@ -73,6 +79,28 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   useEffect(() => {
     if (state?.phase === 'ended') onSummary();
   }, [state?.phase, onSummary]);
+
+  const applyReadiness = async (input: ReadinessInput, d: ReadinessDecision) => {
+    await repo.setKv(`readiness.${sessionId}`, { input, d, at: Date.now() });
+    setCheck({ d });
+    if (!state) return;
+    const work = state.sets.filter((x) => x.status === 'pending');
+    if (d.decision === 'arrêt' || d.decision === 'reporter') {
+      for (const x of work) await send({ type: 'skip_set', plannedSetId: x.planned.id, reason: d.decision === 'arrêt' ? 'arrêt : signal d’alerte' : 'reportée : malade' });
+      await send({ type: 'end_session' });
+      onExit();
+      return;
+    }
+    const blocks = [...new Set(state.sets.map((x) => x.planned.blockId))];
+    for (const [bi, b] of blocks.entries()) {
+      const sets = state.sets.filter((x) => x.planned.blockId === b && x.planned.role === 'work');
+      if (d.shorten && bi >= 2) {
+        for (const x of sets) await send({ type: 'skip_set', plannedSetId: x.planned.id, reason: 'version courte (contrôle avant séance)' });
+        continue;
+      }
+      if (d.dropLastSet && sets.length > 1) await send({ type: 'skip_set', plannedSetId: sets[sets.length - 1]!.planned.id, reason: 'allégée (contrôle avant séance)' });
+    }
+  };
 
   const act = async (cmd: Parameters<typeof send>[0], message?: string): Promise<SendResult> => {
     const res = await send(cmd);
@@ -114,6 +142,16 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
     }
     b.total++;
     if (s.status !== 'pending' && s.status !== 'in_progress') b.done++;
+  }
+
+  // Contrôle avant séance : une fois, avant la toute première série.
+  const fresh = state.phase === 'ready' && state.sets.every((x) => x.status === 'pending');
+  if (check === null && fresh) {
+    return (
+      <div className="session hud">
+        <ReadinessCheck onDone={applyReadiness} />
+      </div>
+    );
   }
 
   return (
@@ -191,7 +229,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
             {focus.planned.kind === 'reps' && (focus.planned.repRange || focus.planned.targetRir !== undefined) && (
               <div className="hud-chips">
                 {focus.planned.repRange && <span className="pill num">plage {focus.planned.repRange[0]}–{focus.planned.repRange[1]}</span>}
-                {isLastOfBlock(state, focus) && focus.planned.lastSetToFailure ? (
+                {isLastOfBlock(state, focus) && focus.planned.lastSetToFailure && !check?.d.noFailure ? (
                   <span className="pill num hud-fail">dernière série : échec propre</span>
                 ) : focus.planned.targetRir !== undefined ? (
                   <span className="pill num">réserve {focus.planned.targetRir}</span>
@@ -397,8 +435,8 @@ function ResultEntry({ state, set, act, loads }: { loads: number[]; state: Sessi
   const saved = currentResult(set);
   const p = set.planned;
   const measuredSeconds = set.startedAt !== undefined && set.endedAt !== undefined ? Math.round((set.endedAt - set.startedAt) / 1000) : undefined;
-  // Valeurs de départ pour faciliter la saisie ; rien n'est enregistré sans validation.
-  const [reps, setReps] = useState<number>(saved?.reps ?? p.targetReps ?? 0);
+  // Répétitions : jamais préremplies comme réussies (champ vide tant que rien n'est saisi).
+  const [reps, setReps] = useState<number | undefined>(saved?.reps);
   const [seconds, setSeconds] = useState<number>(saved?.seconds ?? measuredSeconds ?? p.targetSeconds ?? 0);
   const advice = liveLoad(state, p, loads);
   const advised = advice?.loadKg;
@@ -409,6 +447,7 @@ function ResultEntry({ state, set, act, loads }: { loads: number[]; state: Sessi
   const lastEntry = [...set.entries].reverse().find((e) => !e.undone);
 
   const save = async () => {
+    if (p.kind === 'reps' && reps === undefined) return setError('Saisis le nombre de répétitions réellement faites.');
     const result: SetResult = p.kind === 'reps' ? { reps } : { seconds };
     if (loadKg.trim() !== '') result.loadKg = Number(loadKg);
     if (p.assistance) result.assistance = p.assistance;
@@ -418,7 +457,7 @@ function ResultEntry({ state, set, act, loads }: { loads: number[]; state: Sessi
   };
 
   const value = p.kind === 'reps' ? reps : seconds;
-  const setValue = p.kind === 'reps' ? setReps : setSeconds;
+  const setValue = (v: number) => (p.kind === 'reps' ? setReps(v) : setSeconds(v));
 
   return (
     <section className="card stack" aria-label="Saisie du résultat">
@@ -431,7 +470,7 @@ function ResultEntry({ state, set, act, loads }: { loads: number[]; state: Sessi
         {measuredSeconds !== undefined && ` · durée mesurée ${measuredSeconds} s`}
       </p>
       <div className="stepper">
-        <button className="btn" aria-label="Moins un" onClick={() => setValue(Math.max(0, value - 1))}>
+        <button className="btn" aria-label="Moins un" onClick={() => setValue(Math.max(0, (value ?? p.targetReps ?? 1) - 1))}>
           <Minus aria-hidden="true" />
         </button>
         <input
@@ -439,10 +478,11 @@ function ResultEntry({ state, set, act, loads }: { loads: number[]; state: Sessi
           type="number"
           inputMode="numeric"
           min={0}
-          value={value}
-          onChange={(e) => setValue(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+          value={value ?? ''}
+          placeholder={p.targetReps !== undefined ? `cible ${p.targetReps}` : ''}
+          onChange={(e) => (e.target.value === '' ? setReps(undefined) : setValue(Math.max(0, Math.floor(Number(e.target.value) || 0))))}
         />
-        <button className="btn" aria-label="Plus un" onClick={() => setValue(value + 1)}>
+        <button className="btn" aria-label="Plus un" onClick={() => setValue(value === undefined ? (p.targetReps ?? 0) : value + 1)}>
           <Plus aria-hidden="true" />
         </button>
       </div>

@@ -3,7 +3,7 @@ import { Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { EXERCISES, findVariant } from '../catalog/exercises';
 import type { SetRole } from '../engine/types';
 import type { Repository } from '../storage/db';
-import { NotBuilt, ProgramTabs } from './common';
+import { ProgramTabs } from './common';
 import { newId } from './support';
 import { loadTemplates, saveTemplates, type SessionTemplate, type TemplateLine } from './templates';
 import { startSessionFromTemplate } from './actions';
@@ -65,7 +65,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
               <ul className="muted" style={{ margin: '4px 0 12px', paddingLeft: 18 }}>
                 {t.lines.map((l) => (
                   <li key={l.id}>
-                    {findVariant(l.variantId)?.variant.name ?? l.variantId} — {l.sets} × {l.kind === 'reps' ? `${l.targetReps ?? '?'} rép.` : `${l.targetSeconds ?? '?'} s`}
+                    {findVariant(l.variantId)?.variant.name ?? l.variantId} — {l.sets} × {l.kind === 'reps' ? `${l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps ?? '?'} rép.` : `${l.targetSeconds ?? '?'} s`}
                     {l.loadKg ? ` · +${l.loadKg} kg` : ''}
                     {l.assistance ? ` · ${l.assistance}` : ''}
                   </li>
@@ -98,8 +98,12 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
           ))}
         </div>
       </div>
-      <NotBuilt title="Programme sur plusieurs semaines" phase="phase 1 (suite)">
-      </NotBuilt>
+      <button className="ui-card list-row" onClick={() => go({ name: 'coachProgram' })} style={{ marginTop: 10 }}>
+        <div className="grow">
+          <p className="eyebrow">Programme sur plusieurs semaines</p>
+          <p className="row-title">Construit par le coach</p>
+        </div>
+      </button>
     </>
   );
 }

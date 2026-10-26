@@ -6,14 +6,30 @@ import { OUTCOME_LABEL } from './support';
 
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Fermeture déclenchée par le code (ex. menu → autre fenêtre) : ne pas la signaler comme une fermeture par l'utilisateur,
+  // sinon l'événement « close » remet l'état à zéro après l'ouverture de la fenêtre suivante.
+  const programmatic = useRef(false);
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) d.showModal();
-    if (!open && d.open) d.close();
+    if (!open && d.open) {
+      programmatic.current = true;
+      d.close();
+    }
   }, [open]);
   return (
-    <dialog ref={ref} onClose={onClose} aria-labelledby="modal-title">
+    <dialog
+      ref={ref}
+      onClose={() => {
+        if (programmatic.current) {
+          programmatic.current = false;
+          return;
+        }
+        onClose();
+      }}
+      aria-labelledby="modal-title"
+    >
       <h2 id="modal-title">{title}</h2>
       {open && children}
     </dialog>
