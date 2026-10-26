@@ -247,6 +247,54 @@ button.tile { cursor: pointer; }
 }
 .check.on { background: var(--accent); border-color: var(--accent); transform: scale(1.05); }
 
+/* En-tête héro de l'accueil */
+.hero {
+  position: relative; overflow: hidden; isolation: isolate;
+  margin: 0 0 14px; border-radius: 24px; padding: 18px 16px 26px; color: #ffffff;
+  background:
+    radial-gradient(120% 140% at 0% 0%, #ff8a4c 0%, rgb(255 138 76 / 0) 55%),
+    radial-gradient(120% 120% at 100% 100%, #ff3d6e 0%, rgb(255 61 110 / 0) 60%),
+    linear-gradient(135deg, #ff6a2b 0%, #ff4f3a 55%, #f23b5b 100%);
+  box-shadow: 0 18px 40px -18px rgb(255 74 40 / 0.65);
+  animation: hero-in 520ms cubic-bezier(.2,.8,.2,1) both;
+}
+.hero-blobs { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+.blob { mix-blend-mode: screen; transform-box: fill-box; transform-origin: center; }
+.blob.b1 { fill: #ffe0c4; opacity: 0.9; animation: drift1 14s ease-in-out infinite; }
+.blob.b2 { fill: #ffc2d1; opacity: 0.8; animation: drift2 18s ease-in-out infinite; }
+.blob.b3 { fill: #fff4dc; opacity: 0.7; animation: drift3 11s ease-in-out infinite; }
+@keyframes drift1 { 0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); } 50% { transform: translate(-22px, 14px) scale(1.12) rotate(12deg); } }
+@keyframes drift2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(26px, -12px) scale(0.9); } }
+@keyframes drift3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(14px, 18px) scale(1.18); } }
+.shape { fill: rgb(255 255 255 / 0.13); stroke: rgb(255 255 255 / 0.35); stroke-width: 1.2; transform-box: fill-box; transform-origin: center; }
+.shape.s1 { animation: morph1 12s ease-in-out infinite; }
+.shape.s2 { animation: morph2 15s ease-in-out infinite; }
+@keyframes morph1 { 0%, 100% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(-14deg) scale(1.08); } }
+@keyframes morph2 { 0%, 100% { transform: rotate(0deg) translate(0, 0); } 50% { transform: rotate(10deg) translate(10px, -6px); } }
+.hero-wave { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 26px; z-index: -1; }
+.hero-wave path { fill: rgb(255 255 255 / 0.14); animation: wave 9s ease-in-out infinite; transform-origin: center; }
+@keyframes wave { 0%, 100% { transform: translateX(0) scaleY(1); } 50% { transform: translateX(-12px) scaleY(1.25); } }
+.hero-content { display: flex; align-items: center; gap: 12px; }
+.hero-text { flex: 1; min-width: 0; }
+.hero-date { margin: 0; font-size: 0.72rem; font-weight: 600; opacity: 0.85; text-transform: capitalize; letter-spacing: 0.02em; }
+.hero-greet { margin: 2px 0 10px; font-size: 1.55rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; color: #ffffff; }
+.hero-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hero-chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; color: #ffffff;
+  background: rgb(255 255 255 / 0.18); border: 1px solid rgb(255 255 255 / 0.28);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  animation: chip-in 420ms cubic-bezier(.2,.8,.2,1) both;
+}
+.hero-ring { position: relative; width: 88px; height: 88px; flex: none; }
+.hero-ring svg { display: block; filter: drop-shadow(0 4px 10px rgb(120 20 0 / 0.25)); }
+.hero-ring-fill { transition: stroke-dashoffset 900ms cubic-bezier(.2,.8,.2,1); animation: ring-in 1100ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes ring-in { from { stroke-dashoffset: var(--ring-c); } }
+.hero-ring-value { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; }
+.hero-ring-value small { font-size: 0.7rem; font-weight: 700; margin-left: 1px; opacity: 0.85; }
+@keyframes hero-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes chip-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
 /* Composants compacts façon shadcn (accueil) */
 .home-head { margin: 4px 0 14px; }
 .eyebrow { margin: 0; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.02em; color: var(--text-2); }

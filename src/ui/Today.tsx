@@ -1,7 +1,7 @@
 // Accueil : tableau de bord du jour. Peu de texte, des chiffres et des icônes.
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWeightLog, WeightModal } from './Weight';
@@ -75,6 +75,58 @@ function Kpi({
       )}
       {children}
     </div>
+  );
+}
+
+/** En-tête héro : dégradé chaud, formes organiques animées, anneau « Journée » (habitudes réellement cochées). */
+function HeroHeader({ date, greeting, score, done, total, chips }: { date: string; greeting: string; score: number; done: number; total: number; chips: { icon: ReactNode; text: string }[] }) {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const ringStyle = { strokeDashoffset: c * (1 - Math.min(1, score)), '--ring-c': `${c}` } as CSSProperties;
+  return (
+    <header className="hero">
+      <svg className="hero-blobs" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <filter id="hero-blur" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="9" />
+          </filter>
+        </defs>
+        <g filter="url(#hero-blur)">
+          <path className="blob b1" d="M300,20 C360,10 410,60 395,120 C380,180 320,190 280,160 C240,130 240,30 300,20 Z" />
+          <path className="blob b2" d="M60,130 C100,90 170,110 175,160 C180,210 110,240 70,215 C30,190 20,170 60,130 Z" />
+          <path className="blob b3" d="M190,-20 C240,-30 270,20 250,60 C230,100 170,90 160,50 C150,10 160,-15 190,-20 Z" />
+        </g>
+        <path className="shape s1" d="M330,-30 C400,-20 430,60 400,110 C370,160 300,150 270,110 C240,70 260,-40 330,-30 Z" />
+        <path className="shape s2" d="M-20,170 C30,140 90,160 110,200 C125,230 60,260 10,245 C-30,232 -50,190 -20,170 Z" />
+      </svg>
+      <svg className="hero-wave" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,40 C80,10 160,60 240,35 C300,16 350,24 400,32 L400,60 L0,60 Z" />
+      </svg>
+      <div className="hero-content">
+        <div className="hero-text">
+          <p className="hero-date">{date}</p>
+          <h1 className="hero-greet">{greeting}</h1>
+          <div className="hero-chips">
+            {chips.map((ch, i) => (
+              <span key={i} className="hero-chip num" style={{ animationDelay: `${120 + i * 80}ms` }}>
+                {ch.icon}
+                {ch.text}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="hero-ring" role="img" aria-label={`Journée : ${done} habitudes sur ${total}`}>
+          <svg width="88" height="88" viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r={r} fill="none" stroke="rgb(255 255 255 / 0.28)" strokeWidth="8" />
+            <circle className="hero-ring-fill" cx="44" cy="44" r={r} fill="none" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" strokeDasharray={c} style={ringStyle} transform="rotate(-90 44 44)" />
+          </svg>
+          <span className="hero-ring-value num">
+            {Math.round(score * 100)}
+            <small>%</small>
+          </span>
+        </div>
+      </div>
+    </header>
   );
 }
 
@@ -195,14 +247,18 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   return (
     <>
-      <header className="home-head">
-        <p className="eyebrow">
-          {new Intl.DateTimeFormat('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz }).format(Date.now())}
-        </p>
-        <h1 className="home-title">
-          {night.phase === 'matin' ? 'Bonjour' : night.phase === 'soir' ? 'Bonsoir' : night.phase === 'nuit' ? 'Bonne nuit' : 'Salut'} Hmidou
-        </h1>
-      </header>
+      <HeroHeader
+        date={new Intl.DateTimeFormat('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz }).format(Date.now())}
+        greeting={`${night.phase === 'matin' ? 'Bonjour' : night.phase === 'soir' ? 'Bonsoir' : night.phase === 'nuit' ? 'Bonne nuit' : 'Salut'} Hmidou`}
+        score={habitsDone / NOVEMBER_2026.daily.length}
+        done={habitsDone}
+        total={NOVEMBER_2026.daily.length}
+        chips={[
+          { icon: <Dumbbell size={13} aria-hidden="true" />, text: hero?.kind === 'open' ? 'En cours' : hero?.kind === 'planned' ? hero.item.start : 'Repos' },
+          { icon: <Droplet size={13} aria-hidden="true" />, text: `${((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L` },
+          { icon: <Footprints size={13} aria-hidden="true" />, text: daily?.steps !== undefined ? fmtNum(daily.steps) : '—' },
+        ]}
+      />
 
       {night.pastBed && night.bedtime && (
         <div className="bed-banner" role="status">

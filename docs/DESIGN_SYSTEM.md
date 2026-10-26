@@ -25,6 +25,7 @@ Inspiration : captures « smart home » (monochrome + orange) et « habit tracke
 Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). Chrono compris.
 
 ## Composants
+- En-tête héro (accueil) : seule zone en dégradé (orange → corail), formes organiques floues et translucides animées lentement, vague, anneau « Journée » (habitudes cochées / 6), pastilles séance/eau/pas. Animations coupées si mouvement réduit.
 - Navigation : pilule noire flottante, icônes seules (accueil, programme, nutrition, progrès, coach), rond orange sur l'actif.
 - Barre de séance : même pilule noire, action principale orange.
 - Icônes Lucide, trait fin (1,6).
