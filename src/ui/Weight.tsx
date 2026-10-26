@@ -1,7 +1,7 @@
 // Suivi du poids : saisie rapide, courbe et historique. Données locales uniquement.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Scale, Sunrise, Trash2 } from 'lucide-react';
 import { localDay } from '../engine/derive';
 import { average7, dailyWeights, isValidKg, trend, type WeighIn, type WeightStatus } from '../engine/weight';
 import type { Repository } from '../storage/db';
@@ -55,12 +55,12 @@ export function WeightModal({ open, onClose, onSave, last }: { open: boolean; on
         <div className="chips" role="group" aria-label="Fiabilité">
           {(['mesuré', 'estimé'] as const).map((s) => (
             <button key={s} className="chip" aria-pressed={status === s} onClick={() => setStatus(s)}>
-              {s === 'mesuré' ? '⚖️ Balance' : '≈ Estimé'}
+              {s === 'mesuré' ? 'Balance' : '≈ Estimé'}
             </button>
           ))}
         </div>
         <button className="chip" aria-pressed={fasting} onClick={() => setFasting(!fasting)} style={{ alignSelf: 'flex-start' }}>
-          🌅 À jeun
+          <Sunrise size={14} aria-hidden="true" /> À jeun
         </button>
         <input aria-label="Date de la pesée" type="date" max={today} value={day} onChange={(e) => setDay(e.target.value)} />
         <button className="btn primary block" disabled={!valid} onClick={() => valid && onSave(Math.round(kg * 10) / 10, status, day, fasting)}>
@@ -109,7 +109,7 @@ export function WeightCard({ repo }: { repo: Repository }) {
   return (
     <section className="hero-card" aria-label="Poids">
       <div className="spread">
-        <span className="tile-label">⚖️ Poids à jeun</span>
+        <span className="tile-label"><Scale size={14} aria-hidden="true" /> Poids à jeun</span>
         <button className="btn primary icon" aria-label="Ajouter une pesée" onClick={() => setOpen(true)}>
           <Plus size={20} aria-hidden="true" />
         </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, ChevronLeft, ChevronRight, CloudLightning, Moon, MoreHorizontal, Play, Plus } from 'lucide-react';
+import { Briefcase, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Clock, CloudLightning, Moon, MoreHorizontal, Play, Plus, RotateCw, Timer, Zap } from 'lucide-react';
 import { weekStart as mondayOf } from '../engine/challenge';
 import { localDay } from '../engine/derive';
 import {
@@ -150,11 +150,11 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
       </div>
 
       <div className="week-sum">
-        <span className="pill num">📅 {planned} prévues</span>
-        <span className="pill num">✅ {realized} faites</span>
+        <span className="pill num"><CalendarDays size={12} aria-hidden="true" /> {planned} prévues</span>
+        <span className="pill num"><CircleCheck size={12} aria-hidden="true" /> {realized} faites</span>
         {fixed && fixed.length === 0 && (
           <button className="pill" onClick={() => go({ name: 'onboarding' })}>
-            ⏰ Horaires ?
+            <Clock size={12} aria-hidden="true" /> Horaires ?
           </button>
         )}
       </div>
@@ -202,8 +202,8 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
                       <span className="slot-time num">{i.start}</span>
                       <span className="slot-title">
                         {i.title}
-                        {i.adapted && <span className="slot-flag" title="Version adaptée">⚡</span>}
-                        {i.moves.length > 0 && <span className="slot-flag" title="Déplacé">↻</span>}
+                        {i.adapted && <Zap className="slot-flag" size={13} aria-label="Version adaptée" />}
+                        {i.moves.length > 0 && <RotateCw className="slot-flag" size={13} aria-label="Déplacé" />}
                       </span>
                       {st !== 'prévu' && <span className="slot-status">{st}</span>}
                       {isToday && st === 'prévu' && tpl && (
@@ -241,19 +241,19 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
             return (
               <div className="stack">
                 <div className="row" style={{ gap: 6 }}>
-                  <span className="pill num">🕒 {menu.start}</span>
-                  <span className="pill num">⏱ {menu.adapted ? `≈ ${menu.adapted.estimatedMin}` : menu.durationMin} min</span>
+                  <span className="pill num"><Clock size={12} aria-hidden="true" /> {menu.start}</span>
+                  <span className="pill num"><Timer size={12} aria-hidden="true" /> {menu.adapted ? `≈ ${menu.adapted.estimatedMin}` : menu.durationMin} min</span>
                   <span className="pill">{st}</span>
                 </div>
                 {menu.adjustment && (
                   <ul className="mini-list">
-                    <li>⚡ {REASON_LABELS[menu.adjustment.reason]} → {menu.adjustment.decision === 'adaptée' ? 'version adaptée' : menu.adjustment.decision}</li>
+                    <li><Zap size={12} aria-hidden="true" /> {REASON_LABELS[menu.adjustment.reason]} → {menu.adjustment.decision === 'adaptée' ? 'version adaptée' : menu.adjustment.decision}</li>
                     {menu.adapted?.removed.map((r) => <li key={r}>− {r}</li>)}
                   </ul>
                 )}
                 {menu.moves.some((m) => m.reason) && (
                   <ul className="mini-list">
-                    <li>↻ Reporté : {[...new Set(menu.moves.filter((m) => m.reason).map((m) => REASON_LABELS[m.reason!]))].join(', ')}</li>
+                    <li><RotateCw size={12} aria-hidden="true" /> Reporté : {[...new Set(menu.moves.filter((m) => m.reason).map((m) => REASON_LABELS[m.reason!]))].join(', ')}</li>
                   </ul>
                 )}
                 {date === today && st === 'prévu' && tpl && (

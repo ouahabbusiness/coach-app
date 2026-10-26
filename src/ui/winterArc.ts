@@ -6,6 +6,7 @@ import type { Repository } from '../storage/db';
 
 export type WinterMode = 'auto' | 'on' | 'off';
 const KEY = 'settings.winterArc';
+const EVENT = 'winter-mode-change';
 
 export interface WinterInfo {
   active: boolean;
@@ -31,11 +32,16 @@ export function useWinterMode(repo: Repository) {
   const [mode, setModeState] = useState<WinterMode>('auto');
   useEffect(() => {
     repo.getKv<WinterMode>(KEY).then((m) => m && setModeState(m));
+    // Synchronise toutes les instances (Réglages ↔ reste de l'app) sans rechargement.
+    const onChange = (e: Event) => setModeState((e as CustomEvent<WinterMode>).detail);
+    window.addEventListener(EVENT, onChange);
+    return () => window.removeEventListener(EVENT, onChange);
   }, [repo]);
   const setMode = useCallback(
     async (m: WinterMode) => {
       await repo.setKv(KEY, m);
       setModeState(m);
+      window.dispatchEvent(new CustomEvent(EVENT, { detail: m }));
     },
     [repo],
   );

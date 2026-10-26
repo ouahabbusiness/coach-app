@@ -11,6 +11,8 @@ import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { useDayPhase } from './useDayPhase';
+import { useWinterMode, winterForced, winterInfo } from './winterArc';
+import { localDay } from '../engine/derive';
 import { AppBackground } from './AppBackground';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
@@ -42,6 +44,13 @@ export function App() {
   const repo = useMemo(() => new Repository(new CoachDb()), []);
   const [route, setRoute] = useState<Route>({ name: 'today' });
   const day = useDayPhase(repo);
+  // Thème du mois (Winter Arc) appliqué à toute l'app, pas seulement à l'accueil.
+  const { mode: winterMode } = useWinterMode(repo);
+  const winterOn = winterInfo(winterMode, localDay(Date.now(), deviceTimeZone()), winterForced()).active;
+  useEffect(() => {
+    if (winterOn) document.documentElement.dataset.theme = 'winter';
+    else delete document.documentElement.dataset.theme;
+  }, [winterOn]);
   const go = useCallback((r: Route) => {
     setRoute(r);
     window.scrollTo(0, 0);

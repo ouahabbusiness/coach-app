@@ -1,4 +1,4 @@
-/* Charte (26/10/2026) : clair, monochrome, cartes très arrondies, accent orange pour l'actif.
+/* Charte (26/10/2026) : clair, monochrome, cartes compactes, accent orange pour l'actif (bleu en novembre / Winter Arc).
    Une seule police : Plus Jakarta Sans. Couleurs uniquement via ces tokens. */
 @import '@fontsource/plus-jakarta-sans/400.css';
 @import '@fontsource/plus-jakarta-sans/500.css';
@@ -116,7 +116,7 @@ main.content {
   padding: var(--space-4) var(--space-4) calc(96px + env(safe-area-inset-bottom));
 }
 
-/* Navigation : pilule noire, icônes fines, rond orange sur l'onglet actif */
+/* Navigation : pilule noire, icônes fines, rond d'accent sur l'onglet actif */
 .navwrap {
   position: fixed; left: 0; right: 0; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 10;
   display: flex; justify-content: center; padding: 0 16px; pointer-events: none;
@@ -335,7 +335,18 @@ button.tile { cursor: pointer; }
   animation: snowfall linear infinite;
 }
 @keyframes snowfall { from { transform: translate(0, -10px); } to { transform: translate(18px, 260px); } }
-:root[data-theme='winter'] { --bg: #f3f6fa; --bg-gradient: none; }
+/* Novembre / Winter Arc : accent bleu unique sur toute l'app, zéro orange. Le rouge reste réservé à la sécurité. */
+:root[data-theme='winter'] {
+  --bg: #f3f6fa;
+  --bg-gradient: radial-gradient(900px 420px at 50% -120px, #e3ecf8 0%, rgb(243 246 250 / 0) 70%);
+  --accent: #1d4ed8;
+  --on-accent: #ffffff;
+  --accent-soft: #e3ecff;
+  --tag: #1d4ed8;
+  --focus: #1d4ed8;
+  --warn: #334155;
+  --warn-soft: #e8edf5;
+}
 
 /* Composants compacts façon shadcn (accueil) */
 .home-head { margin: 4px 0 14px; }
@@ -555,7 +566,8 @@ main.content .btn.block[style*="space-between"] { min-height: 52px; border-radiu
 .slot + .slot { border-top: 1px solid var(--border); }
 .slot-time { font-size: 0.78rem; font-weight: 700; color: var(--text-2); width: 40px; flex: none; }
 .slot-title { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slot-flag { margin-left: 4px; font-size: 0.75rem; opacity: 0.8; }
+.slot-flag { margin-left: 5px; vertical-align: -2px; color: var(--accent); }
+.mini-list li { display: flex; align-items: center; gap: 6px; }
 .slot-status { font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
 .st-réalisé .slot-status, .st-adapté .slot-status { background: var(--strong); color: var(--on-strong); }
 .st-partiel .slot-status, .st-suspendu .slot-status { background: var(--warn-soft); color: var(--warn); }

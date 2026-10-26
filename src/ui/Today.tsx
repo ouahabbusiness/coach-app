@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -203,10 +203,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const { entries, update } = useChallengeEntries(repo);
   const { mode: winterMode } = useWinterMode(repo);
   const winter = winterInfo(winterMode, today, winterForced());
-  useEffect(() => {
-    if (winter.active) document.documentElement.dataset.theme = 'winter';
-    else delete document.documentElement.dataset.theme;
-  }, [winter.active]);
+
   const weight = useWeightLog(repo);
   const lastWeight = weight.days[weight.days.length - 1];
   const weightTrend = trend(weight.days, today);
@@ -395,7 +392,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           value={daily?.activeKcal !== undefined ? fmtNum(daily.activeKcal) : '—'}
           sub="kcal actives"
         >
-          <span className="pill">⌚ montre</span>
+          <span className="pill"><Watch size={12} aria-hidden="true" /> montre</span>
         </Kpi>
       </div>
 

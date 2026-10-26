@@ -21,6 +21,12 @@ Inspiration : captures « smart home » (monochrome + orange) et « habit tracke
 | Accent (actif) | #FF5A1F |
 | Danger | #D92D20 |
 
+## Thème du mois — Novembre / Winter Arc
+Actif automatiquement du 1er au 30/11 (réglable : auto / activé / désactivé), sur **toutes** les pages.
+- Accent unique bleu #1D4ED8 (blanc dessus 6,7:1 ; sur pastille #E3ECFF 5,65:1). Zéro orange.
+- Fond #F3F6FA, statuts « partiel / suspendu » en ardoise #334155 sur #E8EDF5 (8,8:1). Rouge réservé à la sécurité.
+- Emojis colorés remplacés par des icônes vectorielles qui suivent l'accent.
+
 ## Typographie
 Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). Chrono compris.
 
