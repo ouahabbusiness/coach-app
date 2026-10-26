@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Download, Upload } from 'lucide-react';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
+import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
+import { STEPS } from './Onboarding';
+import { loadGoals, loadOnboarding } from './profileStore';
 
 type Status = 'testé' | 'non testé sur iPhone' | 'non implémenté' | 'à valider';
 
@@ -15,8 +18,8 @@ const FEATURES: { name: string; status: Status; note?: string }[] = [
   { name: 'Consignes des exercices', status: 'à valider', note: 'Rédigées sans relecture professionnelle.' },
   { name: 'Démonstrations (images, animations)', status: 'non implémenté' },
   { name: 'Défi de novembre (saisie déclarée)', status: 'testé', note: 'Calculs testés automatiquement ; pas, sommeil et course sont déclarés, pas importés.' },
-  { name: 'Onboarding et profil', status: 'non implémenté' },
-  { name: 'Planning de la semaine', status: 'non implémenté' },
+  { name: 'Onboarding et profil', status: 'testé', note: 'Sauvegarde et reprise vérifiées dans le navigateur ; objectifs versionnés testés automatiquement.' },
+  { name: 'Planning de la semaine', status: 'testé', note: 'Conflits et conséquences testés automatiquement ; placement manuel uniquement.' },
   { name: 'Nutrition', status: 'non implémenté' },
   { name: 'Course à pied', status: 'non implémenté' },
   { name: 'Apple Santé / Apple Watch', status: 'non implémenté', note: 'Impossible dans une app web ; prévu dans l’app native.' },
@@ -24,7 +27,7 @@ const FEATURES: { name: string; status: Status; note?: string }[] = [
   { name: 'Notifications', status: 'non implémenté' },
 ];
 
-export function Settings({ repo, onBack }: { repo: Repository; onBack: () => void }) {
+export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; onBack: () => void; onEditProfile: () => void }) {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [message, setMessage] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -61,6 +64,8 @@ export function Settings({ repo, onBack }: { repo: Repository; onBack: () => voi
         <ChevronLeft size={20} aria-hidden="true" /> Retour
       </button>
       <h1 style={{ marginTop: 12 }}>Réglages et données</h1>
+
+      <ProfileCard repo={repo} onEdit={onEditProfile} />
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
@@ -113,3 +118,59 @@ export function Settings({ repo, onBack }: { repo: Repository; onBack: () => voi
   );
 }
 
+
+const FIELD_LABEL: Record<string, string> = {
+  main: 'objectif principal',
+  secondary: 'objectifs secondaires',
+  description: 'description',
+  why: 'motivation',
+  measure: 'critère de réussite',
+  targetDate: 'date souhaitée',
+  limits: 'limites',
+};
+
+function ProfileCard({ repo, onEdit }: { repo: Repository; onEdit: () => void }) {
+  const [goals, setGoals] = useState<GoalVersion[]>([]);
+  const [done, setDone] = useState<boolean | null>(null);
+  useEffect(() => {
+    loadGoals(repo).then(setGoals);
+    loadOnboarding(repo).then((o) => setDone(!!o.completedAt));
+  }, [repo]);
+
+  const edit = async () => {
+    const ob = await loadOnboarding(repo);
+    // Une configuration terminée s'ouvre sur le récapitulatif ; sinon on reprend où on en était.
+    await repo.setKv('onboarding', { ...ob, step: ob.completedAt ? STEPS.length : ob.step, updatedAt: Date.now() });
+    onEdit();
+  };
+
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>Mon profil et mon objectif</h2>
+      {done === false && <Notice tone="warn">Configuration non terminée.</Notice>}
+      <button className="btn primary block" onClick={edit}>
+        {done ? 'Modifier mon profil' : 'Reprendre la configuration'}
+      </button>
+      {goals.length > 0 && (
+        <details>
+          <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center' }}>Historique de l’objectif ({goals.length} version{goals.length > 1 ? 's' : ''})</summary>
+          <ol style={{ margin: '8px 0 0', paddingLeft: 18 }} className="stack">
+            {goals.map((g, i) => {
+              const changes = goalChanges(goals[i - 1], g);
+              return (
+                <li key={g.version}>
+                  <strong>v{g.version}</strong> · {new Date(g.at).toLocaleDateString('fr-BE')} · {g.reason}
+                  <div className="muted" style={{ fontSize: '0.9rem' }}>
+                    {g.main ? GOAL_LABELS[g.main] : 'sans objectif principal'}
+                    {g.targetDate ? ` · pour le ${g.targetDate}` : ''}
+                    {changes.length > 0 && ` · modifié : ${changes.map((c) => FIELD_LABEL[c] ?? c).join(', ')}`}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </details>
+      )}
+    </div>
+  );
+}

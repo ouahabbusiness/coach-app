@@ -3,7 +3,13 @@ import { Dumbbell, Layers, Play, Repeat, Trophy } from 'lucide-react';
 import { EXERCISES, findVariant, type Exercise } from '../catalog/exercises';
 import { project } from '../engine/session';
 import type { Repository, SessionSummaryRow } from '../storage/db';
-import { NotBuilt, OutcomeBadge } from './common';
+import { OutcomeBadge } from './common';
+import { STEPS } from './Onboarding';
+import { loadOnboarding } from './profileStore';
+import { loadPlanning } from './Planning';
+import { conflicts, dateOf, fixedEventsFromAnswers, itemStatus, spansOf, toMin, type FixedEvent, type PlannedItem } from '../engine/planning';
+import { weekStart } from '../engine/challenge';
+import { ClipboardList } from 'lucide-react';
 import { CATEGORY_ICON, Scene } from './Scene';
 import { fmtDateTime, deviceTimeZone } from './support';
 import { loadTemplates, type SessionTemplate } from './templates';
@@ -96,6 +102,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
         </button>
       )}
 
+      <OnboardingCard repo={repo} onOpen={() => go({ name: 'onboarding' })} />
       <ChallengeCard repo={repo} onOpen={() => go({ name: 'challenge' })} />
 
       <div className="section-head">
@@ -200,11 +207,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
         </>
       )}
 
-      <div style={{ marginTop: 16 }}>
-        <NotBuilt title="Planning de la semaine" phase="phase 1 (suite)">
-          Il viendra après l’onboarding (horaires, trajets, disponibilités).
-        </NotBuilt>
-      </div>
+      <DayPlan repo={repo} go={go} />
       {!open && templates && templates.length > 0 && (
         <p className="muted" style={{ textAlign: 'center' }}>
           <Play size={14} aria-hidden="true" /> Touche une carte pour commencer la séance.
@@ -235,4 +238,95 @@ function ChallengeCard({ repo, onOpen }: { repo: Repository; onOpen: () => void 
       </div>
     </button>
   );
+}
+
+function OnboardingCard({ repo, onOpen }: { repo: Repository; onOpen: () => void }) {
+  const [step, setStep] = useState<number | null>(null);
+  useEffect(() => {
+    loadOnboarding(repo).then((o) => setStep(o.completedAt ? null : o.step));
+  }, [repo]);
+  if (step === null) return null;
+  return (
+    <button className="item" onClick={onOpen}>
+      <div className="thumb">
+        <Scene kind="gym" icon={ClipboardList} />
+      </div>
+      <div className="grow">
+        <div className="tag">Configuration</div>
+        <div className="name">Reprendre la configuration</div>
+        <div className="meta">
+          Étape {Math.min(step + 1, STEPS.length + 1)} / {STEPS.length + 1} · tes réponses sont enregistrées
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/** Planning du jour : événements fixes et éléments prévus, avec leur statut réel. */
+function DayPlan({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
+  const tz = deviceTimeZone();
+  const today = localDay(Date.now(), tz);
+  const week = weekStart(today);
+  const day = DAY_INDEX(today);
+  const [items, setItems] = useState<PlannedItem[]>([]);
+  const [fixed, setFixed] = useState<FixedEvent[]>([]);
+  const [sessions, setSessions] = useState<{ title: string; outcome: string }[]>([]);
+  useEffect(() => {
+    loadPlanning(repo).then((all) => setItems(all.filter((i) => i.weekStart === week && i.day === day)));
+    loadOnboarding(repo).then((o) => setFixed(fixedEventsFromAnswers(o.answers)));
+    repo.listSessions().then((rows) => setSessions(rows.filter((r) => localDay(r.startedAt, tz) === today)));
+  }, [repo, week, day, today, tz]);
+
+  const dayFixed = fixed.filter((ev) => spansOf(ev).some((s) => s.day === day && s.start > 0)).sort((a, b) => toMin(a.start) - toMin(b.start));
+  const sorted = [...items].sort((a, b) => toMin(a.start) - toMin(b.start));
+  return (
+    <>
+      <div className="section-head">
+        <h2>Planning du jour</h2>
+        <button className="link" onClick={() => go({ name: 'planning' })}>
+          Voir la semaine
+        </button>
+      </div>
+      <div className="card stack">
+        {[
+          ...dayFixed.map((ev) => ({ min: toMin(ev.start), key: ev.id, node: (
+            <div key={ev.id} className="spread muted">
+              <span>{ev.label}</span>
+              <span className="num">
+                {ev.start}–{ev.end}
+              </span>
+            </div>
+          ) })),
+          ...sorted.map((i) => {
+            const st = itemStatus(i, dateOf(week, day), today, sessions);
+            const clash = conflicts(i.day, i.start, i.durationMin, fixed);
+            return { min: toMin(i.start), key: i.id, node: (
+              <div key={i.id} className="spread">
+                <div>
+                  <div style={{ fontWeight: 600 }}>
+                    <span className="num">{i.start}</span> · {i.title}
+                  </div>
+                  {clash.length > 0 && <div style={{ color: 'var(--warn)', fontSize: '0.85rem' }}>Chevauche : {clash.map((c) => c.label).join(', ')}</div>}
+                </div>
+                <span className={`badge ${st === 'réalisé' ? 'ok' : st === 'partiel' ? 'warn' : ''}`}>{st}</span>
+              </div>
+            ) };
+          }),
+        ]
+          .sort((a, b) => a.min - b.min)
+          .map((e) => e.node)}
+        {dayFixed.length === 0 && sorted.length === 0 && <p className="muted" style={{ margin: 0 }}>Rien de prévu aujourd’hui.</p>}
+        {sorted.length === 0 && (
+          <button className="btn block" onClick={() => go({ name: 'planning' })}>
+            Planifier ma semaine
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Index du jour (0 = lundi) d'une date AAAA-MM-JJ. */
+function DAY_INDEX(day: string): number {
+  return (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7;
 }

@@ -3,7 +3,7 @@ import { Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { EXERCISES, findVariant } from '../catalog/exercises';
 import type { SetRole } from '../engine/types';
 import type { Repository } from '../storage/db';
-import { NotBuilt } from './common';
+import { NotBuilt, ProgramTabs } from './common';
 import { newId } from './support';
 import { loadTemplates, saveTemplates, type SessionTemplate, type TemplateLine } from './templates';
 import { startSessionFromTemplate } from './actions';
@@ -46,6 +46,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
   return (
     <>
       <h1>Programme</h1>
+      <ProgramTabs current="program" go={go} />
       <div className="card">
         <div className="spread">
           <h2 style={{ margin: 0 }}>Mes séances</h2>

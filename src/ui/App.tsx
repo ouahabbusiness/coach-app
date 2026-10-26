@@ -6,6 +6,9 @@ import { Program } from './Program';
 import { SessionScreen } from './SessionScreen';
 import { Settings } from './Settings';
 import { Challenge } from './Challenge';
+import { Onboarding } from './Onboarding';
+import { Planning } from './Planning';
+import { loadOnboarding } from './profileStore';
 import { Summary } from './Summary';
 import { Today } from './Today';
 import { deviceTimeZone, fmtDateTime } from './support';
@@ -18,6 +21,8 @@ export type Route =
   | { name: 'coach' }
   | { name: 'settings' }
   | { name: 'challenge' }
+  | { name: 'onboarding' }
+  | { name: 'planning' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -36,14 +41,21 @@ export function App() {
     window.scrollTo(0, 0);
   }, []);
 
-  // Au lancement, une séance restée ouverte (fermeture, plantage) est reprise directement.
+  // Au lancement : une séance restée ouverte est reprise ; sinon, l'onboarding non terminé s'ouvre.
   useEffect(() => {
-    repo.openSession().then((open) => open && setRoute({ name: 'session', id: open.id }));
+    (async () => {
+      const open = await repo.openSession();
+      if (open) return setRoute({ name: 'session', id: open.id });
+      const ob = await loadOnboarding(repo);
+      if (!ob.completedAt && ob.updatedAt === 0) setRoute({ name: 'onboarding' });
+    })();
   }, [repo]);
 
   return render();
 
   function render() {
+  if (route.name === 'onboarding') return <Onboarding repo={repo} onExit={() => go({ name: 'today' })} />;
+
   if (route.name === 'session') {
     const id = route.id;
     return (
@@ -84,14 +96,19 @@ export function App() {
             </NotBuilt>
           </>
         )}
-        {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} />}
+        {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}
         {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} />}
+        {route.name === 'planning' && <Planning repo={repo} go={go} />}
         {route.name === 'summary' && <Summary repo={repo} sessionId={route.id} onBack={() => go({ name: 'progress' })} />}
       </main>
       <nav className="navwrap" aria-label="Navigation principale">
         <div className="tabbar">
           {TABS.map(({ name, label, Icon }) => (
-            <button key={name} aria-current={route.name === name ? 'page' : undefined} onClick={() => go({ name })}>
+            <button
+              key={name}
+              aria-current={route.name === name || (name === 'program' && route.name === 'planning') ? 'page' : undefined}
+              onClick={() => go(name === 'program' ? { name: 'planning' } : { name })}
+            >
               <Icon size={20} aria-hidden="true" />
               {label}
             </button>

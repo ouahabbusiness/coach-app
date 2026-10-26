@@ -14,5 +14,11 @@ Chaque événement : `id` (UUID, clé d'idempotence), `sessionId`, `at` (UTC ms)
 ## Export
 `{ format: "coach-app-export", version: 1, exportedAt, events[], kv[] }`. L'import refuse un format inconnu ou une version plus récente.
 
+## Profil et planning (clé-valeur locale)
+- `onboarding` : `{ step, answers, completedAt? }`, enregistré à chaque saisie. Valeurs corporelles `{ value?, status: mesuré | déclaré | estimé | inconnu, at }`.
+- `goals` : versions successives `{ version, at, reason, main, secondary, description, why, measure, targetDate, limits }`. Jamais modifiées après coup.
+- `planning.items` : `{ id, weekStart (lundi), day 0–6, start HH:MM, durationMin, kind, title, templateId?, moves[] }`.
+  Les horaires fixes ne sont pas stockés : ils sont recalculés depuis l'onboarding.
+
 ## À concevoir (phases suivantes)
-Profil, consentements, objectifs versionnés, mesures (statut mesuré/déclaré/estimé), planning, nutrition, course, règles versionnées, paliers du personnage.
+Consentements versionnés, historique des mesures corporelles, nutrition, course, règles de progression versionnées, lien séance prévue ↔ réalisée par identifiant.

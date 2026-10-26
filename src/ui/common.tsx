@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import type { SessionOutcome } from '../engine/types';
+import type { Route } from './App';
 import { OUTCOME_LABEL } from './support';
 
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
@@ -49,6 +50,20 @@ export function NotBuilt({ title, phase, children }: { title: string; phase: str
         <span className="badge">Non implémenté</span>
       </div>
       <p className="muted" style={{ marginTop: 8 }}>Prévu en {phase}. {children}</p>
+    </div>
+  );
+}
+
+/** Bascule entre la semaine planifiée et les modèles de séance (onglet Programme). */
+export function ProgramTabs({ current, go }: { current: 'planning' | 'program'; go: (r: Route) => void }) {
+  return (
+    <div className="chips" role="group" aria-label="Vue du programme" style={{ marginBottom: 16 }}>
+      <button className="chip" aria-pressed={current === 'planning'} onClick={() => go({ name: 'planning' })}>
+        Semaine
+      </button>
+      <button className="chip" aria-pressed={current === 'program'} onClick={() => go({ name: 'program' })}>
+        Mes séances
+      </button>
     </div>
   );
 }
