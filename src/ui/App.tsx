@@ -23,6 +23,7 @@ import { NutritionPage, NutritionSetup } from './Nutrition';
 import { AgendaPage } from './WeekSetup';
 import { KitchenPage } from './Kitchen';
 import { GearPage } from './Gear';
+import { LiveRun } from './LiveRun';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -45,6 +46,7 @@ export type Route =
   | { name: 'agenda' }
   | { name: 'kitchen' }
   | { name: 'gear' }
+  | { name: 'run' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -64,7 +66,7 @@ export function App() {
   const { mode: winterMode } = useWinterMode(repo);
   const winterOn = winterInfo(winterMode, localDay(Date.now(), deviceTimeZone()), winterForced()).active;
   // Zone sombre uniquement pendant l'entraînement (et sur la page Winter Arc) ; ailleurs, thème clair (bleu en novembre).
-  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding' || route.name === 'coachProgram' || route.name === 'nutritionSetup' || route.name === 'agenda';
+  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding' || route.name === 'coachProgram' || route.name === 'nutritionSetup' || route.name === 'agenda' || route.name === 'run';
   useEffect(() => {
     if (zone) document.documentElement.dataset.theme = 'zone';
     else if (winterOn) document.documentElement.dataset.theme = 'winter';
@@ -105,6 +107,7 @@ export function App() {
   if (route.name === 'coachProgram') return <CoachProgram repo={repo} go={go} />;
   if (route.name === 'nutritionSetup') return <NutritionSetup repo={repo} go={go} />;
   if (route.name === 'agenda') return <AgendaPage repo={repo} go={go} />;
+  if (route.name === 'run') return <LiveRun repo={repo} go={go} />;
 
   if (route.name === 'session') {
     const id = route.id;

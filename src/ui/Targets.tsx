@@ -170,7 +170,7 @@ export function RunModal({ open, onClose, repo, t, onProved }: { open: boolean; 
   }, [open]);
   const k = Number(km.replace(',', '.'));
   const m = min.trim() === '' ? undefined : Number(min.replace(',', '.'));
-  const valid = km.trim() !== '' && k > 0 && k < 100 && (m === undefined || (m > 0 && m < 1000)) && effort !== undefined && !!shot;
+  const valid = km.trim() !== '' && k > 0 && k < 100 && (m === undefined || (m > 0 && m < 1000)) && effort !== undefined;
   const target = t.run.value?.km;
   return (
     <Modal open={open} onClose={onClose} title="J’ai couru">
@@ -192,19 +192,23 @@ export function RunModal({ open, onClose, repo, t, onProved }: { open: boolean; 
           ))}
         </div>
         <label className={`chip ${shot ? 'on' : ''}`} style={{ alignSelf: 'flex-start', cursor: 'pointer' }}>
-          {shot ? <Check size={14} aria-hidden="true" /> : <Camera size={14} aria-hidden="true" />} Photo de la montre
+          {shot ? <Check size={14} aria-hidden="true" /> : <Camera size={14} aria-hidden="true" />} Photo de la montre (facultatif)
           <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => setShot(e.target.files?.[0])} />
         </label>
+        {!shot && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>Sans photo : course déclarée, pas comptée dans le défi. Avec « Go », le GPS sert de preuve.</p>}
         {err && <p className="hs-err" role="alert">{err}</p>}
         <button
           className="btn primary block"
           disabled={!valid}
           onClick={async () => {
             if (!valid) return;
-            const e = await saveProof(repo, t.today, 'run', shot!);
-            if (e) return setErr(e);
+            // Avec photo du jour : compte pour le défi. Sans photo : course déclarée (utilisée pour la progression).
+            if (shot) {
+              const e = await saveProof(repo, t.today, 'run', shot);
+              if (e) return setErr(e);
+            }
             await t.addRun({ id: newId(), day: t.today, km: k, minutes: m, effort, at: Date.now() });
-            onProved();
+            if (shot) onProved();
             onClose();
           }}
         >

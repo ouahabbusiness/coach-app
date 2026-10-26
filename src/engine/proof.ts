@@ -11,6 +11,8 @@ export interface Proof {
   /** Date de la photo (fichier), en ms epoch. */
   takenAt: number;
   savedAt: number;
+  /** 'gps' : course mesurée par le GPS de l'app (pas de photo). */
+  source?: 'photo' | 'gps';
 }
 
 export type ProofDay = Record<string, Proof>;

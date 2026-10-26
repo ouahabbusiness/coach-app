@@ -233,7 +233,7 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
               {fromApp ? (
                 <span className="badge ok">séance app</span>
               ) : proof ? (
-                <img className="hs-thumb" src={proof.photo} alt={`Preuve : ${g.label}`} />
+                proof.source === 'gps' ? <span className="badge ok">GPS</span> : <img className="hs-thumb" src={proof.photo} alt={`Preuve : ${g.label}`} />
               ) : day === today ? (
                 <ShotButton
                   label="Preuve"

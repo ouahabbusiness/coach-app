@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Pencil, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -329,8 +329,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           </button>
         )}
         {hero?.kind === 'planned' && hero.item.kind === 'course' && !targets.ranToday && (
-          <button className="btn sm" onClick={() => setRunning(true)}>
-            <Camera size={14} aria-hidden="true" /> J’ai couru
+          <button className="icon-btn primary" aria-label="Lancer la course guidée" onClick={() => go({ name: 'run' })}>
+            <Play size={18} aria-hidden="true" />
           </button>
         )}
         {hero?.kind === 'planned' && hero.tpl && (
@@ -358,9 +358,14 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         {targets.ranToday ? (
           <span className="pill num">✓ {targets.runs.filter((r) => r.day === today).reduce((n, r) => n + r.km, 0).toLocaleString('fr-BE')} km</span>
         ) : (
-          <button className="btn sm" onClick={() => setRunning(true)}>
-            <Camera size={14} aria-hidden="true" /> J’ai couru
-          </button>
+          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+            <button className="btn sm ghost" onClick={() => setRunning(true)} aria-label="Saisir une course faite">
+              <Pencil size={14} aria-hidden="true" />
+            </button>
+            <button className="btn sm primary" onClick={() => go({ name: 'run' })}>
+              <Play size={14} aria-hidden="true" /> Go
+            </button>
+          </div>
         )}
       </section>
 
