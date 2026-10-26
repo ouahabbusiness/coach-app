@@ -913,3 +913,27 @@ main.content .btn.block[style*="space-between"] { min-height: 52px; border-radiu
 .book-arrow { font-size: 1.4rem; padding-bottom: 10px; }
 .book-sum { margin: 0; font-weight: 700; min-height: 1.2em; }
 .book-from { display: block; font-size: 1.6rem; font-weight: 800; text-align: center; padding: 8px 0; border-bottom: 1.5px dashed color-mix(in srgb, var(--ink) 25%, transparent); cursor: pointer; }
+
+/* Consigne de charge en séance (« Trop facile : 17,5 kg, monte ») */
+.hud-order { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); animation: order-in 420ms cubic-bezier(.2,.9,.3,1.3) both; }
+.hud-order strong { font-size: 1.35rem; letter-spacing: -0.02em; }
+.hud-order > span:last-child { font-size: 0.8rem; color: var(--text-2); }
+.hud-order-tag { font-family: var(--font-mono, monospace); font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--text); color: var(--bg); }
+.hud-order.facile { border-color: var(--text); box-shadow: 0 0 0 1px var(--text), 0 0 24px rgb(243 236 220 / 0.15); }
+.hud-order.facile strong { animation: order-pulse 1.6s ease-in-out infinite; }
+.hud-order.manqué .hud-order-tag { background: var(--warn); }
+@keyframes order-in { from { transform: translateY(6px) scale(0.97); opacity: 0; } }
+@keyframes order-pulse { 50% { opacity: 0.55; } }
+
+/* Cibles calculées : justification et course */
+.why-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; counter-reset: why; }
+.why-list li { counter-increment: why; display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface-2, var(--accent-soft)); font-weight: 600; font-size: 0.9rem; }
+.why-list li::before { content: counter(why); width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 0.7rem; background: var(--accent); color: var(--on-accent, #fff); flex: none; }
+div.why-list { flex-direction: row; flex-wrap: wrap; }
+.warn-pill { background: var(--warn-soft); color: var(--warn); }
+.run-row .icon-chip { border: 0; cursor: pointer; }
+.run-row.done { background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface)); }
+.run-goal { margin: 0; font-size: 0.9rem; color: var(--text-2); }
+.run-goal strong { font-size: 1.5rem; color: var(--text); }
+.effort { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.effort .chip { padding: 0; justify-content: center; min-width: 0; }

@@ -26,6 +26,8 @@ export interface PlannedSet {
   restSeconds: number;
   /** Consigne d'exécution saisie par l'utilisateur (ex. « prise neutre »). */
   cue?: string;
+  /** Ajustement calculé au lancement d'après la dernière séance (ex. « ↑ +2,5 kg »). */
+  progression?: string;
 }
 
 export interface SessionPlan {

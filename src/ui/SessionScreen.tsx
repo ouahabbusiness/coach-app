@@ -3,6 +3,7 @@ import { Check, ChevronLeft, History, Minus, MoreHorizontal, Pause, Play, Plus, 
 import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
+import { liveLoad } from '../engine/progression';
 import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
 import type { Repository } from '../storage/db';
@@ -98,6 +99,8 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const openInterruption = state.interruptions.find((i) => i.end === undefined);
   const focusInfo = focus ? findVariant(focus.planned.variantId) : undefined;
   const comparable = focus ? lastComparable(history, focus.planned.variantId, state.startedAt) : undefined;
+  // Consigne en direct : si la série d'avant était trop facile, la suivante monte.
+  const order = focus && focus.status === 'pending' ? liveLoad(state, focus.planned) : undefined;
   const setsDone = state.sets.filter((s) => s.status === 'done' || s.status === 'skipped').length;
   const blocks: { blockId: string; name: string; icon?: LucideIcon; done: number; total: number }[] = [];
   for (const s of state.sets) {
@@ -168,6 +171,21 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
               {focus.planned.kind === 'reps' ? focus.planned.targetReps ?? '?' : focus.planned.targetSeconds ?? '?'}
               <span>{focus.planned.kind === 'reps' ? 'rép.' : 's'}</span>
             </div>
+            {order && (
+              <div className={`hud-order ${order.reason}`} role="status" key={`${focus.planned.id}-order`}>
+                <span className="hud-order-tag">{order.reason === 'facile' ? 'Trop facile' : order.reason === 'manqué' ? 'Trop lourd' : 'Charge'}</span>
+                <strong className="num">
+                  {order.loadKg !== undefined ? `${order.loadKg.toLocaleString('fr-BE')} kg` : `${order.targetReps} rép.`}
+                </strong>
+                <span>{order.reason === 'facile' ? 'monte, vas-y' : order.reason === 'manqué' ? 'redescends' : 'garde'}</span>
+              </div>
+            )}
+            {!order && focus.planned.progression && (
+              <div className="hud-order prog" role="status">
+                <span className="hud-order-tag">Dernière séance</span>
+                <strong className="num">{focus.planned.progression}</strong>
+              </div>
+            )}
             {(focus.planned.cue || focus.planned.loadKg || focus.planned.assistance) && (
               <div className="hud-chips">
                 {focus.planned.cue && <span className="pill">{focus.planned.cue}</span>}
@@ -370,7 +388,8 @@ function ResultEntry({ state, set, act }: { state: SessionState; set: SetState; 
   // Valeurs de départ pour faciliter la saisie ; rien n'est enregistré sans validation.
   const [reps, setReps] = useState<number>(saved?.reps ?? p.targetReps ?? 0);
   const [seconds, setSeconds] = useState<number>(saved?.seconds ?? measuredSeconds ?? p.targetSeconds ?? 0);
-  const [loadKg, setLoadKg] = useState<string>(String(saved?.loadKg ?? p.loadKg ?? ''));
+  const advised = liveLoad(state, p)?.loadKg;
+  const [loadKg, setLoadKg] = useState<string>(String(saved?.loadKg ?? advised ?? p.loadKg ?? ''));
   const [rir, setRir] = useState<number | undefined>(saved?.rir);
   const [error, setError] = useState<string | null>(null);
   const name = findVariant(p.variantId)?.variant.name ?? p.variantId;

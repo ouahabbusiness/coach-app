@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Camera, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -10,6 +10,7 @@ import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
 import { addWater, daysUntil } from '../engine/daily';
 import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
+import { RunModal, WhyModal, useTargets } from './Targets';
 import { useReading } from './Reading';
 import { localDay } from '../engine/derive';
 import { estimateMinutes } from '../engine/disruption';
@@ -205,6 +206,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const habits = useDayHabits(repo, today);
   const { daily, saveDaily } = habits;
   const [sheet, setSheet] = useState(false);
+  const [why, setWhy] = useState<'water' | 'kcal' | 'run' | null>(null);
+  const [running, setRunning] = useState(false);
   const reading = useReading(repo);
   const { mode: winterMode } = useWinterMode(repo);
   const winter = winterInfo(winterMode, today, winterForced());
@@ -261,6 +264,11 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   const challengeOn = today >= NOVEMBER_2026.start && today <= NOVEMBER_2026.end;
   const habitsDone = habits.done;
+  const trainingMin = hero?.kind === 'planned' && hero.tpl ? hero.item.adapted?.estimatedMin ?? estimateMinutes(hero.tpl.lines) : hero?.kind === 'open' ? 60 : 0;
+  const targets = useTargets(repo, weight.days, trainingMin);
+  const waterL = targets.water.value;
+  const kcal = targets.calories.value;
+  const runKm = targets.run.value?.km;
   const pageNow = reading.book ? currentPage(reading.log, reading.book.id) : undefined;
   const sleepBars = Math.min(8, Math.round(daily?.sleepH ?? 0));
 
@@ -340,6 +348,23 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         )}
       </section>
 
+      <section className={`ui-card list-row run-row ${targets.ranToday ? 'done' : ''}`} aria-label="Course">
+        <button className="icon-chip accent" onClick={() => setWhy('run')} aria-label="Pourquoi cette distance">
+          <Footprints size={16} aria-hidden="true" />
+        </button>
+        <div className="grow">
+          <p className="eyebrow">{targets.ranToday ? 'Course faite' : targets.run.value?.move === 'départ' ? 'Course · départ' : 'Prochaine course'}</p>
+          <p className="row-title num">{runKm !== undefined ? `${runKm.toLocaleString('fr-BE')} km` : '—'}</p>
+        </div>
+        {targets.ranToday ? (
+          <span className="pill num">✓ {targets.runs.filter((r) => r.day === today).reduce((n, r) => n + r.km, 0).toLocaleString('fr-BE')} km</span>
+        ) : (
+          <button className="btn sm" onClick={() => setRunning(true)}>
+            <Camera size={14} aria-hidden="true" /> J’ai couru
+          </button>
+        )}
+      </section>
+
       <div className="kpi-grid">
         <Kpi icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')} value={daily?.sleepH !== undefined ? fmtHours(daily.sleepH) : '—'}>
           <div className="bars" aria-hidden="true">
@@ -363,8 +388,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           icon={<Droplet size={16} aria-hidden="true" />}
           label="Eau"
           value={`${((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L`}
-          sub={waterGoal ? `/ ${(waterGoal / 1000).toLocaleString('fr-BE')} L` : undefined}
-          onLabel={() => openEditor('waterGoal')}
+          sub={waterL ? `/ ${(waterL / 1000).toLocaleString('fr-BE')} L` : undefined}
+          onLabel={() => setWhy('water')}
         >
           <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
             <button className="icon-btn" aria-label="Retirer 250 ml" onClick={() => saveDaily(addWater(daily, -250, Date.now()))}>
@@ -373,22 +398,27 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
             <button className="icon-btn primary" aria-label="Ajouter 250 ml" onClick={() => saveDaily(addWater(daily, 250, Date.now()))}>
               <Plus size={16} aria-hidden="true" />
             </button>
-            {!waterGoal && (
-              <button className="pill" onClick={() => openEditor('waterGoal')}>
-                objectif ?
-              </button>
-            )}
+            <button className="pill" onClick={() => setWhy('water')} aria-label="Pourquoi cette cible d’eau">
+              {waterL ? `${Math.min(100, Math.round(((daily?.waterMl ?? 0) / waterL) * 100))} %` : '?'}
+            </button>
           </div>
         </Kpi>
 
         <Kpi
           icon={<Flame size={16} aria-hidden="true" />}
           label="Calories"
-          onClick={() => openEditor('activeKcal')}
-          value={daily?.activeKcal !== undefined ? fmtNum(daily.activeKcal) : '—'}
-          sub="kcal actives"
+          onClick={() => setWhy('kcal')}
+          value={kcal ? fmtNum(kcal.kcal) : '—'}
+          sub={kcal ? 'kcal cible' : undefined}
         >
-          <span className="pill"><Watch size={12} aria-hidden="true" /> montre</span>
+          <div className="row" style={{ gap: 6 }}>
+            {kcal ? <span className="pill num">P {kcal.proteinG} g</span> : <span className="pill">calculer ?</span>}
+            {daily?.activeKcal !== undefined && (
+              <span className="pill num">
+                <Watch size={12} aria-hidden="true" /> {fmtNum(daily.activeKcal)}
+              </span>
+            )}
+          </div>
         </Kpi>
       </div>
 
@@ -455,6 +485,33 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           <Meter value={(daily?.readPages ?? 0) / DAILY_PAGES} />
         </Kpi>
       </div>
+
+      <WhyModal open={why === 'water'} onClose={() => setWhy(null)} title="Eau" c={targets.water} />
+      <WhyModal open={why === 'run'} onClose={() => setWhy(null)} title="Course" c={targets.run} />
+      <WhyModal open={why === 'kcal'} onClose={() => setWhy(null)} title="Calories" c={targets.calories}>
+        <div className="chips" role="group" aria-label="Formule">
+          {(['homme', 'femme'] as const).map((x) => (
+            <button key={x} className="chip" aria-pressed={targets.sex === x} onClick={() => targets.setSex(x)}>
+              Formule {x}
+            </button>
+          ))}
+        </div>
+        {targets.calories.missing.some((m) => m !== 'formule homme/femme') && (
+          <button className="btn ghost" onClick={() => go({ name: 'onboarding' })}>
+            Compléter mon profil
+          </button>
+        )}
+        <button
+          className="btn ghost"
+          onClick={() => {
+            setWhy(null);
+            openEditor('activeKcal');
+          }}
+        >
+          <Watch size={14} aria-hidden="true" /> Actives montre
+        </button>
+      </WhyModal>
+      <RunModal open={running} onClose={() => setRunning(false)} repo={repo} t={targets} onProved={() => habits.setCheck('run', true)} />
 
       <HabitsSheet open={sheet} onClose={() => setSheet(false)} h={habits} onReading={() => go({ name: 'reading' })} />
 
