@@ -30,6 +30,7 @@ import { fitPlanning } from './agenda';
 import { loadFree } from './FreeWork';
 import { lightLoadsReport, OVERRIDES } from './actions';
 import { loadJournal, type JournalEntry } from './journal';
+import { acceptDeload, closeDeload, recoveryReport, refuseDeload, type RecoveryReport } from './deload';
 import type { LightLoad } from '../engine/progression';
 import { loadPlanning } from './Planning';
 import { loadOnboarding } from './profileStore';
@@ -658,6 +659,8 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   const [pullYesterday, setPullYesterday] = useState(0);
   const [pullToday, setPullToday] = useState<string[]>([]);
   const [proposals, setProposals] = useState<JournalEntry[]>([]);
+  const [rec, setRec] = useState<RecoveryReport | null>(null);
+  const loadRec = () => recoveryReport(repo).then(setRec);
   const loadProposals = async () => {
     const resolved = new Set((await repo.getKv<string[]>('proposals.resolved')) ?? []);
     const j = await loadJournal(repo);
@@ -678,6 +681,7 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   useEffect(() => {
     lightLoadsReport(repo).then(setLight);
     loadProposals();
+    loadRec();
     (async () => {
       const t = localDay(Date.now(), deviceTimeZone());
       const day = (new Date(`${t}T12:00:00Z`).getUTCDay() + 6) % 7;
@@ -764,6 +768,7 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           </div>
         </section>
       ))}
+      {rec && <RecoveryCard rec={rec} onAccept={async () => { await acceptDeload(repo, rec.proposal.reasons); await loadRec(); }} onRefuse={async () => { await refuseDeload(repo, rec.proposal.reasons); await loadRec(); }} onClose={async () => { await closeDeload(repo); await loadRec(); }} />}
       {light.length > 0 && (
         <section className="ui-card stack light-card" aria-label="Charges trop légères" style={{ marginTop: 10 }}>
           <p className="eyebrow" style={{ margin: 0 }}>Coach · charges trop légères</p>
@@ -825,4 +830,64 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
       </button>
     </>
   );
+}
+
+/** Stagnation / récupération : rien sur une seule séance ; phase allégée proposée, jamais imposée ; puis réévaluation. */
+function RecoveryCard({ rec, onAccept, onRefuse, onClose }: { rec: RecoveryReport; onAccept: () => void; onRefuse: () => void; onClose: () => void }) {
+  const stuck = rec.trends.filter((t) => t.trend === 'stable' || t.trend === 'baisse');
+  const d = rec.deload;
+  if (d?.status === 'active' && !rec.reevaluate) {
+    return (
+      <section className="ui-card stack light-card" aria-label="Phase allégée" style={{ marginTop: 10 }}>
+        <p className="eyebrow" style={{ margin: 0 }}>Coach · phase allégée jusqu’au {d.to}</p>
+        <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{d.reason}</p>
+        <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>≈ 40 % de séries en moins, réserve +1, pas d’échec. Ces séances ne comptent pas pour la progression.</p>
+      </section>
+    );
+  }
+  if (rec.reevaluate) {
+    return (
+      <section className="ui-card stack light-card" aria-label="Réévaluation" style={{ marginTop: 10 }}>
+        <p className="eyebrow" style={{ margin: 0 }}>Coach · réévaluation après phase allégée</p>
+        <ul className="cq-rules">
+          {rec.trends.map((t) => (
+            <li key={t.variantId}>{t.name} : {t.trend} — {t.reason}</li>
+          ))}
+        </ul>
+        <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+          Retour aux charges d’avant. Les 2 prochaines séances comparables servent de référence. Si la stagnation persiste, le coach proposera de changer de variante ou de plage (à valider).
+        </p>
+        <button className="btn sm primary" onClick={onClose} style={{ alignSelf: 'flex-start' }}>
+          Reprendre le programme
+        </button>
+      </section>
+    );
+  }
+  if (rec.proposal.propose) {
+    return (
+      <section className="ui-card stack light-card" aria-label="Phase allégée proposée" style={{ marginTop: 10 }}>
+        <p className="eyebrow" style={{ margin: 0 }}>Coach · à valider</p>
+        <p className="row-title" style={{ margin: 0 }}>Phase allégée de 6 jours</p>
+        {rec.proposal.reasons.map((r) => (
+          <p key={r} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{r}</p>
+        ))}
+        <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>≈ 40 % de séries en moins, réserve +1, pas d’échec, puis réévaluation. Seuils = choix de conception, pas une loi.</p>
+        <div className="row" style={{ gap: 6 }}>
+          <button className="btn sm primary" onClick={onAccept}>Valider</button>
+          <button className="btn sm ghost" onClick={onRefuse}>Continuer normalement</button>
+        </div>
+      </section>
+    );
+  }
+  if (stuck.length && rec.proposal.first.length) {
+    return (
+      <section className="ui-card stack" aria-label="Stagnation : d’abord" style={{ marginTop: 10 }}>
+        <p className="eyebrow" style={{ margin: 0 }}>Coach · avant de changer le programme</p>
+        {rec.proposal.first.map((r) => (
+          <p key={r} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{r}</p>
+        ))}
+      </section>
+    );
+  }
+  return null;
 }

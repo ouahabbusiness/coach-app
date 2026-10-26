@@ -1,5 +1,6 @@
 import { decide, project } from '../engine/session';
-import { currentResult } from '../engine/derive';
+import { currentResult, localDay } from '../engine/derive';
+import { DELOAD, deloadSets, inDeload, type Deload } from '../engine/stagnation';
 import { lightLoad, nextSessionAdjust, type LightLoad } from '../engine/progression';
 import { decide as decideProgression, type Decision, type Sample } from '../engine/decide';
 import { findVariant } from '../catalog/exercises';
@@ -84,6 +85,11 @@ export async function samplesFor(repo: Repository, states: SessionState[], set: 
  * tant qu'elle n'est pas validée. Baisse validée (override) → appliquée une fois puis effacée.
  */
 export async function withProgression(repo: Repository, plan: SessionPlan): Promise<SessionPlan> {
+  // Phase allégée validée : pas de progression, séries réduites, réserve +1, pas d'échec.
+  const deload = await repo.getKv<Deload>(DELOAD);
+  if (inDeload(deload ?? undefined, localDay(Date.now(), deviceTimeZone()))) {
+    return { ...plan, sets: deloadSets(plan.sets, `Phase allégée (validée) jusqu’au ${deload!.to} : moins de séries, réserve +1, pas d’échec.`) };
+  }
   const states = [...(await repo.allSessionEvents()).values()].map((ev) => project(ev)).filter((s): s is SessionState => s !== null);
   const eq = await loadEquipment(repo);
   const weights = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];

@@ -3,12 +3,13 @@
 import 'fake-indexeddb/auto';
 // @ts-ignore -- module Node disponible pendant les tests (types Node non installés)
 import { webcrypto } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CoachDb, Repository } from '../src/storage/db';
 import { decide, project } from '../src/engine/session';
 import type { SessionCommand, SetResult } from '../src/engine/types';
 import { startSessionFromTemplate } from '../src/ui/actions';
 import { loadJournal } from '../src/ui/journal';
+import { acceptDeload, recoveryReport } from '../src/ui/deload';
 import type { SessionTemplate } from '../src/ui/templates';
 
 // Node 18 : `crypto` n'est pas global (il l'est dans le navigateur).
@@ -107,5 +108,38 @@ describe('parcours complet du coach', () => {
     const s2 = await startSessionFromTemplate(repo, tpl);
     expect((await planOf(repo, s2)).every((s) => s.loadKg === 10)).toBe(true);
     expect((await loadJournal(repo)).at(-1)?.missing).toContain('réserve (RIR)');
+  });
+
+  it('stagnation sur 3 séances comparables / 14 jours (2 exercices) → phase allégée proposée ; validée → séries réduites, réserve +1, puis réévaluation', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const repo = await freshRepo('journey-deload');
+      const two: SessionTemplate = { ...tpl, id: 'prog-B', lines: [...tpl.lines, { ...tpl.lines[0]!, id: 'l2', variantId: 'dips-weighted' }] };
+      const same = { reps: 8, rir: 2, loadKg: 10 };
+      // Une seule séance : aucune conclusion.
+      vi.setSystemTime(new Date('2026-11-02T18:00:00'));
+      await doSession(repo, await startSessionFromTemplate(repo, two), Array(6).fill(same));
+      expect((await recoveryReport(repo)).proposal.propose).toBe(false);
+      for (const d of ['2026-11-09', '2026-11-16']) {
+        vi.setSystemTime(new Date(`${d}T18:00:00`));
+        await doSession(repo, await startSessionFromTemplate(repo, two), Array(6).fill(same));
+      }
+      const rep = await recoveryReport(repo);
+      expect(rep.trends.map((t) => t.trend)).toEqual(['stable', 'stable']);
+      expect(rep.proposal.propose).toBe(true);
+
+      await acceptDeload(repo, rep.proposal.reasons);
+      vi.setSystemTime(new Date('2026-11-18T18:00:00'));
+      const s = await startSessionFromTemplate(repo, two);
+      const work = await planOf(repo, s);
+      expect(work).toHaveLength(4);
+      expect(work.every((x) => x.targetRir === 3 && x.loadKg === 10)).toBe(true);
+      // Pendant la phase : pas de nouvelle proposition. Après : réévaluation.
+      expect((await recoveryReport(repo)).proposal.propose).toBe(false);
+      vi.setSystemTime(new Date('2026-11-24T18:00:00'));
+      expect((await recoveryReport(repo)).reevaluate).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
