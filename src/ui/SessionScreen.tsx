@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronLeft, History, ImageOff, Minus, Pause, Play, Plus, SkipForward, Square, Timer, TriangleAlert, Undo2, X } from 'lucide-react';
+import { Check, ChevronLeft, History, Minus, MoreHorizontal, Pause, Play, Plus, SkipForward, Square, TriangleAlert, Undo2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
@@ -33,16 +33,6 @@ function describeResult(r: SetResult | undefined): string {
   return parts.join(' · ') || 'saisi sans valeur';
 }
 
-/** Paramètre compact de la série (libellé + valeur). */
-function Param({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
-  return (
-    <div className={`hud-param ${wide ? 'wide' : ''}`}>
-      <span className="hud-label">{label}</span>
-      <span className="hud-param-v num">{value}</span>
-    </div>
-  );
-}
-
 function setPosition(st: SessionState, set: SetState): string {
   const same = st.sets.filter((s) => s.planned.blockId === set.planned.blockId);
   return `Série ${same.indexOf(set) + 1}/${same.length}`;
@@ -55,8 +45,9 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   const [history, setHistory] = useState<SessionState[]>([]);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [entryId, setEntryId] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | null>(null);
+  const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | 'menu' | null>(null);
   const [live, setLive] = useState('');
+  const [flash, setFlash] = useState(0);
 
   useEffect(() => {
     repo.allSessionEvents().then((map) => {
@@ -71,12 +62,20 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   }, [repo, sessionId]);
 
   useEffect(() => {
+    if (!flash) return;
+    const id = window.setTimeout(() => setFlash(0), 750);
+    return () => window.clearTimeout(id);
+  }, [flash]);
+
+  useEffect(() => {
     if (state?.phase === 'ended') onSummary();
   }, [state?.phase, onSummary]);
 
   const act = async (cmd: Parameters<typeof send>[0], message?: string): Promise<SendResult> => {
     const res = await send(cmd);
     if (res.ok && message) setLive(message);
+    // Effet visuel de validation (flash + pulsation) sur les actions clés.
+    if (res.ok && ['start_set', 'end_set', 'end_interruption', 'record_result', 'skip_set'].includes(cmd.type)) setFlash(Date.now());
     return res;
   };
 
@@ -115,139 +114,110 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   return (
     <div className="session hud">
       <header className="hud-top">
-        <button className="icon-btn" onClick={onExit} aria-label="Quitter l’écran de séance (la séance reste en cours)">
+        <button className="icon-btn ghost" onClick={onExit} aria-label="Quitter l’écran de séance (la séance reste en cours)">
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <div className="grow">
           <p className="hud-label">Mission</p>
           <p className="row-title">{state.plan.title}</p>
         </div>
-        <span className="pill num" aria-label={`Durée totale ${fmtDuration(t.totalMs)}`}>
-          <Timer size={12} aria-hidden="true" /> {fmtDuration(t.totalMs)}
-        </span>
-        <button className="btn sm" onClick={() => setDialog('end')}>
-          Terminer
+        <button className="icon-btn ghost hud-pain" aria-label="Signaler une douleur ou un problème" onClick={() => setDialog('pain')}>
+          <TriangleAlert size={17} aria-hidden="true" />
+        </button>
+        <button className="icon-btn ghost" aria-label="Options de la séance" onClick={() => setDialog('menu')}>
+          <MoreHorizontal size={18} aria-hidden="true" />
         </button>
       </header>
+      <div className="hud-progress" aria-label={`${setsDone} séries sur ${state.sets.length}`}>
+        <span className="meter">
+          <span style={{ width: `${(setsDone / Math.max(1, state.sets.length)) * 100}%` }} />
+        </span>
+        <span className="hud-progress-txt num">
+          {setsDone}/{state.sets.length} · {fmtDuration(t.totalMs)}
+        </span>
+      </div>
 
       <div className="session-body hud-body">
         <div aria-live="polite" className="sr-only">{live}</div>
-        {storageError && <Notice tone="danger">Échec d’enregistrement : dernière action non sauvegardée. ({storageError})</Notice>}
-        {state.safetyStop && <Notice tone="danger">Arrêt pour douleur. Pas de diagnostic : si ça persiste, avis médical.</Notice>}
-
-        <section className="ui-card hud-stats" aria-label="Avancement de la mission">
-          <div className="hud-stat">
-            <span className="hud-label">Exos</span>
-            <span className="hud-num num">
-              {blocks.filter((b) => b.done === b.total).length}/{blocks.length}
-            </span>
-          </div>
-          <div className="hud-stat">
-            <span className="hud-label">Séries</span>
-            <span className="hud-num num">
-              {setsDone}/{state.sets.length}
-            </span>
-          </div>
-          <div className="hud-stat">
-            <span className="hud-label">Actif</span>
-            <span className="hud-num num">{fmtDuration(t.activeMs)}</span>
-          </div>
-          <div className="hud-stat">
-            <span className="hud-label">Repos</span>
-            <span className="hud-num num">{fmtDuration(t.restMs)}</span>
-          </div>
-          <span className="meter hud-meter" aria-hidden="true">
-            <span style={{ width: `${(setsDone / Math.max(1, state.sets.length)) * 100}%` }} />
-          </span>
-        </section>
+        {storageError && <Notice tone="danger">Échec d’enregistrement : dernière action non sauvegardée.</Notice>}
+        {state.safetyStop && <Notice tone="danger">Arrêt pour douleur. Si ça persiste : avis médical.</Notice>}
 
         {state.phase === 'interrupted' && openInterruption ? (
-          <section className="ui-card hud-main" aria-label="Interruption">
-            <div className="spread">
-              <span className="hud-tag">Interruption · {openInterruption.reason}</span>
-              <span className="hud-status">Pause</span>
-            </div>
+          <section className="hud-core" aria-label="Interruption">
+            <span className="hud-tag">Pause · {openInterruption.reason}</span>
             <div className="hud-clock num">{fmtDuration(now - openInterruption.start)}</div>
-            <p className="hud-clock-label">Compté à part, pas comme repos.</p>
-            <button className="btn primary big" onClick={() => act({ type: 'end_interruption' }, 'Interruption terminée')}>
+            <button className={`btn primary big hud-cta ${flash ? 'pulse' : ''}`} onClick={() => act({ type: 'end_interruption' }, 'Interruption terminée')}>
               <Play size={18} aria-hidden="true" /> Reprendre
             </button>
           </section>
         ) : focus ? (
-          <section className={`ui-card hud-main ${inSet ? 'is-live' : ''}`} aria-label="Série en cours">
-            <div className="spread">
+          <section
+            key={`${focus.planned.id}-${state.phase}`}
+            className={`hud-core ${inSet ? 'is-live' : ''} ${flash ? 'flash' : ''}`}
+            aria-label="Série en cours"
+          >
+            <div className="hud-core-head">
               <span className="hud-tag num">
-                Exo {blocks.findIndex((b) => b.blockId === focus.planned.blockId) + 1}/{blocks.length} · {setPosition(state, focus)}
+                {blocks.findIndex((b) => b.blockId === focus.planned.blockId) + 1}/{blocks.length} · {setPosition(state, focus).replace('Série ', 'S')}
               </span>
               <span className={`hud-status ${inSet ? 'live' : ''}`}>{inSet ? 'En série' : state.phase === 'resting' ? 'Repos' : 'Prêt'}</span>
             </div>
             <h1 className="hud-title">{focusInfo?.variant.name ?? focus.planned.variantId}</h1>
-            <div className="hud-params">
-              <Param label="Cible" value={focus.planned.kind === 'reps' ? `${focus.planned.targetReps ?? '?'} rép.` : `${focus.planned.targetSeconds ?? '?'} s`} />
-              <Param label="Repos" value={fmtDuration(focus.planned.restSeconds * 1000)} />
-              {focus.planned.loadKg ? <Param label="Lest" value={`${focus.planned.loadKg} kg`} /> : null}
-              {focus.planned.assistance ? <Param label="Assist." value={focus.planned.assistance} /> : null}
-              {focus.planned.targetRir !== undefined ? <Param label="RIR" value={String(focus.planned.targetRir)} /> : null}
-              {focus.planned.cue ? <Param label="Consigne" value={focus.planned.cue} wide /> : null}
+
+            <div className="hud-target num" key={focus.planned.id}>
+              {focus.planned.kind === 'reps' ? focus.planned.targetReps ?? '?' : focus.planned.targetSeconds ?? '?'}
+              <span>{focus.planned.kind === 'reps' ? 'rép.' : 's'}</span>
             </div>
+            {(focus.planned.cue || focus.planned.loadKg || focus.planned.assistance) && (
+              <div className="hud-chips">
+                {focus.planned.cue && <span className="pill">{focus.planned.cue}</span>}
+                {focus.planned.loadKg ? <span className="pill num">+{focus.planned.loadKg} kg</span> : null}
+                {focus.planned.assistance && <span className="pill">{focus.planned.assistance}</span>}
+              </div>
+            )}
 
             <div className="hud-clock-wrap">
               {state.phase === 'resting' && lastRest && t.currentRestMs !== undefined ? (
                 <>
-                  <div className={`hud-clock num ${t.currentRestMs > lastRest.targetSeconds * 1000 ? 'over' : ''}`}>{fmtDuration(t.currentRestMs)}</div>
+                  <div className={`hud-clock num running ${t.currentRestMs > lastRest.targetSeconds * 1000 ? 'over' : ''}`}>{fmtDuration(t.currentRestMs)}</div>
                   <span className="meter" aria-hidden="true">
                     <span style={{ width: `${Math.min(100, (t.currentRestMs / Math.max(1, lastRest.targetSeconds * 1000)) * 100)}%` }} />
                   </span>
                   <p className="hud-clock-label num">
                     {t.currentRestMs > lastRest.targetSeconds * 1000
-                      ? `+${fmtDuration(t.currentRestMs - lastRest.targetSeconds * 1000)} au-delà de ${fmtDuration(lastRest.targetSeconds * 1000)}`
-                      : `Repos ${fmtDuration(lastRest.targetSeconds * 1000)}`}
+                      ? `+${fmtDuration(t.currentRestMs - lastRest.targetSeconds * 1000)}`
+                      : `repos ${fmtDuration(lastRest.targetSeconds * 1000)}`}
                   </p>
                 </>
               ) : inSet && t.currentSetMs !== undefined ? (
-                <>
-                  <div className="hud-clock num">{fmtDuration(t.currentSetMs)}</div>
-                  <p className="hud-clock-label">{focus.planned.kind === 'hold' ? `Cible ${focus.planned.targetSeconds ?? '?'} s` : 'Série en cours'}</p>
-                </>
+                <div className="hud-clock num running live">{fmtDuration(t.currentSetMs)}</div>
               ) : (
-                <>
-                  <div className="hud-clock num idle" aria-hidden="true">0:00</div>
-                  <p className="hud-clock-label">Prêt</p>
-                </>
+                <div className="hud-clock num idle" aria-hidden="true">0:00</div>
               )}
             </div>
 
             {inSet ? (
               <button
-                className="btn primary big"
+                className={`btn primary big hud-cta ${flash ? 'pulse' : ''}`}
                 onClick={() => act({ type: 'end_set', plannedSetId: focus.planned.id }, 'Série terminée, repos lancé').then(() => setEntryId(focus.planned.id))}
               >
                 <Square size={16} aria-hidden="true" /> Terminer la série
               </button>
             ) : (
-              <button className="btn primary big" disabled={state.safetyStop} onClick={() => act({ type: 'start_set', plannedSetId: focus.planned.id }, 'Série commencée')}>
-                <Play size={18} aria-hidden="true" /> Commencer la série
+              <button className={`btn primary big hud-cta ${flash ? 'pulse' : ''}`} disabled={state.safetyStop} onClick={() => act({ type: 'start_set', plannedSetId: focus.planned.id }, 'Série commencée')}>
+                <Play size={18} aria-hidden="true" /> Commencer
               </button>
             )}
-            <div className="hud-actions">
-              <button className="btn sm" disabled={!!inSet || state.safetyStop} onClick={() => setDialog('interrupt')}>
-                <Pause size={14} aria-hidden="true" /> Pause
-              </button>
-              <button className="btn sm" disabled={!!inSet} onClick={() => setDialog('skip')}>
-                <SkipForward size={14} aria-hidden="true" /> Passer
-              </button>
-              <button className="btn sm hud-danger" onClick={() => setDialog('pain')}>
-                <TriangleAlert size={14} aria-hidden="true" /> Douleur
-              </button>
-            </div>
-            <p className="row-meta">
-              <History size={12} aria-hidden="true" /> Dernière fois : {comparable ? comparable.results.map(describeResult).join(' / ') : '—'}
-            </p>
+            {comparable && (
+              <p className="hud-last num">
+                <History size={12} aria-hidden="true" /> {comparable.results.map(describeResult).join(' / ')}
+              </p>
+            )}
           </section>
         ) : (
-          <section className="ui-card hud-main" aria-label="Mission terminée">
-            <span className="hud-status">Mission accomplie</span>
-            <button className="btn primary big" onClick={() => setDialog('end')}>
+          <section className="hud-core" aria-label="Mission terminée">
+            <span className="hud-tag">Mission accomplie</span>
+            <button className={`btn primary big hud-cta ${flash ? 'pulse' : ''}`} onClick={() => setDialog('end')}>
               <Check size={18} aria-hidden="true" /> Terminer la séance
             </button>
           </section>
@@ -256,59 +226,72 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
         {entry && <ResultEntry key={entry.planned.id + entry.entries.length} state={state} set={entry} act={act} />}
 
         <section className="ui-card" aria-label="Plan de mission">
-          <p className="hud-label">Plan de mission</p>
-          <ul className="hud-sets">
-            {state.sets.map((s) => {
-              const name = findVariant(s.planned.variantId)?.variant.name ?? s.planned.variantId;
-              const res = currentResult(s);
-              const clickable = (s.status === 'pending' || s.status === 'done') && !inSet;
+          <p className="hud-label">Plan</p>
+          <ul className="hud-plan">
+            {blocks.map((b) => {
+              const sets = state.sets.filter((s) => s.planned.blockId === b.blockId);
+              const nextPending = sets.find((s) => s.status === 'pending');
+              const isCurrent = focus?.planned.blockId === b.blockId;
               return (
-                <li key={s.planned.id} className={`hud-set st-${s.status} ${s === focus ? 'current' : ''}`}>
-                  <span className="hud-set-ico" aria-hidden="true">
-                    {s.status === 'done' ? <Check size={12} /> : s.status === 'skipped' ? <X size={12} /> : s.status === 'in_progress' ? <Play size={10} /> : null}
-                  </span>
-                  <span className="hud-set-name">
-                    {name}
-                    <span className="hud-set-sub num">
-                      {setPosition(state, s).replace('Série ', 'S')} · {s.planned.kind === 'reps' ? `${s.planned.targetReps ?? '?'}` : `${s.planned.targetSeconds ?? '?'}s`}
-                      {s.planned.cue ? ` · ${s.planned.cue}` : ''}
+                <li key={b.blockId} className={isCurrent ? 'current' : ''}>
+                  <button
+                    className="hud-plan-row"
+                    disabled={!!inSet || !nextPending}
+                    onClick={() => nextPending && setFocusId(nextPending.planned.id)}
+                    aria-label={`${b.name} : ${b.done} séries sur ${b.total}`}
+                  >
+                    <span className="hud-plan-name">{findVariant(sets[0]!.planned.variantId)?.variant.name ?? b.name}</span>
+                    <span className="hud-plan-dots" aria-hidden="true">
+                      {sets.map((s) => (
+                        <span key={s.planned.id} className={`dot st-${s.status}`} />
+                      ))}
                     </span>
-                  </span>
-                  <span className="hud-set-res num">{s.status === 'done' ? (res ? describeResult(res) : '—') : s.status === 'skipped' ? 'passée' : ''}</span>
-                  {clickable && (
-                    <button className="btn ghost sm" onClick={() => (s.status === 'pending' ? setFocusId(s.planned.id) : setEntryId(s.planned.id))}>
-                      {s.status === 'pending' ? 'Choisir' : 'Corriger'}
-                    </button>
-                  )}
+                    <span className="hud-plan-count num">
+                      {b.done}/{b.total}
+                    </span>
+                  </button>
                 </li>
               );
             })}
           </ul>
-          <p className="row-meta">
-            {wake === 'active' ? 'Écran maintenu allumé' : wake === 'unsupported' ? 'Écran : maintien allumé non pris en charge' : ''}
-          </p>
         </section>
-
-        {focusInfo && (
-          <details className="ui-card">
-            <summary className="hud-summary">Consignes</summary>
-            {focusInfo.variant.media.length === 0 && (
-              <div className="media-missing">
-                <ImageOff size={16} aria-hidden="true" /> Pas de démonstration vérifiée
-              </div>
-            )}
-            <ul className="mini-list">
-              {focusInfo.variant.cues.map((c) => (
-                <li key={c}>• {c}</li>
-              ))}
-              {focusInfo.variant.commonErrors.map((c) => (
-                <li key={c}>✕ {c}</li>
-              ))}
-            </ul>
-            <span className="pill" style={{ alignSelf: 'flex-start' }}>Non relu par un pro</span>
-          </details>
-        )}
       </div>
+
+      <Modal open={dialog === 'menu'} onClose={() => setDialog(null)} title="Options">
+        <div className="stack">
+          <button className="btn block" disabled={!!inSet || state.safetyStop || state.phase === 'interrupted'} onClick={() => setDialog('interrupt')}>
+            <Pause size={16} aria-hidden="true" /> Pause
+          </button>
+          <button className="btn block" disabled={!!inSet || !focus} onClick={() => setDialog('skip')}>
+            <SkipForward size={16} aria-hidden="true" /> Passer la série
+          </button>
+          {state.sets.some((s) => s.status === 'done') && (
+            <button
+              className="btn block"
+              onClick={() => {
+                const last = [...state.sets].filter((s) => s.status === 'done').sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0];
+                if (last) setEntryId(last.planned.id);
+                setDialog(null);
+              }}
+            >
+              Corriger un résultat
+            </button>
+          )}
+          {focusInfo && (
+            <details>
+              <summary className="hud-summary">Consignes</summary>
+              <ul className="mini-list">
+                {focusInfo.variant.cues.map((c) => (
+                  <li key={c}>• {c}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <button className="btn primary block" onClick={() => setDialog('end')}>
+            Terminer la séance
+          </button>
+        </div>
+      </Modal>
 
       <Modal open={dialog === 'pain'} onClose={() => setDialog(null)} title="Douleur ou problème">
         <PainForm
