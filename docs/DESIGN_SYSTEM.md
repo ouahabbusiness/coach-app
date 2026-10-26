@@ -18,7 +18,7 @@ Outils : skills ui-ux-pro-max / brand / design. La palette « vibrant orange » 
 | Danger | #B42318 | #F97066 |
 
 ## Typographie
-Inter (texte) et Doto (chrono à points), auto-hébergées via @fontsource (licence OFL) pour le hors ligne.
+Poppins (titres), Plus Jakarta Sans (texte), Doto (chrono à points) — auto-hébergées via @fontsource (licence OFL).
 
 ## Illustrations
 - Pas de personnage (retiré à la demande de Hmidou, voir docs/CHARACTER.md).
@@ -34,7 +34,9 @@ Inter (texte) et Doto (chrono à points), auto-hébergées via @fontsource (lice
 Zéro paragraphe inutile : chiffres, badges, compteurs, icônes/emojis, cartes épurées. Explications derrière « ? » ou un détail repliable.
 
 ## Ambiance
-Fond selon l'heure (matin, jour, soir) en thème clair ; nuit = thème sombre bleu nuit, 1 h avant le coucher déclaré.
+Fond = forêt en blocs pixel originale (`src/ui/PixelForest.tsx`, aucune texture de jeu existant), déclinée matin, jour, soir, nuit.
+Nuit = thème sombre bleu nuit, 1 h avant le coucher déclaré. Cartes en verre dépoli.
+Fonds personnels possibles (jour / nuit) dans Réglages, stockés sur l'appareil.
 
 ## Ton du coach
 Ferme, factuel, jamais humiliant. Dit ce qu'il sait et ce qu'il ne sait pas.

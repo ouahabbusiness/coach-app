@@ -1,9 +1,11 @@
 /* Système visuel inspiré des maquettes fournies : clair, cartes arrondies, navigation flottante.
    Couleurs uniquement via ces tokens. */
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
+@import '@fontsource/plus-jakarta-sans/400.css';
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/600.css';
+@import '@fontsource/plus-jakarta-sans/700.css';
+@import '@fontsource/poppins/600.css';
+@import '@fontsource/poppins/700.css';
 @import '@fontsource/doto/700.css';
 
 :root {
@@ -31,8 +33,9 @@
   --shadow: 0 10px 30px rgb(20 40 32 / 0.08);
   --shadow-strong: 0 14px 40px rgb(20 40 32 / 0.16);
 
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-dots: 'Doto', 'Inter', monospace;
+  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-title: 'Poppins', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-dots: 'Doto', 'Plus Jakarta Sans', monospace;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -106,6 +109,18 @@
   --shadow-strong: 0 14px 40px rgb(0 0 0 / 0.55);
 }
 body { transition: background-color 600ms ease; }
+/* Forêt en blocs : fixe derrière le contenu, un voile garde le texte lisible. */
+.forest { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+.forest svg { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.tile, .hero-card, .card:not(.soft), .item {
+  background: var(--surface-glass);
+  backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
+}
+.forest-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgb(255 255 255 / 0.62) 0%, rgb(255 255 255 / 0.25) 35%, rgb(255 255 255 / 0) 60%); }
+:root[data-phase='nuit'] .forest-scrim { background: linear-gradient(180deg, rgb(10 14 30 / 0.35) 0%, rgb(10 14 30 / 0) 50%); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-phase='nuit']) .forest-scrim { background: linear-gradient(180deg, rgb(28 31 33 / 0.75) 0%, rgb(28 31 33 / 0.35) 40%, rgb(28 31 33 / 0.1) 70%); }
+}
 .bed-banner {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 16px;
   border-radius: 22px; color: #eef0f6;
@@ -130,6 +145,7 @@ body {
   font-size: 1rem;
   line-height: 1.5;
 }
+h1, h2, h3, .greeting, .hero-title, .ex-name, .tile-value { font-family: var(--font-title); }
 h1, h2, h3 { font-weight: 600; line-height: 1.2; margin: 0 0 var(--space-3); letter-spacing: -0.01em; }
 h1 { font-size: 1.9rem; }
 h2 { font-size: 1.25rem; }

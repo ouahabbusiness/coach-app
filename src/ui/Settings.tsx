@@ -4,6 +4,7 @@ import type { Repository } from '../storage/db';
 import { Notice } from './common';
 import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
 import { STEPS } from './Onboarding';
+import { useBackgrounds, type BgSlot } from './backgrounds';
 import { loadGoals, loadOnboarding } from './profileStore';
 
 type Status = 'testé' | 'non testé sur iPhone' | 'non implémenté' | 'à valider';
@@ -67,6 +68,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
       <h1 style={{ marginTop: 12 }}>Réglages et données</h1>
 
       <ProfileCard repo={repo} onEdit={onEditProfile} />
+
+      <BackgroundCard />
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
@@ -170,6 +173,62 @@ function ProfileCard({ repo, onEdit }: { repo: Repository; onEdit: () => void })
           </ol>
         </details>
       )}
+    </div>
+  );
+}
+
+function BackgroundCard() {
+  const { images, setImage } = useBackgrounds();
+  const [error, setError] = useState<string | null>(null);
+  const slots: { slot: BgSlot; label: string }[] = [
+    { slot: 'jour', label: '☀️ Jour' },
+    { slot: 'nuit', label: '🌙 Nuit' },
+  ];
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>Fond d’écran</h2>
+      <span className="badge" style={{ alignSelf: 'flex-start' }}>🌲 Forêt par défaut · 🔒 reste sur l’appareil</span>
+      {slots.map(({ slot, label }) => (
+        <div key={slot} className="spread">
+          <div className="row" style={{ flexWrap: 'nowrap' }}>
+            <div
+              className="thumb"
+              style={{ width: 56, height: 56, background: images[slot] ? `center / cover url(${images[slot]})` : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              {!images[slot] && '🌲'}
+            </div>
+            <strong>{label}</strong>
+          </div>
+          <div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
+            <label className="btn" style={{ cursor: 'pointer' }}>
+              Choisir
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  if (f.size > 20 * 1024 * 1024) return setError('Image trop lourde (max 20 Mo).');
+                  try {
+                    await setImage(slot, f);
+                    setError(null);
+                  } catch {
+                    setError('Image illisible.');
+                  }
+                }}
+              />
+            </label>
+            {images[slot] && (
+              <button className="btn ghost" aria-label={`Retirer le fond ${slot}`} onClick={() => setImage(slot, null)}>
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {error && <Notice tone="danger">{error}</Notice>}
     </div>
   );
 }

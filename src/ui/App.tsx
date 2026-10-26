@@ -10,6 +10,8 @@ import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { useDayPhase } from './useDayPhase';
+import { PixelForest } from './PixelForest';
+import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
 import { deviceTimeZone, fmtDateTime } from './support';
@@ -53,7 +55,12 @@ export function App() {
     })();
   }, [repo]);
 
-  return render();
+  return (
+    <BackgroundProvider repo={repo}>
+      <PixelForest phase={day.phase} />
+      {render()}
+    </BackgroundProvider>
+  );
 
   function render() {
   if (route.name === 'onboarding') return <Onboarding repo={repo} onExit={() => go({ name: 'today' })} />;

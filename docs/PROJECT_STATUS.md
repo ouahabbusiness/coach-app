@@ -23,6 +23,7 @@
 - Fin de séance : durée, séries, kcal et bpm (déclarés), routine du jour, détail repliable.
 - Ambiance selon l'heure (matin, jour, soir, nuit) ; mode nuit 1 h avant le coucher déclaré ; rappel « Au lit » après l'heure de coucher.
 - Règle UI : textes réduits au minimum (badges, chiffres, icônes).
+- Polices Poppins / Plus Jakarta Sans ; fond forêt en blocs selon l'heure ; fonds personnels jour/nuit.
 - Illustrations : décors simples + icônes d'exercice (personnages retirés).
 - Captures des écrans dans docs/maquettes/.
 - Catalogue de 15 variantes, consignes **non relues**, **aucun média**.
