@@ -1,6 +1,7 @@
 import { decide, project } from '../engine/session';
 import { currentResult } from '../engine/derive';
-import { nextSessionAdjust } from '../engine/progression';
+import { availableLoads, nextSessionAdjust } from '../engine/progression';
+import { loadPieces } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
 import { EXERCISES } from '../catalog/exercises';
 import type { Repository } from '../storage/db';
@@ -46,12 +47,13 @@ function lastWork(states: SessionState[], variantId: string): SetResult[] | unde
 /** Applique la progression calculée (charge ou répétitions) aux séries de travail, avec la raison visible. */
 export async function withProgression(repo: Repository, plan: SessionPlan): Promise<SessionPlan> {
   const states = [...(await repo.allSessionEvents()).values()].map((ev) => project(ev)).filter((s): s is SessionState => s !== null);
+  const loads = availableLoads(await loadPieces(repo));
   const memo = new Map<string, ReturnType<typeof nextSessionAdjust>>();
   return {
     ...plan,
     sets: plan.sets.map((set) => {
       if (set.role !== 'work' || set.kind !== 'reps') return set;
-      if (!memo.has(set.blockId)) memo.set(set.blockId, nextSessionAdjust(lastWork(states, set.variantId), set));
+      if (!memo.has(set.blockId)) memo.set(set.blockId, nextSessionAdjust(lastWork(states, set.variantId), set, loads));
       const a = memo.get(set.blockId)!;
       return { ...set, loadKg: a.loadKg ?? set.loadKg, targetReps: a.targetReps ?? set.targetReps, progression: a.note };
     }),

@@ -1,7 +1,7 @@
 // Données de test fictives.
 import { describe, expect, it } from 'vitest';
 import { calorieTarget, runTarget, waterTarget, type RunEntry } from '../src/engine/targets';
-import { liveLoad, nextSessionAdjust, tooEasy } from '../src/engine/progression';
+import { DEFAULT_PIECES, availableLoads, liveLoad, nextSessionAdjust, tooEasy } from '../src/engine/progression';
 import type { PlannedSet, SessionState, SetState } from '../src/engine/types';
 
 const run = (day: string, km: number, effort?: number): RunEntry => ({ id: day, day, km, effort, at: 0 });
@@ -57,10 +57,10 @@ describe('lest', () => {
 
   it('séance suivante : tout tenu avec marge → +2,5 kg ; manqué → −2,5 kg ; sinon garde', () => {
     const line = { targetReps: 8, loadKg: 15 };
-    expect(nextSessionAdjust([{ reps: 8, rir: 2, loadKg: 15 }, { reps: 8, rir: 2, loadKg: 15 }], line)).toEqual({ loadKg: 17.5, note: '↑ +2,5 kg' });
+    expect(nextSessionAdjust([{ reps: 8, rir: 2, loadKg: 15 }, { reps: 8, rir: 2, loadKg: 15 }], line)).toEqual({ loadKg: 17.5, targetReps: 8, note: '↑ 17,5 kg' });
     expect(nextSessionAdjust([{ reps: 5, loadKg: 15 }, { reps: 8, loadKg: 15 }], line).loadKg).toBe(12.5);
     expect(nextSessionAdjust([{ reps: 8, rir: 1, loadKg: 15 }], line)).toEqual({});
-    expect(nextSessionAdjust([{ reps: 9, rir: 2 }], { targetReps: 8 })).toEqual({ targetReps: 9, note: '↑ +1 rép.' });
+    expect(nextSessionAdjust([{ reps: 9, rir: 2 }], { targetReps: 8 })).toEqual({ targetReps: 10, note: '↑ +1 rép.' });
   });
 
   it('en séance : 15 kg trop facile → la série suivante passe à 17,5 kg, puis reste à 17,5', () => {
@@ -71,5 +71,27 @@ describe('lest', () => {
     expect(liveLoad(st, ps('s3'))).toEqual({ loadKg: 17.5, reason: 'facile' });
     const st2 = { sets: [done('s1', 15, 4), done('s2', 17.5, 2), pending] } as unknown as SessionState;
     expect(liveLoad(st2, ps('s3'))).toEqual({ loadKg: 17.5, reason: 'suite' });
+  });
+
+  it('charges réalisables avec 5, 5, 6 et 12 kg', () => {
+    expect(availableLoads(DEFAULT_PIECES)).toEqual([0, 5, 6, 10, 11, 12, 16, 17, 18, 22, 23, 28]);
+  });
+
+  it('matériel réel : 10 → 11 kg direct ; 12 → 16 kg seulement après +2 répétitions', () => {
+    const loads = availableLoads(DEFAULT_PIECES);
+    const line = { targetReps: 8, loadKg: 10 };
+    expect(nextSessionAdjust([{ reps: 8, rir: 2, loadKg: 10 }], line, loads)).toMatchObject({ loadKg: 11, note: '↑ 11 kg' });
+    const at12 = { targetReps: 8, loadKg: 12 };
+    expect(nextSessionAdjust([{ reps: 8, rir: 2, loadKg: 12 }], at12, loads)).toMatchObject({ loadKg: 12, targetReps: 9, note: '↑ +1 rép. avant 16 kg' });
+    expect(nextSessionAdjust([{ reps: 9, rir: 2, loadKg: 12 }], at12, loads)).toMatchObject({ loadKg: 12, targetReps: 10 });
+    expect(nextSessionAdjust([{ reps: 10, rir: 2, loadKg: 12 }], at12, loads)).toEqual({ loadKg: 16, targetReps: 8, note: '↑ 16 kg' });
+    expect(nextSessionAdjust([{ reps: 5, loadKg: 16 }], { targetReps: 8, loadKg: 16 }, loads)).toMatchObject({ loadKg: 12 });
+  });
+
+  it('en séance avec mon matériel : 12 kg trop facile → 16 kg et 2 répétitions de moins', () => {
+    const loads = availableLoads(DEFAULT_PIECES);
+    const ps = (id: string): PlannedSet => ({ id, exerciseId: 'e', variantId: 'v', blockId: 'b', blockType: 'straight', role: 'work', kind: 'reps', targetReps: 8, loadKg: 12, restSeconds: 90 });
+    const st = { sets: [{ planned: ps('s1'), status: 'done', entries: [{ eventId: 'x', at: 0, undone: false, result: { reps: 8, loadKg: 12, rir: 4 } }] }] } as unknown as SessionState;
+    expect(liveLoad(st, ps('s2'), loads)).toEqual({ loadKg: 16, targetReps: 6, reason: 'facile' });
   });
 });

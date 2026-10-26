@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Download, Upload } from 'lucide-react';
+import { availableLoads } from '../engine/progression';
+import { loadPieces, savePieces } from './equipment';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
 import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
@@ -73,6 +75,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
       <BackgroundCard />
 
       <WinterCard repo={repo} />
+
+      <LoadCard repo={repo} />
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
@@ -253,6 +257,51 @@ function WinterCard({ repo }: { repo: Repository }) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Mon lest : pièces disponibles ; l'app ne propose que des charges réalisables avec elles. */
+function LoadCard({ repo }: { repo: Repository }) {
+  const [pieces, setPieces] = useState<number[] | null>(null);
+  const [draft, setDraft] = useState('');
+  useEffect(() => {
+    loadPieces(repo).then(setPieces);
+  }, [repo]);
+  if (!pieces) return null;
+  const save = async (next: number[]) => {
+    const sorted = [...next].sort((a, b) => a - b);
+    await savePieces(repo, sorted);
+    setPieces(sorted);
+  };
+  const kg = Number(draft.replace(',', '.'));
+  const loads = availableLoads(pieces).filter((l) => l > 0);
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>Mon lest</h2>
+      <div className="chips" aria-label="Pièces de lest">
+        {pieces.map((p, i) => (
+          <button key={`${p}-${i}`} className="chip num" aria-label={`Retirer ${p} kg`} onClick={() => save(pieces.filter((_, j) => j !== i))}>
+            {p.toLocaleString('fr-BE')} kg ✕
+          </button>
+        ))}
+      </div>
+      <div className="row" style={{ flexWrap: 'nowrap' }}>
+        <input aria-label="Ajouter une pièce en kg" placeholder="kg" type="text" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <button
+          className="btn"
+          disabled={!(kg > 0 && kg <= 60)}
+          onClick={() => {
+            save([...pieces, kg]);
+            setDraft('');
+          }}
+        >
+          Ajouter
+        </button>
+      </div>
+      <p className="muted num" style={{ margin: 0, fontSize: '0.85rem' }}>
+        Charges possibles : {loads.map((l) => l.toLocaleString('fr-BE')).join(' · ')} kg
+      </p>
     </div>
   );
 }

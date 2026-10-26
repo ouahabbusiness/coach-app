@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
 import { liveLoad } from '../engine/progression';
+import { useLoads } from './equipment';
 import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
 import type { Repository } from '../storage/db';
@@ -44,6 +45,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const now = useNow(250);
   const wake = useWakeLock(!!state && state.phase !== 'ended');
   const [history, setHistory] = useState<SessionState[]>([]);
+  const loads = useLoads(repo);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [entryId, setEntryId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | 'menu' | null>(null);
@@ -100,7 +102,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const focusInfo = focus ? findVariant(focus.planned.variantId) : undefined;
   const comparable = focus ? lastComparable(history, focus.planned.variantId, state.startedAt) : undefined;
   // Consigne en direct : si la série d'avant était trop facile, la suivante monte.
-  const order = focus && focus.status === 'pending' ? liveLoad(state, focus.planned) : undefined;
+  const order = focus && focus.status === 'pending' ? liveLoad(state, focus.planned, loads) : undefined;
   const setsDone = state.sets.filter((s) => s.status === 'done' || s.status === 'skipped').length;
   const blocks: { blockId: string; name: string; icon?: LucideIcon; done: number; total: number }[] = [];
   for (const s of state.sets) {
@@ -175,7 +177,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
               <div className={`hud-order ${order.reason}`} role="status" key={`${focus.planned.id}-order`}>
                 <span className="hud-order-tag">{order.reason === 'facile' ? 'Trop facile' : order.reason === 'manqué' ? 'Trop lourd' : 'Charge'}</span>
                 <strong className="num">
-                  {order.loadKg !== undefined ? `${order.loadKg.toLocaleString('fr-BE')} kg` : `${order.targetReps} rép.`}
+                  {order.loadKg !== undefined ? `${order.loadKg.toLocaleString('fr-BE')} kg` : ''}{order.loadKg !== undefined && order.targetReps !== undefined ? ' × ' : ''}{order.targetReps !== undefined ? `${order.targetReps} rép.` : ''}
                 </strong>
                 <span>{order.reason === 'facile' ? 'monte, vas-y' : order.reason === 'manqué' ? 'redescends' : 'garde'}</span>
               </div>
@@ -241,7 +243,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
           </section>
         )}
 
-        {entry && <ResultEntry key={entry.planned.id + entry.entries.length} state={state} set={entry} act={act} />}
+        {entry && <ResultEntry key={entry.planned.id + entry.entries.length} state={state} set={entry} act={act} loads={loads} />}
 
         <section className="ui-card" aria-label="Plan de mission">
           <p className="hud-label">Plan</p>
@@ -381,14 +383,15 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   );
 }
 
-function ResultEntry({ state, set, act }: { state: SessionState; set: SetState; act: (cmd: Parameters<ReturnType<typeof useSession>['send']>[0], msg?: string) => Promise<SendResult> }) {
+function ResultEntry({ state, set, act, loads }: { loads: number[]; state: SessionState; set: SetState; act: (cmd: Parameters<ReturnType<typeof useSession>['send']>[0], msg?: string) => Promise<SendResult> }) {
   const saved = currentResult(set);
   const p = set.planned;
   const measuredSeconds = set.startedAt !== undefined && set.endedAt !== undefined ? Math.round((set.endedAt - set.startedAt) / 1000) : undefined;
   // Valeurs de départ pour faciliter la saisie ; rien n'est enregistré sans validation.
   const [reps, setReps] = useState<number>(saved?.reps ?? p.targetReps ?? 0);
   const [seconds, setSeconds] = useState<number>(saved?.seconds ?? measuredSeconds ?? p.targetSeconds ?? 0);
-  const advised = liveLoad(state, p)?.loadKg;
+  const advice = liveLoad(state, p, loads);
+  const advised = advice?.loadKg;
   const [loadKg, setLoadKg] = useState<string>(String(saved?.loadKg ?? advised ?? p.loadKg ?? ''));
   const [rir, setRir] = useState<number | undefined>(saved?.rir);
   const [error, setError] = useState<string | null>(null);
