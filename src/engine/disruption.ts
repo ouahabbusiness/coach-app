@@ -3,6 +3,7 @@
 // Une séance adaptée est toujours marquée comme telle, jamais équivalente à la séance complète.
 
 import type { SetKind, SetRole } from './types';
+import type { Strictness } from './programBuilder';
 
 export type DisruptionReason =
   | 'retard'
@@ -52,8 +53,13 @@ const OPT: Record<OptionId, DisruptionOption> = {
   annuler: { id: 'annuler', label: 'Annuler cette séance', detail: 'Aucune pénalité, rien à rattraper en double.' },
 };
 
-/** Options proposées selon l'imprévu. Malade ou douleur : on ne propose jamais de « forcer en plus léger ». */
-export function disruptionOptions(reason: DisruptionReason): DisruptionOption[] {
+/**
+ * Options proposées selon l'imprévu. Malade ou douleur : on ne propose jamais de « forcer en plus léger ».
+ * La rigueur choisie avec le coach retire des options (jamais pour maladie ou douleur) :
+ *  - strict : pas de report ;
+ *  - militaire : ni report, ni annulation, ni marche à la place d'une séance : on adapte le jour même.
+ */
+export function disruptionOptions(reason: DisruptionReason, strictness: Strictness = 'souple'): DisruptionOption[] {
   const ids: Record<DisruptionReason, OptionId[]> = {
     retard: ['raccourcir', 'reporter', 'annuler'],
     mauvaise_nuit: ['garder', 'alleger', 'remplacer_marche', 'reporter', 'annuler'],
@@ -63,8 +69,18 @@ export function disruptionOptions(reason: DisruptionReason): DisruptionOption[] 
     lieu_indisponible: ['sans_materiel', 'reporter', 'annuler'],
     materiel_manquant: ['sans_materiel', 'reporter', 'annuler'],
   };
-  return ids[reason].map((id) => OPT[id]);
+  const health = reason === 'maladie' || reason === 'douleur';
+  const banned: OptionId[] = health || strictness === 'souple' ? [] : strictness === 'strict' ? ['reporter'] : ['reporter', 'annuler', 'remplacer_marche'];
+  return ids[reason].filter((id) => !banned.includes(id)).map((id) => OPT[id]);
 }
+
+/** Pour une course en mode militaire, il ne reste que la marche : jamais une case vide. */
+export function nonWorkoutOptions(reason: DisruptionReason, strictness: Strictness = 'souple'): DisruptionOption[] {
+  const list = disruptionOptions(reason, strictness).filter((o) => !['raccourcir', 'alleger', 'sans_materiel'].includes(o.id));
+  return list.length ? list : [OPT.remplacer_marche];
+}
+
+export const STRICT_LABEL: Record<Strictness, string> = { souple: 'Souple', strict: 'Strict : pas de report', militaire: 'Militaire : on adapte, on ne lâche pas' };
 
 /** Message d'accompagnement, sans diagnostic. */
 export function reasonNotice(reason: DisruptionReason): string | undefined {

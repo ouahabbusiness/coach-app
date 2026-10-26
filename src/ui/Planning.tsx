@@ -24,6 +24,7 @@ import { loadTemplates, type SessionTemplate } from './templates';
 import { startSessionFromTemplate } from './actions';
 import { DisruptionPanel } from './Disruption';
 import { REASON_LABELS, type DisruptionReason } from '../engine/disruption';
+import type { Strictness } from '../engine/programBuilder';
 import type { Route } from './App';
 
 const KEY = 'planning.items';
@@ -69,12 +70,14 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
   const [draft, setDraft] = useState<Draft | null>(null);
   const [disrupting, setDisrupting] = useState<PlannedItem | null>(null);
   const [menu, setMenu] = useState<PlannedItem | null>(null);
+  const [program, setProgram] = useState<{ id: string; strictness?: Strictness } | null>(null);
 
   useEffect(() => {
     loadPlanning(repo).then(setItems);
     loadTemplates(repo).then(setTemplates);
     repo.listSessions().then(setSessions);
     loadOnboarding(repo).then((o) => setFixed(fixedEventsFromAnswers(o.answers)));
+    repo.getKv<{ id: string; answers: { strictness?: Strictness } }>('program.current').then((p) => p && setProgram({ id: p.id, strictness: p.answers.strictness }));
   }, [repo]);
 
   const persist = async (list: PlannedItem[]) => {
@@ -369,6 +372,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
       <Modal open={!!disrupting} onClose={() => setDisrupting(null)} title="Déclarer un imprévu">
         {disrupting && (
           <DisruptionPanel
+            strictness={program && disrupting.programId === program.id ? program.strictness : undefined}
             item={disrupting}
             template={templates.find((t) => t.id === disrupting.templateId)}
             onCancel={() => setDisrupting(null)}

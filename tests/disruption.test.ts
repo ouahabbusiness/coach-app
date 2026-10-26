@@ -82,3 +82,15 @@ describe('statuts après imprévu', () => {
     expect(itemStatus(linked, '2026-11-02', '2026-11-02', [{ id: 'autre', title: 'Haut', outcome: 'completed' }])).toBe('prévu');
   });
 });
+
+describe('rigueur du programme appliquée aux imprévus', () => {
+  it('strict : plus de report ; militaire : ni report, ni annulation ; maladie : toujours libre', async () => {
+    const { disruptionOptions, nonWorkoutOptions } = await import('../src/engine/disruption');
+    const ids = (r: Parameters<typeof disruptionOptions>[0], s: Parameters<typeof disruptionOptions>[1]) => disruptionOptions(r, s).map((o) => o.id);
+    expect(ids('retard', 'strict')).toEqual(['raccourcir', 'annuler']);
+    expect(ids('retard', 'militaire')).toEqual(['raccourcir']);
+    expect(ids('mauvaise_nuit', 'militaire')).toEqual(['garder', 'alleger']);
+    expect(ids('maladie', 'militaire')).toEqual(['annuler', 'reporter']);
+    expect(nonWorkoutOptions('retard', 'militaire').map((o) => o.id)).toEqual(['remplacer_marche']);
+  });
+});

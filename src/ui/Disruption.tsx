@@ -3,6 +3,8 @@ import { EXERCISES, findVariant } from '../catalog/exercises';
 import {
   REASON_LABELS,
   disruptionOptions,
+  nonWorkoutOptions,
+  STRICT_LABEL,
   estimateMinutes,
   keepFeasible,
   lighten,
@@ -13,6 +15,7 @@ import {
   type OptionId,
 } from '../engine/disruption';
 import type { PlannedItem } from '../engine/planning';
+import type { Strictness } from '../engine/programBuilder';
 import { Notice } from './common';
 import type { SessionTemplate, TemplateLine } from './templates';
 
@@ -57,7 +60,9 @@ export function DisruptionPanel({
   onCancel,
   onApply,
   onReschedule,
+  strictness,
 }: {
+  strictness?: Strictness;
   item: PlannedItem;
   template?: SessionTemplate;
   onCancel: () => void;
@@ -72,7 +77,7 @@ export function DisruptionPanel({
   const [onSite, setOnSite] = useState<string[]>([]);
   const isWorkout = item.kind === 'seance' && !!template;
 
-  const options = reason ? disruptionOptions(reason).filter((o) => isWorkout || !['raccourcir', 'alleger', 'sans_materiel'].includes(o.id)) : [];
+  const options = reason ? (isWorkout ? disruptionOptions(reason, strictness) : nonWorkoutOptions(reason, strictness)) : [];
   const neededEquipment = [...new Set(baseLines.flatMap((l) => equipmentOf(l.variantId)))].filter((e) => ALL_EQUIPMENT.includes(e));
 
   const adapted = useMemo((): Adapted<TemplateLine> | null => {
@@ -136,6 +141,7 @@ export function DisruptionPanel({
       {reason && (
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
           <legend style={{ fontWeight: 600, marginBottom: 6 }}>Que veux-tu faire ?</legend>
+          {strictness && strictness !== 'souple' && reason !== 'maladie' && reason !== 'douleur' && <p className="badge" style={{ margin: '0 0 8px' }}>{STRICT_LABEL[strictness]}</p>}
           <div className="stack" style={{ gap: 8 }}>
             {options.map((o) => (
               <button
