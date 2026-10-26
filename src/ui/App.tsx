@@ -11,6 +11,7 @@ import { MeasuresCard } from './Measures';
 import { WeekReportCard } from './WeekReportCard';
 import { VolumeCard } from './VolumeCard';
 import { Onboarding } from './Onboarding';
+import { PrivacyGate } from './Privacy';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { useDayPhase } from './useDayPhase';
@@ -101,8 +102,10 @@ export function App() {
   return (
     <BackgroundProvider repo={repo}>
       <AppBackground phase={day.phase} />
-      {render()}
-      {route.name !== 'session' && route.name !== 'onboarding' && route.name !== 'run' && <WeighInGate repo={repo} />}
+      <PrivacyGate repo={repo}>
+        {render()}
+        {route.name !== 'session' && route.name !== 'onboarding' && route.name !== 'run' && <WeighInGate repo={repo} />}
+      </PrivacyGate>
     </BackgroundProvider>
   );
 
@@ -115,7 +118,7 @@ export function App() {
   if (route.name === 'nutritionSetup') return <NutritionSetup repo={repo} go={go} />;
   if (route.name === 'agenda') return <AgendaPage repo={repo} go={go} />;
   if (route.name === 'run') return <LiveRun repo={repo} go={go} />;
-  if (route.name === 'spots') return <SpotsPage go={go} />;
+  if (route.name === 'spots') return <SpotsPage repo={repo} go={go} />;
 
   if (route.name === 'session') {
     const id = route.id;

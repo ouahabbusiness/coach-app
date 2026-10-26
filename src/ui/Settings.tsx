@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Download, Upload, X } from 'lucide-react';
+import { ChevronLeft, Upload, X } from 'lucide-react';
 import { availableLoads } from '../engine/progression';
 import { loadKettlebells, loadPieces, saveKettlebells, savePieces } from './equipment';
 import { timesFor, usePrayer } from './prayerStore';
@@ -9,6 +9,7 @@ import { localDay } from '../engine/derive';
 import { DEFAULT_PRAYER, PRAYER_LABELS } from '../engine/prayer';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
+import { PrivacyCard, useConsent } from './Privacy';
 import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
 import { STEPS } from './Onboarding';
 import { useBackgrounds, type BgSlot } from './backgrounds';
@@ -46,18 +47,6 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
     navigator.storage?.persisted?.().then(setPersisted).catch(() => setPersisted(null));
   }, []);
 
-  const exportData = async () => {
-    const data = await repo.exportAll();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `coach-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setMessage({ tone: 'info', text: `Export créé : ${data.events.length} événements.` });
-  };
-
   const importData = async (file: File) => {
     if (file.size > 20 * 1024 * 1024) return setMessage({ tone: 'danger', text: 'Fichier trop volumineux (max 20 Mo).' });
     try {
@@ -87,18 +76,17 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
 
       <TrackingCard repo={repo} />
 
+      <PrivacyCard repo={repo} />
+
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
-        <span className="badge ok" style={{ alignSelf: 'flex-start' }}>100 % sur cet appareil</span>
+        <span className="badge ok" style={{ alignSelf: 'flex-start' }}>Stockées sur cet appareil</span>
         {persisted === false && (
           <Notice tone="warn">
             Le navigateur peut effacer ces données : exporte souvent.
           </Notice>
         )}
         {persisted === true && <Notice>Stockage persistant accordé par le navigateur.</Notice>}
-        <button className="btn primary block" onClick={exportData}>
-          <Download size={18} aria-hidden="true" /> Exporter mes données (JSON)
-        </button>
         <button className="btn block" onClick={() => fileRef.current?.click()}>
           <Upload size={18} aria-hidden="true" /> Importer un export
         </button>
@@ -325,6 +313,7 @@ function LoadCard({ repo }: { repo: Repository }) {
 
 /** Prières : heures calculées sur le téléphone, routine et planning calés dessus. */
 function PrayerCard({ repo }: { repo: Repository }) {
+  const gps = useConsent(repo, 'location');
   const { settings: s, save } = usePrayer(repo);
   const [locating, setLocating] = useState(false);
   if (!s) return null;
@@ -359,7 +348,8 @@ function PrayerCard({ repo }: { repo: Repository }) {
         <button
           className="btn sm"
           disabled={locating}
-          onClick={() => {
+          onClick={async () => {
+            if (!(await gps.ensure())) return;
             setLocating(true);
             navigator.geolocation?.getCurrentPosition(
               (p) => {
@@ -372,6 +362,7 @@ function PrayerCard({ repo }: { repo: Repository }) {
         >
           {locating ? 'Localisation…' : 'Utiliser ma position (vacances)'}
         </button>
+        {gps.modal}
         <button className="btn sm ghost" onClick={() => save({ ...s, lat: DEFAULT_PRAYER.lat, lon: DEFAULT_PRAYER.lon, place: DEFAULT_PRAYER.place })}>
           Alost
         </button>

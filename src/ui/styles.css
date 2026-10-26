@@ -1281,3 +1281,8 @@ body:has(.run-live.full) { background-image: none; }
 /* Fiche d'exercice */
 .sheet .sheet-row { display: grid; gap: 2px; }
 .sheet .sheet-row p:not(.eyebrow) { font-size: 0.88rem; line-height: 1.35; }
+
+/* Où vont mes données */
+.privacy-flow { border-top: 1px solid var(--line, rgba(0,0,0,.08)); padding-top: 8px; display: grid; gap: 6px; }
+.privacy-flow > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; list-style: none; }
+.privacy-flow > summary::-webkit-details-marker { display: none; }

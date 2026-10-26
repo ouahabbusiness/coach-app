@@ -8,6 +8,7 @@ import type { Repository } from '../storage/db';
 import { Modal } from './common';
 import { newId } from './support';
 import type { Route } from './App';
+import { useConsent } from './Privacy';
 
 const FOODS_KEY = 'kitchen.foods';
 const DISHES_KEY = 'kitchen.dishes';
@@ -171,11 +172,17 @@ export function KitchenPage({ repo, go }: { repo: Repository; go: (r: Route) => 
   const [editFood, setEditFood] = useState<Partial<KitchenFood> | null>(null);
   const [editDish, setEditDish] = useState<Dish | 'new' | null>(null);
   const [scan, setScan] = useState<string | null>(null);
+  const food = useConsent(repo, 'food');
 
   const onPhoto = async (file: File) => {
     setScan('Lecture du code-barres…');
     const code = await readBarcode(file);
     if (!code) return setScan('Code-barres illisible : reprends la photo bien à plat, ou saisis l’étiquette.');
+    // Accord avant le premier envoi du code-barres à Open Food Facts ; sinon saisie manuelle.
+    if (!(await food.ensure())) {
+      setScan(`Code ${code} lu sur l’appareil, non envoyé : recopie l’étiquette.`);
+      return setEditFood({ barcode: code, source: 'étiquette' });
+    }
     setScan(`Code ${code} · recherche…`);
     try {
       const f = await lookupBarcode(code);
@@ -194,6 +201,7 @@ export function KitchenPage({ repo, go }: { repo: Repository; go: (r: Route) => 
         <ChevronLeft size={20} aria-hidden="true" /> Nutrition
       </button>
       <h1 style={{ marginTop: 8 }}>Ma cuisine</h1>
+      {food.modal}
 
       <section className="ui-card stack" aria-label="Mes produits">
         <div className="spread">

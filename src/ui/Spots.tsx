@@ -6,6 +6,8 @@ import { ChevronLeft, Dumbbell, Footprints, Navigation, Trees } from 'lucide-rea
 import type { Map as LMap, LayerGroup } from 'leaflet';
 import { overpassQuery, parsePhoton, parseSpots, photonUrl, type Spot, type SpotKind } from '../engine/spots';
 import type { Route } from './App';
+import type { Repository } from '../storage/db';
+import { useConsent } from './Privacy';
 
 const ICON: Record<SpotKind, React.ReactNode> = {
   'street workout': <Dumbbell size={16} aria-hidden="true" />,
@@ -33,7 +35,11 @@ async function fetchOverpass(query: string): Promise<{ elements?: [] } | undefin
 
 const fmtDist = (m: number) => (m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1).replace('.', ',')} km`);
 
-export function SpotsPage({ go }: { go: (r: Route) => void }) {
+export function SpotsPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
+  const gps = useConsent(repo, 'location');
+  const osm = useConsent(repo, 'spots');
+  const tiles = useConsent(repo, 'map');
+  const [noMap, setNoMap] = useState(false);
   const [pos, setPos] = useState<{ lat: number; lon: number } | null>(null);
   const [spots, setSpots] = useState<Spot[] | null>(null);
   const [filter, setFilter] = useState<SpotKind | 'tout'>('tout');
@@ -44,6 +50,10 @@ export function SpotsPage({ go }: { go: (r: Route) => void }) {
 
   useEffect(() => {
     if (!navigator.geolocation) return setMsg('GPS indisponible.');
+    (async () => {
+    // Accords avant activation : GPS (lu sur l'appareil), puis envoi de la position arrondie à OpenStreetMap.
+    if (!(await gps.ensure())) return setMsg('GPS non autorisé dans l’app (Réglages → Mes données).');
+    if (!(await osm.ensure())) return setMsg('Recherche de spots non autorisée : rien n’a été envoyé (Réglages → Mes données).');
     navigator.geolocation.getCurrentPosition(
       async (p) => {
         const here = { lat: p.coords.latitude, lon: p.coords.longitude };
@@ -68,11 +78,13 @@ export function SpotsPage({ go }: { go: (r: Route) => void }) {
       () => setMsg('Autorise la localisation pour trouver les spots autour de toi.'),
       { enableHighAccuracy: false, timeout: 15000 },
     );
-  }, []);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!pos || !mapEl.current || map.current) return;
     (async () => {
+      if (!(await tiles.ensure())) return setNoMap(true);
       const L = await import('leaflet');
       await import('leaflet/dist/leaflet.css');
       const m = L.map(mapEl.current!, { zoomControl: false }).setView([pos.lat, pos.lon], 15);
@@ -99,7 +111,7 @@ export function SpotsPage({ go }: { go: (r: Route) => void }) {
 
   return (
     <div className="spots">
-      <div ref={mapEl} className="spots-map" aria-label="Carte des spots" />
+      <div ref={mapEl} className="spots-map" aria-label="Carte des spots" hidden={noMap} />
       <header className="spots-top">
         <button className="icon-btn" aria-label="Retour" onClick={() => go({ name: 'coach' })}>
           <ChevronLeft size={18} aria-hidden="true" />
@@ -112,8 +124,12 @@ export function SpotsPage({ go }: { go: (r: Route) => void }) {
           ))}
         </div>
       </header>
+      {gps.modal}
+      {osm.modal}
+      {tiles.modal}
       <section className="spots-sheet" aria-label="Spots à proximité">
         {msg && <p className="muted" style={{ margin: 0 }}>{msg}</p>}
+        {noMap && <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>Carte non chargée (accord refusé) : liste seulement.</p>}
         <ul className="spots-list">
           {shown.map((s) => (
             <li key={s.id} onClick={() => map.current?.m.setView([s.lat, s.lon], 17, { animate: true })}>

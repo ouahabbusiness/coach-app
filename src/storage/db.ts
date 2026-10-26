@@ -124,6 +124,16 @@ export class Repository {
     };
   }
 
+  /** Supprime toutes les données (séances, index, réglages, photos) puis vérifie qu'il ne reste rien. */
+  async deleteAll(): Promise<{ events: number; sessions: number; kv: number }> {
+    await this.db.transaction('rw', this.db.events, this.db.sessions, this.db.kv, async () => {
+      await this.db.events.clear();
+      await this.db.sessions.clear();
+      await this.db.kv.clear();
+    });
+    return { events: await this.db.events.count(), sessions: await this.db.sessions.count(), kv: await this.db.kv.count() };
+  }
+
   /** Importe un export. Refuse tout fichier dont le format n'est pas reconnu. */
   async importAll(data: unknown): Promise<{ events: number }> {
     if (!isExportFile(data)) throw new Error('Fichier non reconnu : ce n’est pas un export de cette application.');

@@ -17,6 +17,7 @@ import { useChallengeEntries } from './Challenge';
 import { loadPlanning } from './Planning';
 import { deviceTimeZone, fmtDuration, newId } from './support';
 import type { Route } from './App';
+import { useConsent } from './Privacy';
 
 type Mode = 'guidee' | 'distance' | 'libre';
 type Phase = 'setup' | 'running' | 'paused' | 'done';
@@ -42,6 +43,8 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   const [segments, setSegments] = useState<Segment[]>([]);
   const [now, setNow] = useState(Date.now());
   const [err, setErr] = useState<string | null>(null);
+  const gps = useConsent(repo, 'location');
+  const tiles = useConsent(repo, 'map');
   const [effort, setEffort] = useState<number | undefined>();
   const [guide, setGuide] = useState<GuideState>({ index: 0, startM: 0, startS: 0 });
   const [steps, setSteps] = useState<GuidedStep[]>([]);
@@ -103,19 +106,21 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   }, [st.meters, elapsedS]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Carte (chargée seulement quand la course démarre).
+  const first = segments.flatMap((sg) => sg.points)[0];
   useEffect(() => {
-    if (phase === 'setup' || !mapEl.current || map.current) return;
+    if (phase === 'setup' || !mapEl.current || map.current || !first) return;
     (async () => {
       const L = await import('leaflet');
       await import('leaflet/dist/leaflet.css');
-      const m = L.map(mapEl.current!, { zoomControl: false, attributionControl: true }).setView([50.94, 4.04], 18);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
+      // Pas de position par défaut : aucune tuile n'est demandée avant le 1er point GPS. Sans accord « carte » : tracé sans fond.
+      const m = L.map(mapEl.current!, { zoomControl: false, attributionControl: true }).setView([first.lat, first.lon], 18);
+      if (tiles.granted) L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
       const line = L.polyline([], { color: '#f3ecdc', weight: 4 }).addTo(m);
-      const dot = L.circleMarker([50.94, 4.04], { radius: 7, color: '#050505', weight: 2, fillColor: '#f3ecdc', fillOpacity: 1 }).addTo(m);
+      const dot = L.circleMarker([first.lat, first.lon], { radius: 7, color: '#050505', weight: 2, fillColor: '#f3ecdc', fillOpacity: 1 }).addTo(m);
       map.current = { m, line, dot };
       window.setTimeout(() => m.invalidateSize(), 50);
     })();
-  }, [phase]);
+  }, [phase, !!first]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const last = segments[segments.length - 1]?.points.slice(-1)[0];
@@ -152,6 +157,9 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   };
 
   const goRun = async () => {
+    // Accords avant activation : GPS (reste sur l'appareil), puis fond de carte (zone envoyée à OpenStreetMap).
+    if (!(await gps.ensure())) return setErr('GPS non autorisé dans l’app : Réglages → Mes données.');
+    await tiles.ensure();
     const s = mode === 'guidee' && planned ? stepsFor(planned, pacesFrom(runs)) : [];
     setSteps(s);
     setGuide({ index: 0, startM: 0, startS: 0 });
@@ -217,6 +225,8 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   const step = steps[guide.index];
   return (
     <div className={`app ob cq run-live ${phase !== 'setup' ? 'full' : ''}`}>
+      {gps.modal}
+      {tiles.modal}
       {phase !== 'setup' && <div ref={mapEl} className="run-map-full" aria-label="Carte du tracé" />}
       {phase !== 'setup' && (
         <button className="run-recenter" aria-label="Recentrer sur ma position" onClick={() => {
