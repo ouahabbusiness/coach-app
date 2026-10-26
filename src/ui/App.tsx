@@ -14,6 +14,7 @@ import { useDayPhase } from './useDayPhase';
 import { useWinterMode, winterForced, winterInfo } from './winterArc';
 import { localDay } from '../engine/derive';
 import { AppBackground } from './AppBackground';
+import { BootOverlay } from './BootOverlay';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -51,8 +52,13 @@ export function App() {
     if (winterOn) document.documentElement.dataset.theme = 'winter';
     else delete document.documentElement.dataset.theme;
   }, [winterOn]);
+  const [boot, setBoot] = useState<string | null>(null);
   const go = useCallback((r: Route) => {
-    setRoute(r);
+    // Lancement d'une séance depuis l'app : transition « Discipline Protocol ».
+    setRoute((prev) => {
+      if (r.name === 'session' && prev.name !== 'session') setBoot('Mission');
+      return r;
+    });
     window.scrollTo(0, 0);
   }, []);
 
@@ -79,12 +85,15 @@ export function App() {
   if (route.name === 'session') {
     const id = route.id;
     return (
+      <>
+      {boot && <BootOverlay title={boot} onDone={() => setBoot(null)} />}
       <SessionScreen
         repo={repo}
         sessionId={id}
         onExit={() => go({ name: 'today' })}
         onSummary={() => go({ name: 'summary', id })}
       />
+      </>
     );
   }
 

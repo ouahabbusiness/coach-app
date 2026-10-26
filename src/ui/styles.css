@@ -5,6 +5,8 @@
 @import '@fontsource/plus-jakarta-sans/600.css';
 @import '@fontsource/plus-jakarta-sans/700.css';
 @import '@fontsource/plus-jakarta-sans/800.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
 
 :root {
   color-scheme: light;
@@ -335,18 +337,7 @@ button.tile { cursor: pointer; }
   animation: snowfall linear infinite;
 }
 @keyframes snowfall { from { transform: translate(0, -10px); } to { transform: translate(18px, 260px); } }
-/* Novembre / Winter Arc : accent bleu unique sur toute l'app, zéro orange. Le rouge reste réservé à la sécurité. */
-:root[data-theme='winter'] {
-  --bg: #f3f6fa;
-  --bg-gradient: radial-gradient(900px 420px at 50% -120px, #e3ecf8 0%, rgb(243 246 250 / 0) 70%);
-  --accent: #1d4ed8;
-  --on-accent: #ffffff;
-  --accent-soft: #e3ecff;
-  --tag: #1d4ed8;
-  --focus: #1d4ed8;
-  --warn: #334155;
-  --warn-soft: #e8edf5;
-}
+
 
 /* Composants compacts façon shadcn (accueil) */
 .home-head { margin: 4px 0 14px; }
@@ -671,3 +662,157 @@ main.content .btn.block[style*="space-between"] { min-height: 52px; border-radiu
 .hud-plan li.current { background: linear-gradient(90deg, var(--accent-soft), rgb(0 0 0 / 0)); border-radius: 8px; }
 .hud-plan li.current .hud-plan-row { padding-left: 8px; transition: padding 300ms ease; }
 .hud-status, .hud-tag { transition: color 300ms ease, background-color 300ms ease; }
+
+/* ======================================================================
+   Thème tactique « Winter Arc » (sombre, grille numérique, bleus).
+   Actif quand data-theme='winter'. Contrastes mesurés (voir docs).
+   ====================================================================== */
+:root[data-theme='winter'] {
+  color-scheme: dark;
+  --bg: #070b14;
+  --bg-gradient: none;
+  --surface: #0d1424;
+  --surface-2: #121b30;
+  --surface-glass: rgb(13 20 36 / 0.86);
+  --text: #e7eefa;
+  --text-2: #8fa2c2;
+  --border: #1f2c48;
+  --accent: #60a5fa;
+  --accent-strong: #2563eb;
+  --on-accent: #ffffff;
+  --accent-soft: rgb(59 130 246 / 0.16);
+  --tag: #60a5fa;
+  --focus: #93c5fd;
+  --warn: #cbd5e1;
+  --warn-soft: rgb(148 163 184 / 0.16);
+  --danger: #f87171;
+  --on-danger: #1a0505;
+  --danger-soft: rgb(248 113 113 / 0.14);
+  --strong: #e7eefa;
+  --on-strong: #070b14;
+  --shadow: 0 0 0 1px rgb(59 130 246 / 0.04), 0 10px 30px -18px rgb(0 0 0 / 0.9);
+  --shadow-strong: 0 18px 40px -16px rgb(0 0 0 / 0.9);
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+/* Fond : grille numérique + halos bleus, fixe. */
+:root[data-theme='winter'] body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(700px 380px at 85% -60px, rgb(37 99 235 / 0.28), rgb(37 99 235 / 0) 70%),
+    radial-gradient(600px 420px at -10% 40%, rgb(30 64 175 / 0.18), rgb(30 64 175 / 0) 70%),
+    linear-gradient(rgb(96 165 250 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(96 165 250 / 0.05) 1px, transparent 1px);
+  background-size: auto, auto, 28px 28px, 28px 28px;
+  background-attachment: fixed;
+}
+/* Cartes : verre sombre, fine bordure bleutée, coin lumineux. */
+:root[data-theme='winter'] :is(.ui-card, .card, .hero-card, .day, .hud-core, .item) {
+  background: linear-gradient(180deg, rgb(18 27 48 / 0.92), rgb(11 17 31 / 0.92));
+  border: 1px solid rgb(96 165 250 / 0.16);
+  box-shadow: inset 0 1px 0 rgb(147 197 253 / 0.06), var(--shadow);
+}
+:root[data-theme='winter'] .card.soft { background: rgb(18 27 48 / 0.6); }
+:root[data-theme='winter'] .hud-core.is-live,
+:root[data-theme='winter'] .day.today { border-color: rgb(96 165 250 / 0.55); }
+/* Libellés techniques en mono majuscules. */
+:root[data-theme='winter'] :is(.hud-label, .eyebrow, .eyebrow-btn, .tile-label, .kpi-label, .hud-tag, .hud-status, .pill, .badge, .hero-date, .winter-tag, .hud-progress-txt, .hud-clock-label, .day-name, .slot-status, .hud-plan-count, .meta-ico, .row-meta) {
+  font-family: var(--font-mono); letter-spacing: 0.06em;
+}
+:root[data-theme='winter'] :is(.eyebrow, .tile-label, .kpi-label, .hero-date, .hud-clock-label, .pill) { text-transform: uppercase; font-size: 0.66rem; }
+:root[data-theme='winter'] .hud-clock, :root[data-theme='winter'] .hud-target, :root[data-theme='winter'] .num.kpi-value { font-family: var(--font-mono); letter-spacing: -0.02em; }
+:root[data-theme='winter'] .pill, :root[data-theme='winter'] .badge { background: rgb(18 27 48 / 0.9); border-color: rgb(96 165 250 / 0.2); color: var(--text-2); }
+:root[data-theme='winter'] .pill.accent, :root[data-theme='winter'] .hud-tag { background: var(--accent-soft); color: var(--accent); border: 1px solid rgb(96 165 250 / 0.35); }
+:root[data-theme='winter'] .icon-chip { background: rgb(37 99 235 / 0.14); border-color: rgb(96 165 250 / 0.25); color: var(--accent); }
+:root[data-theme='winter'] .icon-btn, :root[data-theme='winter'] .round, :root[data-theme='winter'] .btn:not(.primary):not(.danger) {
+  background: rgb(18 27 48 / 0.9); border-color: rgb(96 165 250 / 0.22); color: var(--text);
+}
+:root[data-theme='winter'] .btn.primary, :root[data-theme='winter'] .icon-btn.primary {
+  background: linear-gradient(180deg, #2f6df0, #1d4ed8); border-color: #3b82f6; color: #ffffff;
+  box-shadow: 0 0 0 1px rgb(147 197 253 / 0.15) inset, 0 10px 26px -10px rgb(37 99 235 / 0.8);
+}
+:root[data-theme='winter'] .tabbar { background: rgb(7 11 20 / 0.85); border: 1px solid rgb(96 165 250 / 0.2); }
+:root[data-theme='winter'] .tabbar button[aria-current='page'] { background: #1d4ed8; box-shadow: 0 0 16px rgb(37 99 235 / 0.7); }
+:root[data-theme='winter'] .chip { background: rgb(18 27 48 / 0.9); border-color: rgb(96 165 250 / 0.22); color: var(--text); }
+:root[data-theme='winter'] .chip[aria-pressed='true'] { background: #1d4ed8; border-color: #3b82f6; color: #ffffff; }
+:root[data-theme='winter'] .check.on { background: #1d4ed8; border-color: #3b82f6; }
+:root[data-theme='winter'] .meter, :root[data-theme='winter'] .segments span, :root[data-theme='winter'] .bars span { background: rgb(96 165 250 / 0.12); }
+:root[data-theme='winter'] .meter span, :root[data-theme='winter'] .segments span.on, :root[data-theme='winter'] .bars span.on { background: linear-gradient(90deg, #2563eb, #60a5fa); box-shadow: 0 0 10px rgb(59 130 246 / 0.6); }
+:root[data-theme='winter'] input, :root[data-theme='winter'] select, :root[data-theme='winter'] textarea { background: #0b1222; color: var(--text); border-color: rgb(96 165 250 / 0.22); }
+:root[data-theme='winter'] dialog { background: #0d1424; color: var(--text); border: 1px solid rgb(96 165 250 / 0.22); }
+:root[data-theme='winter'] dialog::backdrop { background: rgb(2 6 16 / 0.75); backdrop-filter: blur(4px); }
+:root[data-theme='winter'] .hud-top { background: rgb(7 11 20 / 0.85); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid rgb(96 165 250 / 0.12); }
+:root[data-theme='winter'] .notice { background: rgb(18 27 48 / 0.9); }
+:root[data-theme='winter'] .notice.danger { background: var(--danger-soft); }
+:root[data-theme='winter'] .bed-banner { background: rgb(18 27 48 / 0.92); }
+:root[data-theme='winter'] .dot { background: rgb(96 165 250 / 0.08); border-color: rgb(96 165 250 / 0.3); }
+:root[data-theme='winter'] .dot.st-done { background: #3b82f6; border-color: #60a5fa; box-shadow: 0 0 8px rgb(59 130 246 / 0.7); }
+
+/* En-tête d'accueil tactique (remplace la version claire glacée). */
+:root[data-theme='winter'] .hero.winter {
+  color: var(--text);
+  background:
+    radial-gradient(90% 80% at 100% 0%, rgb(37 99 235 / 0.35) 0%, rgb(37 99 235 / 0) 65%),
+    radial-gradient(70% 70% at 0% 20%, rgb(30 64 175 / 0.25) 0%, rgb(30 64 175 / 0) 70%),
+    linear-gradient(180deg, #0a1122 0%, #080d19 75%, var(--bg) 100%);
+  border-bottom: 1px solid rgb(96 165 250 / 0.12);
+}
+:root[data-theme='winter'] .hero.winter .blob { mix-blend-mode: screen; }
+:root[data-theme='winter'] .hero.winter .blob.b1 { fill: #1d4ed8; opacity: 0.35; }
+:root[data-theme='winter'] .hero.winter .blob.b2 { fill: #1e3a8a; opacity: 0.4; }
+:root[data-theme='winter'] .hero.winter .blob.b3 { fill: #3b82f6; opacity: 0.2; }
+:root[data-theme='winter'] .hero.winter .shape { fill: rgb(59 130 246 / 0.05); stroke: rgb(96 165 250 / 0.3); }
+:root[data-theme='winter'] .hero.winter .hero-wave path { fill: var(--bg); }
+:root[data-theme='winter'] .hero.winter .hero-wave path.back { fill: rgb(96 165 250 / 0.08); }
+:root[data-theme='winter'] .hero.winter :is(.hero-greet, .hero-ring-value) { color: #ffffff; }
+:root[data-theme='winter'] .hero.winter :is(.hero-date, .hero-ring-value small) { color: var(--text-2); }
+:root[data-theme='winter'] .hero.winter .hero-greet { text-transform: uppercase; letter-spacing: -0.01em; }
+:root[data-theme='winter'] .hero.winter .hero-chip { background: rgb(13 20 36 / 0.85); border: 1px solid rgb(96 165 250 / 0.25); color: var(--text); font-family: var(--font-mono); }
+:root[data-theme='winter'] .hero.winter .hero-chip svg { color: var(--accent); }
+:root[data-theme='winter'] .hero.winter .hero-ring { background: rgb(7 11 20 / 0.7); box-shadow: 0 0 0 1px rgb(96 165 250 / 0.25), 0 0 26px -6px rgb(37 99 235 / 0.7); }
+:root[data-theme='winter'] .winter-tag { background: rgb(37 99 235 / 0.16); color: var(--accent); border: 1px solid rgb(96 165 250 / 0.35); font-family: var(--font-mono); }
+:root[data-theme='winter'] .snow span { background: #93c5fd; box-shadow: 0 0 6px #60a5fa; opacity: 0.55; }
+
+/* Chrono de séance : anneau lumineux. */
+.hud-ring { position: relative; width: 196px; height: 196px; display: grid; place-items: center; }
+.hud-ring svg { position: absolute; inset: 0; }
+.hud-ring .hud-clock { position: relative; }
+.hud-ring-track { stroke: var(--border); }
+.hud-ring-arc { stroke: var(--accent); transition: stroke-dashoffset 400ms linear; filter: drop-shadow(0 0 6px rgb(59 130 246 / 0.6)); }
+.hud-ring-arc.spin { transform-origin: 50% 50%; animation: ring-spin 2.4s linear infinite; }
+@keyframes ring-spin { to { transform: rotate(360deg); } }
+
+/* Transition « Animus » au lancement de séance. */
+.boot {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; overflow: hidden; pointer-events: none;
+  background: #050810; color: #e7eefa; font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  animation: boot-out 1150ms cubic-bezier(.6,0,.4,1) forwards;
+}
+.boot-grid {
+  position: absolute; inset: -50%;
+  background-image: linear-gradient(rgb(96 165 250 / 0.22) 1px, transparent 1px), linear-gradient(90deg, rgb(96 165 250 / 0.22) 1px, transparent 1px);
+  background-size: 32px 32px; transform: perspective(500px) rotateX(55deg) translateY(0);
+  animation: grid-run 1150ms linear forwards; opacity: 0.8;
+}
+.boot-scan {
+  position: absolute; left: 0; right: 0; height: 120px; top: -140px;
+  background: linear-gradient(180deg, rgb(59 130 246 / 0), rgb(96 165 250 / 0.55) 60%, #dbeafe 62%, rgb(96 165 250 / 0) 64%);
+  filter: blur(1px); animation: scan 900ms cubic-bezier(.5,0,.3,1) 120ms forwards;
+}
+.boot-core { position: relative; text-align: center; animation: core-sync 1150ms ease forwards; }
+.boot-title { font-size: 0.75rem; letter-spacing: 0.35em; color: #93c5fd; }
+.boot-main { margin: 8px 0 14px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 1.6rem; letter-spacing: 0.08em; text-shadow: 0 0 18px rgb(59 130 246 / 0.9); }
+.boot-bar { width: 220px; height: 3px; margin: 0 auto; background: rgb(96 165 250 / 0.15); overflow: hidden; border-radius: 99px; }
+.boot-bar span { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #1d4ed8, #93c5fd); transform-origin: left; animation: boot-load 850ms cubic-bezier(.3,.8,.3,1) 100ms both; box-shadow: 0 0 12px #3b82f6; }
+.boot-sub { margin-top: 10px; font-size: 0.68rem; letter-spacing: 0.2em; color: #8fa2c2; }
+@keyframes grid-run { from { transform: perspective(500px) rotateX(55deg) translateY(0); } to { transform: perspective(500px) rotateX(55deg) translateY(160px); } }
+@keyframes scan { to { top: 110%; } }
+@keyframes boot-load { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes core-sync { 0% { opacity: 0; filter: blur(6px); transform: scale(1.08); } 25% { opacity: 1; filter: blur(0); transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(0.96); } }
+@keyframes boot-out { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+/* Après la transition : l'interface se déploie en cascade, du flou au net. */
+.hud.booted :is(.hud-top, .hud-progress, .hud-core, .hud-body > .ui-card) { animation: hud-focus 560ms cubic-bezier(.2,.8,.2,1) both; }
+.hud.booted .hud-progress { animation-delay: 80ms; }
+.hud.booted .hud-core { animation-delay: 160ms; }
+.hud.booted .hud-body > .ui-card { animation-delay: 260ms; }
+@keyframes hud-focus { from { opacity: 0; filter: blur(8px); transform: translateY(10px) scale(0.98); } to { opacity: 1; filter: none; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .boot { display: none; } }
