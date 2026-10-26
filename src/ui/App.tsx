@@ -9,6 +9,7 @@ import { Challenge } from './Challenge';
 import { WeighInGate, WeightCard } from './Weight';
 import { MeasuresCard } from './Measures';
 import { WeekReportCard } from './WeekReportCard';
+import { VolumeCard } from './VolumeCard';
 import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
@@ -183,6 +184,7 @@ function Progress({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
     <>
       <h1>Progression</h1>
       <WeekReportCard repo={repo} />
+      <VolumeCard repo={repo} />
       <WeightCard repo={repo} />
       <MeasuresCard repo={repo} />
       <div className="card">

@@ -1266,3 +1266,14 @@ body:has(.run-live.full) { background-image: none; }
 .pf-tag.ok { background: var(--accent); color: var(--on-accent); }
 .hud-order.prog strong { font-size: 0.88rem; font-weight: 600; line-height: 1.35; letter-spacing: 0; }
 .hud-order.prog { align-items: flex-start; }
+
+/* Volume de la semaine */
+.vol-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.vol-list li { display: grid; grid-template-columns: 82px 1fr auto; gap: 8px; align-items: center; font-size: 0.82rem; }
+.vol-name { font-weight: 700; text-transform: capitalize; }
+.vol-bar { position: relative; height: 10px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.vol-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
+.vol-bar i.planned { background: var(--accent-soft); }
+.vol-bar i.done { background: var(--accent); }
+.vol-bar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: 0.5; }
+.vol-num small { color: var(--text-2); font-size: 0.7rem; }
