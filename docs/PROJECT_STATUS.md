@@ -38,8 +38,12 @@
 ## Non testé
 - Safari iOS, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran.
 
+## En ligne
+- https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publication automatique à chaque envoi sur `main`, tests obligatoires).
+- Vérifié le 26/10/2026 : page servie en HTTPS, service worker actif, cache hors ligne créé.
+
 ## Action requise de Hmidou
-- Accord pour héberger la PWA en HTTPS (GitHub Pages ou autre) afin de l'installer sur l'iPhone avant le 1er novembre.
+- Installer l'app sur l'iPhone (Safari → Partager → Sur l'écran d'accueil) et tester : chrono écran verrouillé, hors ligne, saisie.
 
 ## Limites
 - Icône PNG pour l'écran d'accueil iOS non générée (SVG seulement).

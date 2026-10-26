@@ -13,7 +13,7 @@ npm run build      # version de production dans dist/
 
 ## Sur iPhone
 
-Pas encore publiée. Pour la tester sur le téléphone, il faudra l'héberger en HTTPS (par ex. GitHub Pages), uniquement avec accord.
-Ensuite : Safari → Partager → « Sur l'écran d'accueil ».
+En ligne : https://ouahabbusiness.github.io/coach-app/ (publiée automatiquement à chaque envoi sur `main`).
+Safari → Partager → « Sur l'écran d'accueil ». Le code est public, les données restent sur le téléphone.
 
 Voir `docs/PROJECT_STATUS.md` pour l'état réel.
