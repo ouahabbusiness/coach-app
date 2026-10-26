@@ -8,6 +8,8 @@ export interface WeighIn {
   day: string;
   kg: number;
   status: WeightStatus;
+  /** Pesée à jeun (le matin, avant de manger) : conditions comparables d'un jour à l'autre. */
+  fasting?: boolean;
   /** Instant de saisie (UTC ms). */
   at: number;
 }

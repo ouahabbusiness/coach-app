@@ -6,13 +6,14 @@ Inspiration : captures « smart home » (monochrome + orange) et « habit tracke
 ## Principes
 - Interface claire, minimaliste, monochrome : noir, gris subtils, blanc.
 - Orange vif uniquement pour l'actif : bouton principal, onglet sélectionné, coches, jauges.
-- Cartes très arrondies (28 px), sans bordure, blocs aérés.
+- Cartes compactes façon shadcn : radius 14 px, bordure fine #EBEBE8, ombre très légère, padding 12 px.
+- Chaque indicateur : icône SVG fine dans une pastille 28–36 px, libellé 0,75 rem gris, valeur 1,35 rem gras, jauge fine 4 px.
 - Zéro paragraphe : chiffres, badges courts, jauges, coches. Explications derrière un « ? » ou un détail repliable.
 
 ## Couleurs (tokens dans `src/ui/styles.css`)
 | Rôle | Clair | Sombre / nuit |
 |---|---|---|
-| Fond | #ECECEA | #0E0E0E |
+| Fond | #F6F6F4 + halo chaud très léger | nuit : #EEF0F5 (reste clair) |
 | Carte | #FFFFFF | #1A1A1A |
 | Carte secondaire | #F3F3F1 | #242424 |
 | Texte | #111111 | #F2F2F0 |
@@ -30,7 +31,7 @@ Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). 
 - Habitudes : barre en segments + ronds à cocher orange.
 
 ## Ambiance
-Mode nuit (sombre) 1 h avant le coucher déclaré ; rappel « Au lit » après l'heure de coucher.
+Nuit : fond clair légèrement bleuté (plus de thème sombre, demande du 26/10) ; rappel « Au lit » après l'heure de coucher.
 Fond uni par défaut ; fond personnel jour / nuit possible (Réglages), stocké sur l'appareil.
 
 ## Ton

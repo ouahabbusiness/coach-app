@@ -23,22 +23,24 @@ export function useWeightLog(repo: Repository) {
     },
     [repo],
   );
-  const add = (kg: number, status: WeightStatus, day: string) => save([...log, { id: newId(), day, kg, status, at: Date.now() }]);
+  const add = (kg: number, status: WeightStatus, day: string, fasting = true) => save([...log, { id: newId(), day, kg, status, fasting, at: Date.now() }]);
   const remove = (day: string) => save(log.filter((w) => w.day !== day));
   return { log, days: dailyWeights(log), add, remove };
 }
 
 /** Fenêtre de saisie : un chiffre, son statut, la date. */
-export function WeightModal({ open, onClose, onSave, last }: { open: boolean; onClose: () => void; onSave: (kg: number, status: WeightStatus, day: string) => void; last?: number }) {
+export function WeightModal({ open, onClose, onSave, last }: { open: boolean; onClose: () => void; onSave: (kg: number, status: WeightStatus, day: string, fasting: boolean) => void; last?: number }) {
   const today = localDay(Date.now(), deviceTimeZone());
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState<WeightStatus>('mesuré');
   const [day, setDay] = useState(today);
+  const [fasting, setFasting] = useState(true);
   useEffect(() => {
     if (open) {
       setDraft(last !== undefined ? String(last).replace('.', ',') : '');
       setStatus('mesuré');
       setDay(today);
+      setFasting(true);
     }
   }, [open, last, today]);
   const kg = Number(draft.replace(',', '.'));
@@ -57,8 +59,11 @@ export function WeightModal({ open, onClose, onSave, last }: { open: boolean; on
             </button>
           ))}
         </div>
+        <button className="chip" aria-pressed={fasting} onClick={() => setFasting(!fasting)} style={{ alignSelf: 'flex-start' }}>
+          🌅 À jeun
+        </button>
         <input aria-label="Date de la pesée" type="date" max={today} value={day} onChange={(e) => setDay(e.target.value)} />
-        <button className="btn primary block" disabled={!valid} onClick={() => valid && onSave(Math.round(kg * 10) / 10, status, day)}>
+        <button className="btn primary block" disabled={!valid} onClick={() => valid && onSave(Math.round(kg * 10) / 10, status, day, fasting)}>
           Enregistrer
         </button>
       </div>
@@ -104,7 +109,7 @@ export function WeightCard({ repo }: { repo: Repository }) {
   return (
     <section className="hero-card" aria-label="Poids">
       <div className="spread">
-        <span className="tile-label">⚖️ Poids</span>
+        <span className="tile-label">⚖️ Poids à jeun</span>
         <button className="btn primary icon" aria-label="Ajouter une pesée" onClick={() => setOpen(true)}>
           <Plus size={20} aria-hidden="true" />
         </button>
@@ -144,8 +149,8 @@ export function WeightCard({ repo }: { repo: Repository }) {
         open={open}
         onClose={() => setOpen(false)}
         last={last?.kg}
-        onSave={async (kg, status, day) => {
-          await add(kg, status, day);
+        onSave={async (kg, status, day, fasting) => {
+          await add(kg, status, day, fasting);
           setOpen(false);
         }}
       />

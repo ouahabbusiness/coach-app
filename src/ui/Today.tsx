@@ -2,7 +2,8 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ClipboardList, Droplet, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { trend, type WeighIn } from '../engine/weight';
 import { useWeightLog, WeightModal } from './Weight';
 import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
 import { addWater, challengeValues, dailyKey, daysUntil, type DailyMetrics } from '../engine/daily';
@@ -26,32 +27,78 @@ const STEPS_GOAL = 10000; // objectif du défi de novembre (choisi par Hmidou)
 
 type Field = 'sleepH' | 'steps' | 'activeKcal' | 'waterGoal';
 
-function Tile({ icon, label, onClick, children }: { icon: ReactNode; label: string; onClick?: () => void; children: ReactNode }) {
-  const content = (
+function Kpi({
+  icon,
+  label,
+  value,
+  sub,
+  onClick,
+  onLabel,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+  onClick?: () => void;
+  onLabel?: () => void;
+  children?: ReactNode;
+}) {
+  const head = (
     <>
-      <span className="tile-label">
-        {icon}
-        {label}
+      <span className="kpi-head">
+        <span className="icon-chip sm">{icon}</span>
+        <span className="kpi-label">{label}</span>
       </span>
-      {children}
+      <span className="kpi-value num">
+        {value}
+        {sub && <span className="kpi-sub"> {sub}</span>}
+      </span>
     </>
   );
-  return onClick ? (
-    <button className="tile" onClick={onClick} aria-label={label}>
-      {content}
-    </button>
-  ) : (
-    <div className="tile">{content}</div>
+  if (onClick) {
+    return (
+      <button className="ui-card kpi" onClick={onClick} aria-label={`${label} : ${value}${sub ? ` ${sub}` : ''}`}>
+        {head}
+        {children}
+      </button>
+    );
+  }
+  return (
+    <div className="ui-card kpi">
+      {onLabel ? (
+        <button className="tile-hit kpi-hit" onClick={onLabel} aria-label={`${label} : objectif`}>
+          {head}
+        </button>
+      ) : (
+        head
+      )}
+      {children}
+    </div>
   );
 }
 
-function Ring({ value }: { value: number }) {
-  const r = 26;
-  const c = 2 * Math.PI * r;
+/** Jauge linéaire fine (0–1). */
+function Meter({ value }: { value: number }) {
   return (
-    <svg width="68" height="68" viewBox="0 0 68 68" aria-hidden="true">
-      <circle cx="34" cy="34" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="8" />
-      <circle cx="34" cy="34" r={r} fill="none" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * Math.min(1, value)} ${c}`} transform="rotate(-90 34 34)" />
+    <span className="meter" aria-hidden="true">
+      <span style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
+    </span>
+  );
+}
+
+/** Mini-courbe des 14 dernières pesées. */
+function Spark({ days }: { days: WeighIn[] }) {
+  const pts = days.slice(-14);
+  if (pts.length < 2) return null;
+  const kgs = pts.map((p) => p.kg);
+  const min = Math.min(...kgs);
+  const max = Math.max(...kgs);
+  const range = Math.max(0.5, max - min);
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 76 + 2).toFixed(1)},${(2 + (1 - (p.kg - min) / range) * 30).toFixed(1)}`).join(' ');
+  return (
+    <svg width="80" height="34" viewBox="0 0 80 34" aria-hidden="true">
+      <path d={d} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -84,6 +131,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const { entries, update } = useChallengeEntries(repo);
   const weight = useWeightLog(repo);
   const lastWeight = weight.days[weight.days.length - 1];
+  const weightTrend = trend(weight.days, today);
   const [weighing, setWeighing] = useState(false);
 
   useEffect(() => {
@@ -147,147 +195,167 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   return (
     <>
-      <p className="muted" style={{ margin: 0, textTransform: 'capitalize' }}>
-        {new Intl.DateTimeFormat('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz }).format(Date.now())}
-      </p>
-      <h1 style={{ marginBottom: 16 }}>{night.phase === 'matin' ? 'Bonjour ☀️' : night.phase === 'soir' ? 'Bonsoir 🌇' : night.phase === 'nuit' ? 'Bonne nuit 🌙' : 'Aujourd’hui'}</h1>
+      <header className="home-head">
+        <p className="eyebrow">
+          {new Intl.DateTimeFormat('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz }).format(Date.now())}
+        </p>
+        <h1 className="home-title">
+          {night.phase === 'matin' ? 'Bonjour' : night.phase === 'soir' ? 'Bonsoir' : night.phase === 'nuit' ? 'Bonne nuit' : 'Salut'} Hmidou
+        </h1>
+      </header>
 
       {night.pastBed && night.bedtime && (
         <div className="bed-banner" role="status">
-          <span className="bed-moon" aria-hidden="true">🌙</span>
-          <div>
-            <div style={{ fontWeight: 700 }}>Au lit, Hmidou.</div>
-            <div className="num" style={{ fontSize: '0.85rem', opacity: 0.85 }}>
-              {night.now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })} · coucher prévu {night.bedtime}
-            </div>
+          <span className="icon-chip">
+            <Moon size={16} aria-hidden="true" />
+          </span>
+          <div className="grow">
+            <p className="row-title">Au lit</p>
+            <p className="row-meta num">
+              {night.now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })} · coucher {night.bedtime}
+            </p>
           </div>
         </div>
       )}
 
       {onboardingStep !== null && (
-        <button className="item" onClick={() => go({ name: 'onboarding' })}>
-          <ClipboardList size={22} aria-hidden="true" />
-          <div className="grow">
-            <div className="name">Terminer la configuration</div>
-            <div className="meta">
-              {Math.min(onboardingStep + 1, STEPS.length + 1)} / {STEPS.length + 1}
-            </div>
-          </div>
+        <button className="ui-card list-row" onClick={() => go({ name: 'onboarding' })}>
+          <span className="icon-chip">
+            <ClipboardList size={16} aria-hidden="true" />
+          </span>
+          <span className="grow row-title">Terminer la configuration</span>
+          <span className="pill num">
+            {Math.min(onboardingStep + 1, STEPS.length + 1)}/{STEPS.length + 1}
+          </span>
         </button>
       )}
 
-      <section className="hero-card" aria-label="Séance du jour">
+      <section className="ui-card list-row" aria-label="Séance du jour">
+        <span className="icon-chip accent">
+          <Dumbbell size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">
+            {hero?.kind === 'open' ? 'En cours' : hero?.kind === 'planned' ? `Séance · ${hero.item.start}${hero.item.adapted ? ' · adaptée' : ''}` : 'Séance du jour'}
+          </p>
+          <p className="row-title">{hero?.kind === 'open' ? hero.title : hero?.kind === 'planned' ? hero.item.title : 'Rien de prévu'}</p>
+          {hero?.kind === 'open' && <p className="row-meta num">{hero.done}/{hero.total} séries</p>}
+          {hero?.kind === 'planned' && hero.tpl && (
+            <p className="row-meta num">
+              {(hero.item.adapted?.lines ?? hero.tpl.lines).length} exos · {(hero.item.adapted?.lines ?? hero.tpl.lines).reduce((n, l) => n + l.sets, 0)} séries · ≈
+              {hero.item.adapted?.estimatedMin ?? estimateMinutes(hero.tpl.lines)} min
+            </p>
+          )}
+        </div>
         {hero?.kind === 'open' && (
-          <>
-            <span className="tile-label">En cours</span>
-            <div className="hero-title">{hero.title}</div>
-            <div className="hero-meta num">
-              {hero.done}/{hero.total} séries
-            </div>
-            <button className="btn primary big" onClick={() => go({ name: 'session', id: hero.id })}>
-              <Play size={20} aria-hidden="true" /> Reprendre
-            </button>
-          </>
+          <button className="icon-btn primary" aria-label="Reprendre la séance" onClick={() => go({ name: 'session', id: hero.id })}>
+            <Play size={18} aria-hidden="true" />
+          </button>
         )}
-        {hero?.kind === 'planned' && (
-          <>
-            <span className="tile-label num">
-              {hero.item.start}
-              {hero.item.adapted ? ' · adaptée' : ''}
-            </span>
-            <div className="hero-title">{hero.item.title}</div>
-            {hero.tpl ? (
-              <>
-                <div className="hero-meta num">
-                  {(hero.item.adapted?.lines ?? hero.tpl.lines).length} exercices · {(hero.item.adapted?.lines ?? hero.tpl.lines).reduce((n, l) => n + l.sets, 0)} séries · ≈{' '}
-                  {hero.item.adapted?.estimatedMin ?? estimateMinutes(hero.tpl.lines)} min
-                </div>
-                <button className="btn primary big" onClick={async () => go({ name: 'session', id: await startPlanned(repo, hero.item, hero.tpl!) })}>
-                  <Play size={20} aria-hidden="true" /> Commencer
-                </button>
-              </>
-            ) : (
-              <p className="muted">Modèle de séance introuvable.</p>
-            )}
-          </>
+        {hero?.kind === 'planned' && hero.tpl && (
+          <button className="icon-btn primary" aria-label="Commencer la séance" onClick={async () => go({ name: 'session', id: await startPlanned(repo, hero.item, hero.tpl!) })}>
+            <Play size={18} aria-hidden="true" />
+          </button>
         )}
         {hero?.kind === 'none' && (
-          <>
-            <span className="tile-label">Séance du jour</span>
-            <div className="hero-title">Rien de prévu</div>
-            <button className="btn big" onClick={() => go({ name: 'planning' })}>
-              Planifier
-            </button>
-          </>
+          <button className="btn sm" onClick={() => go({ name: 'planning' })}>
+            Planifier
+          </button>
         )}
       </section>
 
-      <div className="tiles">
-        <Tile icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')}>
-          <div className="tile-value num">
-            {daily?.sleepH !== undefined ? fmtHours(daily.sleepH) : '—'}
-          </div>
+      <div className="kpi-grid">
+        <Kpi icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')} value={daily?.sleepH !== undefined ? fmtHours(daily.sleepH) : '—'}>
           <div className="bars" aria-hidden="true">
             {Array.from({ length: 8 }, (_, i) => (
               <span key={i} className={i < sleepBars ? 'on' : ''} />
             ))}
           </div>
-        </Tile>
+        </Kpi>
 
-        <Tile icon={<Footprints size={16} aria-hidden="true" />} label="Pas" onClick={() => openEditor('steps')}>
-          <div className="row" style={{ flexWrap: 'nowrap', gap: 8 }}>
-            <Ring value={(daily?.steps ?? 0) / STEPS_GOAL} />
-            <div>
-              <div className="tile-value num" style={{ fontSize: '1.25rem' }}>
-                {daily?.steps !== undefined ? fmtNum(daily.steps) : '—'}
-              </div>
-              <div className="muted num" style={{ fontSize: '0.75rem' }}>/ {fmtNum(STEPS_GOAL)}</div>
-            </div>
-          </div>
-        </Tile>
+        <Kpi
+          icon={<Footprints size={16} aria-hidden="true" />}
+          label="Pas"
+          onClick={() => openEditor('steps')}
+          value={daily?.steps !== undefined ? fmtNum(daily.steps) : '—'}
+          sub={`/ ${fmtNum(STEPS_GOAL)}`}
+        >
+          <Meter value={(daily?.steps ?? 0) / STEPS_GOAL} />
+        </Kpi>
 
-        <Tile icon={<Droplet size={16} aria-hidden="true" />} label="Eau">
-          <button className="tile-hit" onClick={() => openEditor('waterGoal')} aria-label="Modifier l’objectif d’eau">
-            <span className="tile-value num">{((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L</span>
-            <span className="muted num" style={{ fontSize: '0.75rem' }}>
-              {' '}
-              / {waterGoal ? `${(waterGoal / 1000).toLocaleString('fr-BE')} L` : 'objectif ?'}
-            </span>
-          </button>
+        <Kpi
+          icon={<Droplet size={16} aria-hidden="true" />}
+          label="Eau"
+          value={`${((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L`}
+          sub={waterGoal ? `/ ${(waterGoal / 1000).toLocaleString('fr-BE')} L` : undefined}
+          onLabel={() => openEditor('waterGoal')}
+        >
           <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-            <button className="btn icon" aria-label="Retirer 250 ml" onClick={() => saveDaily(addWater(daily, -250, Date.now()))}>
-              <Minus size={18} aria-hidden="true" />
+            <button className="icon-btn" aria-label="Retirer 250 ml" onClick={() => saveDaily(addWater(daily, -250, Date.now()))}>
+              <Minus size={16} aria-hidden="true" />
             </button>
-            <button className="btn primary icon" aria-label="Ajouter 250 ml" onClick={() => saveDaily(addWater(daily, 250, Date.now()))}>
-              <Plus size={18} aria-hidden="true" />
+            <button className="icon-btn primary" aria-label="Ajouter 250 ml" onClick={() => saveDaily(addWater(daily, 250, Date.now()))}>
+              <Plus size={16} aria-hidden="true" />
             </button>
+            {!waterGoal && (
+              <button className="pill" onClick={() => openEditor('waterGoal')}>
+                objectif ?
+              </button>
+            )}
           </div>
-        </Tile>
+        </Kpi>
 
-        <Tile icon={<Flame size={16} aria-hidden="true" />} label="Calories actives" onClick={() => openEditor('activeKcal')}>
-          <div className="tile-value num">{daily?.activeKcal !== undefined ? fmtNum(daily.activeKcal) : '—'}</div>
-          <div className="muted" style={{ fontSize: '0.75rem' }}>kcal · montre</div>
-        </Tile>
-
-        <Tile icon={<Target size={16} aria-hidden="true" />} label="Objectif" onClick={() => go({ name: 'settings' })}>
-          <div style={{ fontWeight: 600, lineHeight: 1.2 }}>{goal?.main ? GOAL_LABELS[goal.main] : '—'}</div>
-          {goal?.targetDate && <div className="muted num" style={{ fontSize: '0.8rem' }}>J−{Math.max(0, daysUntil(today, goal.targetDate))}</div>}
-        </Tile>
-
-        <Tile icon={<Scale size={16} aria-hidden="true" />} label="Poids" onClick={() => setWeighing(true)}>
-          <div className="tile-value num">{lastWeight ? lastWeight.kg.toLocaleString('fr-BE', { maximumFractionDigits: 1 }) : '—'}</div>
-          <div className="muted" style={{ fontSize: '0.75rem' }}>
-            kg{lastWeight && lastWeight.day !== today ? ` · ${new Date(`${lastWeight.day}T12:00:00Z`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short', timeZone: 'UTC' })}` : ''}
-          </div>
-        </Tile>
+        <Kpi
+          icon={<Flame size={16} aria-hidden="true" />}
+          label="Calories"
+          onClick={() => openEditor('activeKcal')}
+          value={daily?.activeKcal !== undefined ? fmtNum(daily.activeKcal) : '—'}
+          sub="kcal actives"
+        >
+          <span className="pill">⌚ montre</span>
+        </Kpi>
       </div>
 
-      <section className="hero-card" style={{ marginTop: 12 }} aria-label="Habitudes du jour">
+      <button className="ui-card list-row" onClick={() => setWeighing(true)} aria-label="Poids à jeun : ajouter une pesée">
+        <span className="icon-chip">
+          <Scale size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Poids à jeun</p>
+          <p className="kpi-value num" style={{ margin: 0 }}>
+            {lastWeight ? lastWeight.kg.toLocaleString('fr-BE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}
+            <span className="kpi-sub"> kg</span>
+          </p>
+          <div className="row" style={{ gap: 6, marginTop: 4 }}>
+            {weightTrend.deltaKg !== undefined && (
+              <span className="pill num">
+                {weightTrend.deltaKg > 0 ? '↗ +' : weightTrend.deltaKg < 0 ? '↘ ' : '→ '}
+                {weightTrend.deltaKg.toLocaleString('fr-BE')} kg/7 j
+              </span>
+            )}
+            {lastWeight && lastWeight.day !== today && (
+              <span className="pill">{new Date(`${lastWeight.day}T12:00:00Z`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short', timeZone: 'UTC' })}</span>
+            )}
+            {!lastWeight && <span className="pill">+ pesée</span>}
+          </div>
+        </div>
+        <Spark days={weight.days} />
+      </button>
+
+      <button className="ui-card list-row" onClick={() => go({ name: 'settings' })} aria-label="Objectif">
+        <span className="icon-chip">
+          <Target size={16} aria-hidden="true" />
+        </span>
+        <span className="grow row-title">{goal?.main ? GOAL_LABELS[goal.main] : 'Objectif à définir'}</span>
+        {goal?.targetDate && <span className="pill num">J−{Math.max(0, daysUntil(today, goal.targetDate))}</span>}
+      </button>
+
+      <section className="ui-card" aria-label="Habitudes du jour">
         <div className="spread">
-          <button className="tile-hit tile-label" onClick={() => go({ name: 'challenge' })}>
-            <Trophy size={16} aria-hidden="true" /> Habitudes du jour{!challengeOn ? ` · défi J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}` : ''}
+          <button className="tile-hit eyebrow-btn" onClick={() => go({ name: 'challenge' })}>
+            <Trophy size={14} aria-hidden="true" /> Habitudes{!challengeOn ? ` · défi J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}` : ''}
           </button>
-          <span className="num" style={{ fontWeight: 700 }}>
+          <span className="pill num">
             {habitsDone}/{NOVEMBER_2026.daily.length}
           </span>
         </div>
@@ -314,7 +382,9 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
                 <button className="habit" onClick={toggle} aria-pressed={st === 'done'}>
                   <span className="habit-name">{h.label}</span>
                   {h.kind === 'number' && (
-                    <span className="muted num">{typeof value !== 'number' ? '—' : h.id === 'sleep' ? fmtHours(value) : fmtNum(value)}</span>
+                    <span className="muted num" style={{ fontSize: '0.8rem' }}>
+                      {typeof value !== 'number' ? '—' : h.id === 'sleep' ? fmtHours(value) : fmtNum(value)}
+                    </span>
                   )}
                   <span className={`check ${st === 'done' ? 'on' : ''}`} aria-hidden="true">
                     {st === 'done' ? '✓' : ''}
@@ -330,8 +400,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         open={weighing}
         onClose={() => setWeighing(false)}
         last={lastWeight?.kg}
-        onSave={async (kg, status, day) => {
-          await weight.add(kg, status, day);
+        onSave={async (kg, status, day, fasting) => {
+          await weight.add(kg, status, day, fasting);
           setWeighing(false);
         }}
       />
