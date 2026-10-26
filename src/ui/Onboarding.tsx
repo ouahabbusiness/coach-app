@@ -477,23 +477,25 @@ export function Onboarding({ repo, onExit }: { repo: Repository; onExit: () => v
   const goalChanged = !!lastGoal && goalChanges(lastGoal, a.goal).length > 0;
 
   return (
-    <div className="app">
+    <div className="app ob">
       <main className="content" style={{ paddingBottom: 140 }}>
-        <div className="spread" style={{ marginBottom: 8 }}>
-          <span className="muted" style={{ fontWeight: 600 }}>
-            Étape {Math.min(state.step + 1, total)} / {total}
+        <div className="ob-head">
+          <span className="ob-step num">
+            <i aria-hidden="true" /> Config · {String(Math.min(state.step + 1, total)).padStart(2, '0')}/{total}
           </span>
-          <button className="btn ghost" onClick={onExit}>
+          <button className="btn ghost ob-later" onClick={onExit}>
             Plus tard
           </button>
         </div>
-        <div style={{ height: 6, borderRadius: 999, background: 'var(--surface-2)', overflow: 'hidden', marginBottom: 20 }} aria-hidden="true">
-          <div style={{ width: `${((state.step + 1) / total) * 100}%`, height: '100%', background: 'var(--accent)' }} />
+        <div className="ob-progress" aria-hidden="true">
+          {Array.from({ length: total }, (_, i) => (
+            <span key={i} className={i < state.step ? 'done' : i === state.step ? 'now' : ''} />
+          ))}
         </div>
 
         {isRecap ? (
           <>
-            <h1>Récapitulatif</h1>
+            <h1 className="ob-title">Récapitulatif</h1>
             <p className="muted">Vérifie et modifie ce qui doit l’être. Tout reste modifiable ensuite depuis Réglages.</p>
             <div className="card">
               <Recap a={a} goTo={goTo} />
@@ -510,21 +512,23 @@ export function Onboarding({ repo, onExit }: { repo: Repository; onExit: () => v
           </>
         ) : (
           <>
-            <h1>{step.title}</h1>
-            <p style={{ fontWeight: 500 }}>{step.todo}</p>
-            <button className="btn ghost" style={{ paddingLeft: 0 }} aria-expanded={showWhy} onClick={() => setShowWhy(!showWhy)}>
-              Pourquoi on te le demande ?
+            <h1 className="ob-title">{step.title}</h1>
+            <p className="ob-lead">{step.todo}</p>
+            <button className="ob-why" aria-expanded={showWhy} onClick={() => setShowWhy(!showWhy)}>
+              <span aria-hidden="true">{showWhy ? '−' : '+'}</span> Pourquoi on te le demande ?
             </button>
             {showWhy && (
-              <div className="notice">
+              <div className="notice ob-note">
                 <div>
                   <p style={{ margin: 0 }}>{step.why}</p>
                   <p className="muted" style={{ margin: '6px 0 0' }}>Si tu passes : {step.ifSkip}</p>
                 </div>
               </div>
             )}
-            <div className="card stack">{step.render(a, set)}</div>
-            <p className="muted" style={{ fontSize: '0.85rem' }}>Tes réponses sont enregistrées au fur et à mesure.</p>
+            <div className="card stack ob-card" key={state.step}>{step.render(a, set)}</div>
+            <p className="ob-foot">
+              <i aria-hidden="true" /> Sauvegarde automatique
+            </p>
           </>
         )}
       </main>

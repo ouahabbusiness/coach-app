@@ -53,7 +53,7 @@ export function App() {
   const { mode: winterMode } = useWinterMode(repo);
   const winterOn = winterInfo(winterMode, localDay(Date.now(), deviceTimeZone()), winterForced()).active;
   // Zone sombre uniquement pendant l'entraînement (et sur la page Winter Arc) ; ailleurs, thème clair (bleu en novembre).
-  const zone = route.name === 'session' || route.name === 'arc';
+  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding';
   useEffect(() => {
     if (zone) document.documentElement.dataset.theme = 'zone';
     else if (winterOn) document.documentElement.dataset.theme = 'winter';

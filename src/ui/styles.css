@@ -958,3 +958,62 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 .seg2 button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent, #fff); }
 .why-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .why-foot { margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.74rem; color: var(--text-2); }
+
+
+/* Configuration (onboarding) : zone Winter Arc (noir, crème, pointillés, mono) */
+:root[data-theme='zone'] body:has(.ob) {
+  background-image: radial-gradient(rgb(243 236 220 / 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+  background-attachment: fixed;
+}
+.ob .content { max-width: 560px; }
+.ob-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.ob-step { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono, monospace); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text); }
+.ob-step i { width: 7px; height: 7px; border-radius: 999px; background: var(--text); box-shadow: 0 0 10px rgb(243 236 220 / 0.7); animation: ob-blink 1.8s ease-in-out infinite; }
+@keyframes ob-blink { 50% { opacity: 0.3; } }
+.ob-later { font-family: var(--font-mono, monospace); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-2); }
+
+/* Progression : une marche par étape, pointillée pour celles à venir */
+.ob-progress { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; margin-bottom: 26px; }
+.ob-progress span { height: 3px; border-radius: 2px; background: repeating-linear-gradient(90deg, #3a3833 0 2px, transparent 2px 5px); transition: background 300ms ease; }
+.ob-progress span.done { background: #8f8b82; }
+.ob-progress span.now { background: #f3ecdc; box-shadow: 0 0 10px rgb(243 236 220 / 0.6); }
+
+.ob-title { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; animation: rise 320ms cubic-bezier(.2,.8,.2,1) both; }
+.ob-lead { margin: 0 0 14px; color: var(--text-2); font-size: 0.95rem; line-height: 1.45; }
+.ob-why { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-bottom: 12px; padding: 0 12px; border-radius: 10px;
+  border: 1px dashed #3a3833; background: transparent; color: var(--text); font: 600 0.85rem var(--font-body); cursor: pointer; }
+.ob-why span { font-family: var(--font-mono, monospace); width: 12px; }
+.ob-foot { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-family: var(--font-mono, monospace); font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-2); }
+.ob-foot i { width: 6px; height: 6px; border-radius: 999px; background: var(--text-2); }
+
+/* Cartes : fond noir mat, filet fin, repère crème en haut à gauche */
+.ob .card { background: #0c0c0b; border: 1px solid #262624; border-radius: 14px; padding: 18px; box-shadow: none; gap: 18px; }
+.ob .card.soft { background: #121211; }
+.ob-card { position: relative; animation: rise 320ms cubic-bezier(.2,.8,.2,1) both; }
+.ob-card::before { content: ''; position: absolute; top: -1px; left: 16px; width: 32px; height: 2px; border-radius: 2px; background: #f3ecdc; }
+
+/* Encadrés d'information : plus de pêche, un filet crème */
+.ob .notice, .ob .notice.warn { background: #121211; border: 1px solid #262624; border-left: 2px solid #f3ecdc; border-radius: 10px; color: var(--text); padding: 12px 14px; }
+.ob .notice strong { color: #fff8e8; }
+
+/* Champs HUD : noirs, bord crème au focus */
+.ob label.field { gap: 6px; font-family: var(--font-mono, monospace); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text); }
+.ob label.field .hint { font-family: var(--font-body); font-size: 0.8rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-2); }
+.ob input, .ob select, .ob textarea {
+  background: #050505; color: var(--text); border: 1px solid #2c2b28; border-radius: 10px; min-height: 50px;
+  font-family: var(--font-body); font-size: 1rem; letter-spacing: 0; text-transform: none; transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.ob textarea { padding-top: 12px; min-height: 96px; }
+.ob input::placeholder, .ob textarea::placeholder { color: #5c5a54; }
+.ob input:focus, .ob select:focus, .ob textarea:focus { outline: none; border-color: #f3ecdc; box-shadow: 0 0 0 3px rgb(243 236 220 / 0.12), 0 0 18px rgb(243 236 220 / 0.08); }
+.ob input[type='checkbox'] { accent-color: #f3ecdc; min-height: 0; }
+.ob .chip { background: #050505; border-color: #2c2b28; color: var(--text); }
+.ob .chip[aria-pressed='true'] { background: #f3ecdc; border-color: #f3ecdc; color: #0a0a0a; }
+:root[data-theme='zone'] .ob .btn.ghost { color: var(--text); background: transparent; border-color: transparent; }
+
+/* Barre de commande : noire, bouton crème */
+.ob .controls { background: rgb(10 10 10 / 0.94); border: 1px solid #262624; backdrop-filter: blur(10px); }
+:root[data-theme='zone'] .ob .controls .btn.side { color: var(--text); background: transparent; border-color: transparent; }
+:root[data-theme='zone'] .ob .controls .btn.dark { background: #f3ecdc; border-color: #f3ecdc; color: #0a0a0a; font-family: var(--font-mono, monospace); letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.82rem; }
+:root[data-theme='zone'] .ob .controls .btn.dark:disabled { background: #1a1a18; border-color: #262624; color: #5c5a54; }
