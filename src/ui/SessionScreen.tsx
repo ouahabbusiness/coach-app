@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronLeft, ImageOff, Minus, Pause, Play, Plus, SkipForward, Square, TriangleAlert, Undo2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
 import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { Modal, Notice } from './common';
-import { Scene } from './Fighter';
-import { CharacterArt } from './character';
+import { CATEGORY_ICON, Scene } from './Scene';
 import { fmtDuration, useNow, useWakeLock } from './support';
 import { useSession, type SendResult } from './useSession';
 
@@ -89,11 +89,12 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   const openInterruption = state.interruptions.find((i) => i.end === undefined);
   const focusInfo = focus ? findVariant(focus.planned.variantId) : undefined;
   const comparable = focus ? lastComparable(history, focus.planned.variantId, state.startedAt) : undefined;
-  const blocks: { blockId: string; name: string; done: number; total: number }[] = [];
+  const blocks: { blockId: string; name: string; icon?: LucideIcon; done: number; total: number }[] = [];
   for (const s of state.sets) {
     let b = blocks.find((x) => x.blockId === s.planned.blockId);
     if (!b) {
-      b = { blockId: s.planned.blockId, name: findVariant(s.planned.variantId)?.exercise.name ?? s.planned.variantId, done: 0, total: 0 };
+      const ex = findVariant(s.planned.variantId)?.exercise;
+      b = { blockId: s.planned.blockId, name: ex?.name ?? s.planned.variantId, icon: ex ? CATEGORY_ICON[ex.category] : undefined, done: 0, total: 0 };
       blocks.push(b);
     }
     b.total++;
@@ -103,9 +104,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   return (
     <div className="session">
       <div className="session-hero">
-        <Scene kind="gym">
-          <CharacterArt size={230} />
-        </Scene>
+        <Scene kind="gym" icon={focusInfo ? CATEGORY_ICON[focusInfo.exercise.category] : undefined} iconSize={88} />
         <div className="fade" />
         <div className="top">
           <button className="round" onClick={onExit} aria-label="Quitter l’écran de séance (la séance reste en cours)">
@@ -136,9 +135,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
           {blocks.map((b) => (
             <div key={b.blockId} role="listitem" className="cat" aria-current={focus?.planned.blockId === b.blockId ? 'step' : undefined}>
               <span className="bubble" style={{ position: 'relative', borderColor: focus?.planned.blockId === b.blockId ? 'var(--accent)' : undefined }}>
-                <Scene kind="gym">
-                  <CharacterArt size={54} />
-                </Scene>
+                <Scene kind="gym" icon={b.icon} iconSize={26} />
               </span>
               <span style={{ maxWidth: 76, textAlign: 'center', lineHeight: 1.2 }}>
                 {b.name} · {b.done}/{b.total}

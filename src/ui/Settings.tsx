@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Download, Trash2, Upload } from 'lucide-react';
-import { LEVEL_NAMES, Scene, type FighterLevel } from './Fighter';
-import { CharacterArt, useCharacter } from './character';
+import { ChevronLeft, Download, Upload } from 'lucide-react';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
 
@@ -17,7 +15,6 @@ const FEATURES: { name: string; status: Status; note?: string }[] = [
   { name: 'Consignes des exercices', status: 'à valider', note: 'Rédigées sans relecture professionnelle.' },
   { name: 'Démonstrations (images, animations)', status: 'non implémenté' },
   { name: 'Défi de novembre (saisie déclarée)', status: 'testé', note: 'Calculs testés automatiquement ; pas, sommeil et course sont déclarés, pas importés.' },
-  { name: 'Personnage évolutif', status: 'non implémenté', note: 'Dessin et images perso disponibles ; paliers inactifs tant que les critères ne sont pas validés.' },
   { name: 'Onboarding et profil', status: 'non implémenté' },
   { name: 'Planning de la semaine', status: 'non implémenté' },
   { name: 'Nutrition', status: 'non implémenté' },
@@ -96,8 +93,6 @@ export function Settings({ repo, onBack }: { repo: Repository; onBack: () => voi
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </div>
 
-      <CharacterSettings />
-
       <div className="card">
         <h2>État réel des fonctions</h2>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }} className="stack">
@@ -118,61 +113,3 @@ export function Settings({ repo, onBack }: { repo: Repository; onBack: () => voi
   );
 }
 
-function CharacterSettings() {
-  const { images, setImage } = useCharacter();
-  const [error, setError] = useState<string | null>(null);
-  const levels = Object.keys(LEVEL_NAMES).map(Number) as FighterLevel[];
-  return (
-    <div className="card stack">
-      <h2 style={{ margin: 0 }}>Personnage</h2>
-      <p className="muted" style={{ margin: 0 }}>
-        Tu peux remplacer le personnage dessiné par tes propres images, une par palier. Elles restent sur cet appareil
-        (et dans tes exports), ne sont jamais publiées ni ajoutées au code. Utilise des images que tu as le droit d’utiliser.
-      </p>
-      <Notice tone="warn">Les paliers ne sont pas encore actifs : les critères d’évolution restent à valider.</Notice>
-      {levels.map((lvl) => (
-        <div key={lvl} className="spread">
-          <div className="row" style={{ flexWrap: 'nowrap' }}>
-            <div className="thumb" style={{ width: 56, height: 56 }}>
-              <Scene kind="gym">
-                <CharacterArt level={lvl} size={52} />
-              </Scene>
-            </div>
-            <div>
-              <strong>{LEVEL_NAMES[lvl]}</strong>
-              <div className="muted" style={{ fontSize: '0.85rem' }}>{images[lvl] ? 'Image personnelle' : 'Personnage dessiné'}</div>
-            </div>
-          </div>
-          <div className="row" style={{ flexWrap: 'nowrap', gap: 4 }}>
-            <label className="btn" style={{ cursor: 'pointer' }}>
-              Choisir
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!f) return;
-                  if (f.size > 15 * 1024 * 1024) return setError('Image trop lourde (max 15 Mo).');
-                  try {
-                    await setImage(lvl, f);
-                    setError(null);
-                  } catch {
-                    setError('Image illisible.');
-                  }
-                }}
-              />
-            </label>
-            {images[lvl] && (
-              <button className="btn ghost icon" aria-label={`Retirer l’image du palier ${LEVEL_NAMES[lvl]}`} onClick={() => setImage(lvl, null)}>
-                <Trash2 size={18} aria-hidden="true" />
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-      {error && <Notice tone="danger">{error}</Notice>}
-    </div>
-  );
-}

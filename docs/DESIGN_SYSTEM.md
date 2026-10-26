@@ -21,10 +21,9 @@ Outils : skills ui-ux-pro-max / brand / design. La palette « vibrant orange » 
 Inter (texte) et Doto (chrono à points), auto-hébergées via @fontsource (licence OFL) pour le hors ligne.
 
 ## Illustrations
-- Personnage **original** dessiné en SVG (`src/ui/Fighter.tsx`) : boxeur en garde, aura selon le palier.
-- Aucun personnage sous droits (Goku, Ippo…) dans le code. Hmidou peut importer ses propres images par palier
-  (Réglages → Personnage) : stockées uniquement sur l'appareil.
-- Les décors (salle, extérieur) sont des formes simples en SVG.
+- Pas de personnage (retiré à la demande de Hmidou, voir docs/CHARACTER.md).
+- Décors simples en SVG (salle, extérieur) avec une icône Lucide par catégorie d'exercice (`src/ui/Scene.tsx`).
+- Captures des écrans : `docs/maquettes/`.
 
 ## Règles
 - Cibles tactiles ≥ 44–48 px ; actions de séance ≥ 56 px. Statuts = texte, jamais la couleur seule.

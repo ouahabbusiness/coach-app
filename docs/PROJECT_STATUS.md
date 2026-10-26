@@ -6,7 +6,8 @@
 - Interface façon maquettes : Aujourd'hui (défi, catégories, cartes de séances, dernières séances), Programme (modèles),
   mode séance (chrono à points, barre de contrôle), bilan, historique, réglages avec l'état réel des fonctions.
 - Défi de novembre (01–30/11/2026) : 6 habitudes quotidiennes déclarées + salle 4×/sem (comptée automatiquement si séance dans l'app) + course 3×/sem.
-- Personnage original en SVG ; import d'images personnelles par palier (local).
+- Illustrations : décors simples + icônes d'exercice (personnages retirés).
+- Captures des écrans dans docs/maquettes/.
 - Catalogue de 15 variantes, consignes **non relues**, **aucun média**.
 
 ## Testé
@@ -15,10 +16,9 @@
   rechargement en cours de repos, douleur → arrêt, bilan, écran du défi.
 
 ## Non testé
-- Safari iOS, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran, import d'image personnelle.
+- Safari iOS, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran.
 
 ## Action requise de Hmidou
-- Choisir les critères des paliers du personnage (docs/CHARACTER.md).
 - Accord pour héberger la PWA en HTTPS (GitHub Pages ou autre) afin de l'installer sur l'iPhone avant le 1er novembre.
 
 ## Limites

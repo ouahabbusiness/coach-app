@@ -8,8 +8,8 @@ Application personnelle de coaching sportif pour Hmidou (francophone, Belgique).
 - Ne jamais écraser un résultat réel par la cible ; les corrections sont des événements (traçables, annulables).
 - Aucun seuil physiologique, règle de progression ou consigne présentée comme validée sans source consultée et relecture professionnelle.
 - Ne jamais afficher « synchronisé », « connecté » ou « testé » pour une fonction qui ne l'est pas. L'écran Réglages liste l'état réel.
-- Pas de médias d'exercices récupérés sur Internet ; pas de personnages sous droits d'auteur (Goku, Ippo…) : personnage original uniquement.
-- Personnage / mode strict : aucune punition, aucune privation, aucun dépassement dangereux récompensé.
+- Pas de médias récupérés sur Internet ; pas de personnages sous droits d'auteur. Les personnages ont été retirés (docs/CHARACTER.md).
+- Mode strict / défis : aucune punition, aucune privation, aucun dépassement dangereux récompensé.
 
 ## Stack
 - PWA : Vite 5 + React 18 + TypeScript strict, Dexie (IndexedDB), Vitest. Node 18 (versions figées dans package.json).

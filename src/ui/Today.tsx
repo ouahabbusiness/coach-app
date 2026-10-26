@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Dumbbell, Layers, Play, Repeat } from 'lucide-react';
+import { Dumbbell, Layers, Play, Repeat, Trophy } from 'lucide-react';
 import { EXERCISES, findVariant, type Exercise } from '../catalog/exercises';
 import { project } from '../engine/session';
 import type { Repository, SessionSummaryRow } from '../storage/db';
 import { NotBuilt, OutcomeBadge } from './common';
-import { Scene } from './Fighter';
-import { CharacterArt } from './character';
+import { CATEGORY_ICON, Scene } from './Scene';
 import { fmtDateTime, deviceTimeZone } from './support';
 import { loadTemplates, type SessionTemplate } from './templates';
 import { startSessionFromTemplate } from './actions';
@@ -86,9 +85,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
       {open && (
         <button className="item" onClick={() => go({ name: 'session', id: open.row.id })}>
           <div className="thumb">
-            <Scene kind="gym">
-              <CharacterArt size={56} />
-            </Scene>
+            <Scene kind="gym" />
           </div>
           <div className="grow">
             <div className="tag">Séance en cours</div>
@@ -113,9 +110,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
         {CATEGORIES.map((c) => (
           <button key={c.id} className="cat" aria-pressed={cat === c.id} onClick={() => setCat(cat === c.id ? null : c.id)}>
             <span className="bubble" style={{ position: 'relative' }}>
-              <Scene kind={c.scene}>
-                <CharacterArt size={54} />
-              </Scene>
+              <Scene kind={c.scene} icon={CATEGORY_ICON[c.id]} iconSize={26} />
             </span>
             {c.label}
           </button>
@@ -150,9 +145,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
           const first = findVariant(t.lines[0]?.variantId ?? '');
           return (
             <button key={t.id} className="feature" disabled={starting || !!open} onClick={() => start(t)} aria-label={`Commencer ${t.title}`}>
-              <Scene kind={i % 2 === 0 ? 'gym' : 'outdoor'}>
-                <CharacterArt size={170} />
-              </Scene>
+              <Scene kind={i % 2 === 0 ? 'gym' : 'outdoor'} icon={first ? CATEGORY_ICON[first.exercise.category] : Dumbbell} iconSize={64} />
               <div className="shade" />
               <span className="pill">{first?.exercise.name ?? 'Séance'}</span>
               <div className="info">
@@ -173,7 +166,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
                   <div className="stat">
                     <div className="v">{last ? new Intl.DateTimeFormat('fr-BE', { day: '2-digit', month: '2-digit', timeZone: tz }).format(last) : '—'}</div>
                     <div className="l">
-                      <Repeat size={11} aria-hidden="true" /> dernière fois
+                      <Repeat size={11} aria-hidden="true" /> dernière
                     </div>
                   </div>
                 </div>
@@ -195,9 +188,7 @@ export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }
           {recent.map((r) => (
             <button key={r.id} className="item" onClick={() => go({ name: 'summary', id: r.id })}>
               <div className="thumb">
-                <Scene kind="gym">
-                  <CharacterArt size={56} />
-                </Scene>
+                <Scene kind="gym" />
               </div>
               <div className="grow">
                 <div className="name">{r.title}</div>
@@ -233,9 +224,7 @@ function ChallengeCard({ repo, onOpen }: { repo: Repository; onOpen: () => void 
   return (
     <button className="item" onClick={onOpen}>
       <div className="thumb">
-        <Scene kind="outdoor">
-          <CharacterArt size={56} />
-        </Scene>
+        <Scene kind="outdoor" icon={Trophy} />
       </div>
       <div className="grow">
         <div className="tag">Défi</div>

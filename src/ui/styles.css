@@ -26,6 +26,8 @@
   --on-danger: #ffffff;
   --danger-soft: #fde8e6;
   --focus: #1f5c4f;
+  --strong: #1d2420;
+  --on-strong: #ffffff;
   --shadow: 0 10px 30px rgb(20 40 32 / 0.08);
   --shadow-strong: 0 14px 40px rgb(20 40 32 / 0.16);
 
@@ -66,6 +68,8 @@
     --on-danger: #2a0b08;
     --danger-soft: #3d1c19;
     --focus: #8fe0d4;
+    --strong: #eef0ee;
+    --on-strong: #121413;
     --shadow: 0 10px 30px rgb(0 0 0 / 0.35);
     --shadow-strong: 0 14px 40px rgb(0 0 0 / 0.5);
   }
@@ -176,7 +180,11 @@ main.content {
 }
 .scene { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
 .scene-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.scene > svg:not(.scene-bg) { position: relative; }
+.scene-icon {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #1f5c4f; opacity: 0.85;
+}
+.feature .scene-icon, .session-hero .scene-icon { align-items: flex-start; padding-top: 22%; }
 .feature .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / 0) 40%, rgb(10 30 24 / 0.82) 100%); }
 .feature .pill {
   position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 999px;
@@ -214,7 +222,7 @@ main.content {
 .btn:active { opacity: 0.72; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.btn.dark { background: #1d2420; color: #fff; border-color: #1d2420; }
+.btn.dark { background: var(--strong); color: var(--on-strong); border-color: var(--strong); }
 .btn.danger { background: var(--danger); color: var(--on-danger); border-color: var(--danger); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.big { min-height: var(--touch-lg); font-size: 1.08rem; width: 100%; }
@@ -244,6 +252,8 @@ input, select, textarea {
   border: 1px solid var(--border); border-radius: var(--radius);
   background: var(--surface); color: var(--text); font: 400 1rem var(--font-body);
 }
+input[type='checkbox'] { width: 24px; height: 24px; min-height: 0; flex: none; padding: 0; accent-color: var(--accent); }
+label.row { flex-wrap: nowrap; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 
 .stepper { display: grid; grid-template-columns: var(--touch-lg) 1fr var(--touch-lg); gap: var(--space-2); align-items: center; }
@@ -260,7 +270,7 @@ input, select, textarea {
 
 /* Mode séance */
 .session { min-height: 100dvh; display: flex; flex-direction: column; }
-.session-hero { position: relative; height: 300px; overflow: hidden; }
+.session-hero { position: relative; height: 220px; overflow: hidden; }
 .session-hero .fade { position: absolute; inset: auto 0 0 0; height: 90px; background: linear-gradient(180deg, rgb(0 0 0 / 0), var(--bg)); }
 .session-hero .top {
   position: absolute; top: calc(env(safe-area-inset-top) + 12px); left: 14px; right: 14px; z-index: 2;
@@ -281,7 +291,7 @@ input, select, textarea {
   background: var(--surface-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow-strong);
 }
-.controls .main { flex: 1; min-height: 56px; }
+.controls .main { flex: 1; min-width: 0; min-height: 56px; white-space: nowrap; font-size: 1rem; padding: 0 12px; }
 .controls .side { width: 56px; height: 56px; padding: 0; flex: none; }
 .media-missing {
   border: 1px dashed var(--border); border-radius: var(--radius); padding: var(--space-3);

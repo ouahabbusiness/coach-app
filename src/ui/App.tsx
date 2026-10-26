@@ -8,7 +8,6 @@ import { Settings } from './Settings';
 import { Challenge } from './Challenge';
 import { Summary } from './Summary';
 import { Today } from './Today';
-import { CharacterProvider } from './character';
 import { deviceTimeZone, fmtDateTime } from './support';
 
 export type Route =
@@ -42,7 +41,7 @@ export function App() {
     repo.openSession().then((open) => open && setRoute({ name: 'session', id: open.id }));
   }, [repo]);
 
-  return <CharacterProvider repo={repo}>{render()}</CharacterProvider>;
+  return render();
 
   function render() {
   if (route.name === 'session') {
