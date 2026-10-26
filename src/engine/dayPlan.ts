@@ -276,7 +276,7 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   out.push({ id: 'lumiere', time: fromMin(wake + 15), kind: 'sommeil', title: 'Lumière du jour', items: ['10 min dehors ou à la fenêtre : cale ton horloge interne'] });
   out.push({ id: 'cafe', time: fromMin(Math.max(wake, bedTarget - 8 * 60)), kind: 'sommeil', title: 'Dernier café', items: ['Plus de caféine après : elle reste des heures dans le corps'] });
   out.push({ id: 'ecrans', time: fromMin(bedTarget - 45), kind: 'sommeil', title: 'Écrans coupés', items: ['Lumière tamisée, chambre fraîche (~18 °C) et sombre'] });
-  out.push({ id: 'coucher', time: fromMin(bedTarget), kind: 'coucher', title: 'Au lit', items: [bedTarget < bed ? `Pour 8 h de sommeil (au lieu de ${a.bedtime})` : 'Même heure chaque soir, week-end compris'] });
+  out.push({ id: 'coucher', time: fromMin(bedTarget), kind: 'coucher', title: 'Au lit', items: [bedTarget < bed ? `8 h de sommeil · pas ${a.bedtime}` : 'Même heure chaque soir'] });
   // Repas qui tombent sur une prière : décalés juste après (15 min).
   if (i.prayers) {
     const pr = (['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map((k) => toMin(i.prayers!.times[k]));

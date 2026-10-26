@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChartLine, House, MessageSquare, Settings as SettingsIcon, Utensils } from 'lucide-react';
 import { CoachDb, Repository, type SessionSummaryRow } from '../storage/db';
-import { NotBuilt, OutcomeBadge } from './common';
+import { OutcomeBadge } from './common';
 import { Program } from './Program';
 import { SessionScreen } from './SessionScreen';
 import { Settings } from './Settings';
 import { Challenge } from './Challenge';
 import { WeighInGate, WeightCard } from './Weight';
 import { MeasuresCard } from './Measures';
+import { WeekReportCard } from './WeekReportCard';
 import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
@@ -178,6 +179,7 @@ function Progress({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
   return (
     <>
       <h1>Progression</h1>
+      <WeekReportCard repo={repo} />
       <WeightCard repo={repo} />
       <MeasuresCard repo={repo} />
       <div className="card">
@@ -201,8 +203,7 @@ function Progress({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
           ))}
         </div>
       </div>
-      <NotBuilt title="Tendances et rapports hebdomadaires" phase="phase 1 (suite)">
-      </NotBuilt>
+
     </>
   );
 }

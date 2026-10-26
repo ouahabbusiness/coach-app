@@ -279,7 +279,6 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
                 ))}
               </ul>
             )}
-            {dayItems.length === 0 && unplanned.length === 0 && <span className="day-free">Libre</span>}
           </section>
         );
       })}
@@ -503,7 +502,7 @@ export function GapBar({ spans, items }: { spans: [number, number][]; items: Pla
   const free = gaps.reduce((t, [s, e]) => t + e - s, 0);
   const pct = (m: number) => `${((m - from) / span) * 100}%`;
   const w = ([s, e]: [number, number]) => `${((e - s) / span) * 100}%`;
-  const fmtH = (m: number) => `${Math.floor(m / 60)} h${m % 60 ? String(m % 60).padStart(2, '0') : ''}`;
+  const fmtH = (m: number) => `${Math.floor(m / 60)} h${m % 60 ? ` ${String(m % 60).padStart(2, '0')}` : ''}`;
   return (
     <div className="gapbar-wrap" aria-label={`Temps libre : ${fmtH(free)}`}>
       <div className="gapbar" aria-hidden="true">

@@ -394,7 +394,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                   <div className="tl-body">
                     <p className="tl-title">
                       {e.title}
-                      {e.kcal ? <span className="num tl-kcal"> · {e.kcal} kcal · {e.protein} g P</span> : null}
+                      {e.kcal ? <span className="num tl-kcal">{e.kcal} kcal · {e.protein} g P</span> : null}
                     </p>
                     <p className="tl-items">{e.items.join(' · ')}</p>
                     {e.unplanned && <span className="pill">imprévu · estimation</span>}

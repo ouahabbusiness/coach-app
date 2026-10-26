@@ -635,13 +635,29 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
     loadProgram(repo).then((v) => setP(v ?? null));
   }, [repo]);
   const [light, setLight] = useState<LightLoad[]>([]);
+  const [todayItems, setTodayItems] = useState<PlannedItem[]>([]);
   useEffect(() => {
     lightLoadsReport(repo).then(setLight);
+    (async () => {
+      const t = localDay(Date.now(), deviceTimeZone());
+      const day = (new Date(`${t}T12:00:00Z`).getUTCDay() + 6) % 7;
+      setTodayItems((await loadPlanning(repo)).filter((i) => i.weekStart === weekStart(t) && i.day === day && !(i.adjustment && i.adjustment.decision !== 'adaptée')).sort((a, b) => a.start.localeCompare(b.start)));
+    })();
   }, [repo]);
   if (p === undefined) return null;
   return (
     <>
       <h1>Coach</h1>
+      <section className="coach-today" aria-label="Message du coach">
+        <p className="cq-who">Aujourd’hui</p>
+        {todayItems.length ? (
+          <p className="coach-msg">
+            {todayItems.map((i) => `${i.title} à ${i.start}`).join(', puis ')}. {todayItems.some((i) => i.sessionId) ? 'Déjà commencé : termine proprement.' : 'Pas de négociation : tu y vas.'}
+          </p>
+        ) : (
+          <p className="coach-msg">Pas de séance prévue. Repos actif : 30 min de marche, tes 10 000 pas, et tu dors tôt.</p>
+        )}
+      </section>
       {p ? (
         <section className="ui-card stack" aria-label="Programme en cours">
           <p className="eyebrow">Programme en cours</p>
@@ -696,6 +712,16 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           )}
         </section>
       )}
+      <button className="ui-card list-row" onClick={() => go({ name: 'agenda' })} style={{ marginTop: 10 }}>
+        <span className="icon-chip accent">
+          <CalendarCheck size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Emploi du temps · séjours</p>
+          <p className="row-title">Ma semaine et mes trous</p>
+        </div>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
       <button className="ui-card list-row" onClick={() => go({ name: 'spots' })} style={{ marginTop: 10 }}>
         <span className="icon-chip accent">
           <MapPin size={16} aria-hidden="true" />

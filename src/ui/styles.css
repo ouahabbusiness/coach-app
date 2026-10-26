@@ -1076,7 +1076,7 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 .tl-item.done .tl-title { text-decoration: line-through; }
 .tl-body { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .tl-title { margin: 0; font-weight: 700; font-size: 0.92rem; }
-.tl-kcal { font-weight: 500; color: var(--text-2); font-size: 0.75rem; }
+.tl-kcal { display: block; font-weight: 600; color: var(--accent); font-size: 0.72rem; white-space: nowrap; }
 .tl-items { margin: 0; font-size: 0.82rem; color: var(--text-2); line-height: 1.4; }
 .tl-alt { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--accent); font: 600 0.75rem var(--font-body); cursor: pointer; min-height: 28px; }
 .tl-item .check { margin-top: 4px; cursor: pointer; }
@@ -1217,3 +1217,18 @@ body:has(.run-live.full) { background-image: none; }
 .spot-ico.k-street-workout { background: #f59e0b; }
 .spot-ico.k-piste { background: #ef4444; }
 .spot-ico.k-parc { background: #22c55e; }
+
+/* Bilan de la semaine */
+.week-report { gap: 10px; }
+.wr-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.wr-grid > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border-radius: 10px; background: var(--surface-2); }
+.wr-grid strong { font-size: 1.05rem; font-weight: 800; }
+.wr-grid small { font-size: 0.62rem; color: var(--text-2); text-align: center; }
+.wr-grid .kpi-label { font-size: 0.62rem; }
+.wr-verdict { margin: 0; font-size: 0.85rem; font-weight: 600; }
+
+.coach-today { margin: 0 0 12px; padding: 16px; border-radius: 16px; background: #0a0a0a; color: #f3ecdc; display: flex; flex-direction: column; gap: 6px; animation: rise 320ms cubic-bezier(.2,.8,.2,1) both; }
+.coach-today .cq-who { color: #8f8b82; }
+.coach-msg { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.35; }
+
+.page-title { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }

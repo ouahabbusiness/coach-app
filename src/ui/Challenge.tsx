@@ -115,41 +115,46 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
         <ChevronLeft size={20} aria-hidden="true" /> Retour
       </button>
       <div className="spread" style={{ marginTop: 8 }}>
-        <p className="greeting" style={{ margin: 0 }}>{DEF.title}</p>
+        <div>
+          <h1 className="page-title">{DEF.title}</h1>
+          <p className="eyebrow" style={{ margin: 0 }}>{started ? '1 → 30 nov.' : 'Dès le 1er nov.'}</p>
+        </div>
         {onStatus && (
-          <button className="btn ghost" onClick={onStatus} aria-label="Statut Winter Arc">
-            <Mountain size={18} aria-hidden="true" /> Statut
+          <button className="btn sm" onClick={onStatus} aria-label="Statut Winter Arc">
+            <Mountain size={16} aria-hidden="true" /> Statut
           </button>
         )}
       </div>
-      <p className="greeting-sub" style={{ fontSize: '1.1rem' }}>
-        {started ? '1 → 30 nov.' : 'Dès le 1er nov.'}
-      </p>
 
-      <div className="row" style={{ gap: 6, marginBottom: 12 }}>
+      <div className="row" style={{ gap: 6, margin: '10px 0 12px' }}>
         <span className="badge warn">Gros volume : adapte</span>
         <span className="badge">Pas de rattrapage</span>
         <span className="badge">Jour excusé = 0 pénalité</span>
       </div>
 
       {week && (
-        <div className="card">
+        <section className="ui-card stack">
           <div className="spread">
-            <h2 style={{ margin: 0 }}>Semaine du {fmtDay(week.weekStart, { day: 'numeric', month: 'short' })}</h2>
-            {week.partial && <span className="badge">Semaine partielle ({week.days.length} j)</span>}
+            <p className="eyebrow" style={{ margin: 0 }}>Semaine du {fmtDay(week.weekStart, { day: 'numeric', month: 'short' })}</p>
+            {week.partial && <span className="pill">partielle · non jugée</span>}
           </div>
-          <div className="grid2" style={{ marginTop: 12 }}>
+          <div className="grid2">
             {DEF.weekly.map((g) => (
-              <div key={g.id}>
-                <div className="muted" style={{ fontSize: '0.85rem' }}>{g.label}</div>
-                <div className="num" style={{ fontSize: '1.6rem', fontWeight: 600 }}>
-                  {week.counts[g.id] ?? 0} <span className="muted" style={{ fontSize: '1rem' }}>/ {g.perWeek}</span>
+              <div key={g.id} className="stack" style={{ gap: 6 }}>
+                <span className="kpi-label">{g.label}</span>
+                <span className="kpi-value num">
+                  {week.counts[g.id] ?? 0}
+                  <span className="kpi-sub"> / {g.perWeek}</span>
+                </span>
+                <div className="segments" style={{ gridTemplateColumns: `repeat(${g.perWeek}, 1fr)` }} aria-hidden="true">
+                  {Array.from({ length: g.perWeek }, (_, i) => (
+                    <span key={i} className={i < (week.counts[g.id] ?? 0) ? 'on' : ''} />
+                  ))}
                 </div>
               </div>
             ))}
           </div>
-          {week.partial && <p className="muted" style={{ margin: '8px 0 0', fontSize: '0.88rem' }}>Semaine partielle : non jugée.</p>}
-        </div>
+        </section>
       )}
 
       <div className="section-head">
@@ -181,16 +186,9 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
           <h2 style={{ margin: 0, textTransform: 'capitalize' }}>{fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
         </div>
         {!editable && <p className="muted" style={{ margin: 0 }}>Jour futur</p>}
-        <label className="row" style={{ minHeight: 44 }}>
-          <input
-            type="checkbox"
-            style={{ width: 24, height: 24, minHeight: 0 }}
-            disabled={!editable}
-            checked={!!entry?.excused}
-            onChange={(e) => update(day, (x) => ({ ...x, excused: e.target.checked }))}
-          />
-          Jour excusé (maladie, blessure, repos prescrit)
-        </label>
+        <button className="chip" style={{ alignSelf: 'flex-start' }} disabled={!editable} aria-pressed={!!entry?.excused} onClick={() => update(day, (x) => ({ ...x, excused: !x.excused }))} title="Maladie, blessure, repos prescrit">
+          Jour excusé
+        </button>
 
         <ul className="habits">
           {DEF.daily.map((h) => {
