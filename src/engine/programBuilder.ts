@@ -119,6 +119,8 @@ export interface GenLine {
   targetSeconds?: number;
   loadKg?: number;
   targetRir?: number;
+  repRange?: [number, number];
+  lastSetToFailure?: boolean;
   restSeconds: number;
   cue?: string;
 }
@@ -153,20 +155,25 @@ export interface Program {
   notes: string[];
 }
 
-const RIR: Record<Intensity, number> = { controlee: 2, dure: 1, echec: 0 };
+/** Réserve visée par intensité ; « à l'échec » = 1 rép. de réserve, échec seulement à la dernière série. */
+const RIR: Record<Intensity, number> = { controlee: 3, dure: 2, echec: 1 };
 
+/**
+ * Réglages de départ (choix de conception, ajustables après calibration) :
+ * force 3–6 rép. repos long ; muscle 6–12 ; assistance 10–15 (jusqu'à 20 selon le mouvement).
+ */
 function scheme(p: Priority | undefined) {
   switch (p) {
     case 'force':
-      return { main: { sets: 5, reps: 5, rest: 150 }, acc: { sets: 3, reps: 8, rest: 90 } };
+      return { main: { sets: 5, range: [3, 6] as [number, number], rest: 180 }, acc: { sets: 3, range: [8, 12] as [number, number], rest: 90 } };
     case 'muscle':
-      return { main: { sets: 4, reps: 8, rest: 90 }, acc: { sets: 3, reps: 12, rest: 60 } };
+      return { main: { sets: 4, range: [6, 12] as [number, number], rest: 120 }, acc: { sets: 3, range: [10, 15] as [number, number], rest: 75 } };
     case 'seche':
-      return { main: { sets: 3, reps: 10, rest: 60 }, acc: { sets: 3, reps: 15, rest: 45 } };
+      return { main: { sets: 3, range: [8, 12] as [number, number], rest: 90 }, acc: { sets: 3, range: [12, 20] as [number, number], rest: 60 } };
     case 'course':
-      return { main: { sets: 3, reps: 6, rest: 120 }, acc: { sets: 2, reps: 10, rest: 60 } };
+      return { main: { sets: 3, range: [6, 10] as [number, number], rest: 120 }, acc: { sets: 2, range: [10, 15] as [number, number], rest: 60 } };
     default:
-      return { main: { sets: 4, reps: 6, rest: 120 }, acc: { sets: 3, reps: 10, rest: 75 } };
+      return { main: { sets: 4, range: [5, 8] as [number, number], rest: 150 }, acc: { sets: 3, range: [10, 15] as [number, number], rest: 75 } };
   }
 }
 
@@ -188,8 +195,16 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   const rir = RIR[intensity];
   const pain = new Set(a.pains);
   const notes: string[] = [];
-  const main = (variantId: string, extra: Partial<GenLine> = {}): GenLine => ({ variantId, kind: 'reps', role: 'work', sets: s.main.sets, targetReps: s.main.reps, targetRir: rir, restSeconds: s.main.rest, ...extra });
-  const acc = (variantId: string, extra: Partial<GenLine> = {}): GenLine => ({ variantId, kind: 'reps', role: 'work', sets: s.acc.sets, targetReps: s.acc.reps, targetRir: Math.max(1, rir), restSeconds: s.acc.rest, ...extra });
+  // Une cible fixe (ex. calculée depuis un max) devient une plage de 3–4 rép. au-dessus.
+  const withRange = (l: GenLine, def: [number, number]): GenLine => {
+    if (l.kind !== 'reps') return l;
+    const lo = l.targetReps ?? def[0];
+    const range: [number, number] = l.targetReps !== undefined && l.targetReps !== def[0] ? [lo, lo + Math.max(3, def[1] - def[0] > 6 ? 5 : 3)] : def;
+    return { ...l, targetReps: range[0], repRange: range };
+  };
+  const failLast = intensity === 'echec';
+  const main = (variantId: string, extra: Partial<GenLine> = {}): GenLine => withRange({ variantId, kind: 'reps', role: 'work', sets: s.main.sets, targetRir: rir, restSeconds: s.main.rest, lastSetToFailure: failLast && !extra.loadKg, ...extra }, s.main.range);
+  const acc = (variantId: string, extra: Partial<GenLine> = {}): GenLine => withRange({ variantId, kind: 'reps', role: 'work', sets: s.acc.sets, targetRir: rir, restSeconds: s.acc.rest, lastSetToFailure: failLast, ...extra }, s.acc.range);
 
   // Tirage : niveau d'après le max de tractions strictes.
   const pull = a.maxPullups;
@@ -198,8 +213,8 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     pullLine = main('pullup-strict', { cue: 'Semaine 1 : 1re série = test max' });
     notes.push('Tractions : max inconnu → test à la 1re séance, l’app ajuste ensuite.');
   } else if (pull < 3) pullLine = main('pullup-negative', { targetReps: 4, cue: 'Descente 4–5 s' });
-  else if (pull < 8) pullLine = main('pullup-strict', { targetReps: Math.max(2, Math.min(s.main.reps, Math.floor(pull * 0.6))) });
-  else if (pull < 12 || pain.has('coudes')) pullLine = main('pullup-strict', { targetReps: Math.min(s.main.reps + 2, Math.floor(pull * 0.6)) });
+  else if (pull < 8) pullLine = main('pullup-strict', { targetReps: Math.max(2, Math.min(s.main.range[0], Math.floor(pull * 0.6))) });
+  else if (pull < 12 || pain.has('coudes')) pullLine = main('pullup-strict', { targetReps: Math.min(s.main.range[0] + 2, Math.floor(pull * 0.6)) });
   else {
     const start = fit(pull >= 15 ? 10 : 5, loads.filter((l) => l > 0));
     pullLine = main('pullup-weighted', { loadKg: start, cue: 'Charge de départ estimée' });
@@ -214,7 +229,7 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     notes.push('Épaules : pas de dips ni de pompes piquées. Pompes à la place.');
   } else if (dips === null || dips === undefined) pushLine = main('dips-bars', { cue: 'Semaine 1 : 1re série = test max' });
   else if (dips < 4) pushLine = main('dips-bars', { targetReps: 3, cue: 'Descente contrôlée' });
-  else if (dips < 12) pushLine = main('dips-bars', { targetReps: Math.max(3, Math.min(s.main.reps + 2, Math.floor(dips * 0.6))) });
+  else if (dips < 12) pushLine = main('dips-bars', { targetReps: Math.max(3, Math.min(s.main.range[0] + 2, Math.floor(dips * 0.6))) });
   else {
     const start = fit(5, loads.filter((l) => l > 0));
     pushLine = main('dips-weighted', { loadKg: start, cue: 'Charge de départ estimée' });
@@ -241,7 +256,7 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     key: 'B',
     title: 'Jambes et gainage',
     lines: [
-      main('squat-goblet-kb', { loadKg: kb, targetReps: Math.max(s.main.reps, 8) }),
+      main('squat-goblet-kb', { loadKg: kb, targetReps: Math.max(s.main.range[0], 8) }),
       ...(legsOk ? [acc('split-squat-bulgarian', { cue: 'Par jambe' })] : []),
       ...(backOk ? [acc(a.priority === 'seche' ? 'kb-swing-2h' : 'kb-rdl', { loadKg: kb, targetReps: a.priority === 'seche' ? 15 : 10 })] : []),
       ...(lowerFocus && backOk ? [acc('glute-bridge-kb', { loadKg: kb, targetReps: 12, cue: 'Pause 1 s en haut' })] : []),
@@ -264,6 +279,12 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   const budget = a.minutes ?? 60;
   for (const t of [A, B, C]) {
     while (estimateLineMinutes(t.lines) > budget && t.lines.length > 2) t.lines.pop();
+    // Toujours trop long : on retire des séries (en partant de la fin), jamais les repos des mouvements lourds.
+    for (let guard = 0; estimateLineMinutes(t.lines) > budget && guard < 20; guard++) {
+      const i = [...t.lines.keys()].reverse().find((k) => t.lines[k]!.sets > 2);
+      if (i === undefined) break;
+      t.lines[i] = { ...t.lines[i]!, sets: t.lines[i]!.sets - 1 };
+    }
   }
 
   const days = Math.min(6, Math.max(2, a.days ?? recDays(a).value));

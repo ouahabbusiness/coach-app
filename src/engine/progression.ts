@@ -115,9 +115,11 @@ export function liveLoad(st: SessionState, set: PlannedSet, loads: number[] = []
   const last = before[before.length - 1];
   const r = last && currentResult(last);
   if (!r) return undefined;
-  const target = last!.planned.targetReps;
+  const target = last!.planned.repRange?.[1] ?? last!.planned.targetReps;
   const base = r.loadKg ?? last!.planned.loadKg;
-  if (tooEasy(r, target)) {
+  // En séance, on n'ajuste que si c'est MANIFESTEMENT trop facile (≥ 4 de réserve, ou cible + 4 sans réserve notée).
+  const manifest = target !== undefined && r.reps !== undefined && r.reps >= target && (r.rir !== undefined ? r.rir >= 4 : r.reps >= target + 4);
+  if (manifest) {
     if (base !== undefined && base > 0) {
       const up = loadUp(base, loads);
       if (up === undefined) return { loadKg: base, targetReps: (r.reps ?? 0) + 1, reason: 'facile' };

@@ -188,6 +188,16 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
                 <strong className="num">{focus.planned.progression}</strong>
               </div>
             )}
+            {focus.planned.kind === 'reps' && (focus.planned.repRange || focus.planned.targetRir !== undefined) && (
+              <div className="hud-chips">
+                {focus.planned.repRange && <span className="pill num">plage {focus.planned.repRange[0]}–{focus.planned.repRange[1]}</span>}
+                {isLastOfBlock(state, focus) && focus.planned.lastSetToFailure ? (
+                  <span className="pill num hud-fail">dernière série : échec propre</span>
+                ) : focus.planned.targetRir !== undefined ? (
+                  <span className="pill num">réserve {focus.planned.targetRir}</span>
+                ) : null}
+              </div>
+            )}
             {(focus.planned.cue || focus.planned.loadKg || focus.planned.assistance) && (
               <div className="hud-chips">
                 {focus.planned.cue && <span className="pill">{focus.planned.cue}</span>}
@@ -497,4 +507,10 @@ function PainForm({ onSubmit, onCancel }: { onSubmit: (location: string, intensi
       <button className="btn ghost block" onClick={onCancel}>Annuler</button>
     </div>
   );
+}
+
+/** Dernière série de travail de son bloc ? (l'échec n'est prévu que là) */
+function isLastOfBlock(st: SessionState, set: SetState): boolean {
+  const block = st.sets.filter((x) => x.planned.blockId === set.planned.blockId && x.planned.role === 'work');
+  return block[block.length - 1]?.planned.id === set.planned.id;
 }

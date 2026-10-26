@@ -26,6 +26,10 @@ export interface PlannedSet {
   restSeconds: number;
   /** Consigne d'exécution saisie par l'utilisateur (ex. « prise neutre »). */
   cue?: string;
+  /** Plage de répétitions [bas, haut] (double progression). */
+  repRange?: [number, number];
+  /** Dernière série menée à l'échec (intensité « à l'échec » seulement). */
+  lastSetToFailure?: boolean;
   /** Ajustement calculé au lancement d'après la dernière séance (ex. « ↑ +2,5 kg »). */
   progression?: string;
 }

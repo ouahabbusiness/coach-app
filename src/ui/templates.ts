@@ -15,6 +15,8 @@ export interface TemplateLine {
   loadKg?: number;
   assistance?: string;
   targetRir?: number;
+  repRange?: [number, number];
+  lastSetToFailure?: boolean;
   restSeconds: number;
   /** Consigne d'exécution (ex. « prise neutre »). */
   cue?: string;
@@ -58,6 +60,8 @@ export function planFromTemplate(t: SessionTemplate, exerciseOf: (variantId: str
         loadKg: line.loadKg,
         assistance: line.assistance,
         targetRir: line.targetRir,
+        repRange: line.kind === 'reps' ? line.repRange : undefined,
+        lastSetToFailure: line.lastSetToFailure,
         restSeconds: line.restSeconds,
         cue: line.cue,
       })),

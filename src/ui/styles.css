@@ -1232,3 +1232,5 @@ body:has(.run-live.full) { background-image: none; }
 .coach-msg { margin: 0; font-size: 1.05rem; font-weight: 700; line-height: 1.35; }
 
 .page-title { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
+
+.hud-fail { border-color: var(--text) !important; font-weight: 800; }
