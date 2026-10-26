@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -420,6 +420,17 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           </div>
         </div>
         <Spark days={weight.days} />
+      </button>
+
+      <button className="ui-card list-row" onClick={() => go({ name: 'arc' })} aria-label="Statut Winter Arc">
+        <span className="icon-chip">
+          <Mountain size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Winter Arc</p>
+          <p className="row-title num">{winter.day ? `Jour ${winter.day}/${winter.total}` : `Départ dans ${winter.daysLeft ?? 0} j`}</p>
+        </div>
+        <span className="pill">Voir</span>
       </button>
 
       <button className="ui-card list-row" onClick={() => go({ name: 'settings' })} aria-label="Objectif">

@@ -1,4 +1,4 @@
-// Transition « Discipline Protocol » au lancement d'une séance : grille, balayage, synchronisation (~1 s).
+// Transition « entrée en zone » au lancement d'une séance : fondu au noir, ligne de neige, titre (~1 s).
 // Purement visuelle ; masquée si l'utilisateur a réduit les animations.
 
 import { useEffect } from 'react';
@@ -10,16 +10,16 @@ export function BootOverlay({ title, onDone }: { title: string; onDone: () => vo
     return () => window.clearTimeout(id);
   }, [onDone]);
   return (
-    <div className="boot" role="status" aria-label="Lancement de la séance">
-      <div className="boot-grid" aria-hidden="true" />
+    <div className="boot" role="status" aria-label="Entrée en zone d’entraînement">
+      <div className="boot-line" aria-hidden="true" />
       <div className="boot-scan" aria-hidden="true" />
       <div className="boot-core">
-        <div className="boot-title">DISCIPLINE PROTOCOL</div>
-        <div className="boot-main">SYNCHRONISATION</div>
+        <div className="boot-title">WINTER ARC</div>
+        <div className="boot-main">Entrée en zone</div>
         <div className="boot-bar" aria-hidden="true">
           <span />
         </div>
-        <div className="boot-sub">{title.toUpperCase()} // NO EXCUSES</div>
+        <div className="boot-sub">{title.toUpperCase()} · NO EXCUSES</div>
       </div>
     </div>
   );

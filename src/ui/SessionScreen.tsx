@@ -38,7 +38,7 @@ function setPosition(st: SessionState, set: SetState): string {
   return `Série ${same.indexOf(set) + 1}/${same.length}`;
 }
 
-export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Repository; sessionId: string; onExit: () => void; onSummary: () => void }) {
+export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { repo: Repository; sessionId: string; onExit: () => void; onSummary: () => void; booted?: boolean }) {
   const { state, loaded, send, storageError } = useSession(repo, sessionId);
   const now = useNow(250);
   const wake = useWakeLock(!!state && state.phase !== 'ended');
@@ -112,7 +112,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   }
 
   return (
-    <div className="session hud">
+    <div className={`session hud ${booted ? 'booted' : ''}`}>
       <header className="hud-top">
         <button className="icon-btn ghost" onClick={onExit} aria-label="Quitter l’écran de séance (la séance reste en cours)">
           <ChevronLeft size={18} aria-hidden="true" />

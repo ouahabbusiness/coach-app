@@ -15,6 +15,7 @@ import { useWinterMode, winterForced, winterInfo } from './winterArc';
 import { localDay } from '../engine/derive';
 import { AppBackground } from './AppBackground';
 import { BootOverlay } from './BootOverlay';
+import { ArcPage } from './ArcPage';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -30,6 +31,7 @@ export type Route =
   | { name: 'challenge' }
   | { name: 'onboarding' }
   | { name: 'planning' }
+  | { name: 'arc' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -48,10 +50,13 @@ export function App() {
   // Thème du mois (Winter Arc) appliqué à toute l'app, pas seulement à l'accueil.
   const { mode: winterMode } = useWinterMode(repo);
   const winterOn = winterInfo(winterMode, localDay(Date.now(), deviceTimeZone()), winterForced()).active;
+  // Zone sombre uniquement pendant l'entraînement (et sur la page Winter Arc) ; ailleurs, thème clair (bleu en novembre).
+  const zone = route.name === 'session' || route.name === 'arc';
   useEffect(() => {
-    if (winterOn) document.documentElement.dataset.theme = 'winter';
+    if (zone) document.documentElement.dataset.theme = 'zone';
+    else if (winterOn) document.documentElement.dataset.theme = 'winter';
     else delete document.documentElement.dataset.theme;
-  }, [winterOn]);
+  }, [winterOn, zone]);
   const [boot, setBoot] = useState<string | null>(null);
   const go = useCallback((r: Route) => {
     // Lancement d'une séance depuis l'app : transition « Discipline Protocol ».
@@ -82,6 +87,8 @@ export function App() {
   function render() {
   if (route.name === 'onboarding') return <Onboarding repo={repo} onExit={() => go({ name: 'today' })} />;
 
+  if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;
+
   if (route.name === 'session') {
     const id = route.id;
     return (
@@ -90,6 +97,7 @@ export function App() {
       <SessionScreen
         repo={repo}
         sessionId={id}
+        booted={!!boot}
         onExit={() => go({ name: 'today' })}
         onSummary={() => go({ name: 'summary', id })}
       />
@@ -125,7 +133,7 @@ export function App() {
           </>
         )}
         {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}
-        {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} />}
+        {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} onStatus={() => go({ name: 'arc' })} />}
         {route.name === 'planning' && <Planning repo={repo} go={go} />}
         {route.name === 'summary' && <Summary repo={repo} sessionId={route.id} onBack={() => go({ name: 'progress' })} onHome={() => go({ name: 'today' })} />}
       </main>

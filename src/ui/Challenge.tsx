@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Mountain } from 'lucide-react';
 import {
   NOVEMBER_2026,
   dayRange,
@@ -45,7 +45,7 @@ function fmtDay(day: string, opts: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat('fr-BE', { ...opts, timeZone: 'UTC' }).format(new Date(`${day}T12:00:00Z`));
 }
 
-export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => void }) {
+export function Challenge({ repo, onBack, onStatus }: { repo: Repository; onBack: () => void; onStatus?: () => void }) {
   const tz = deviceTimeZone();
   const today = localDay(Date.now(), tz);
   const days = useMemo(() => dayRange(DEF.start, DEF.end), []);
@@ -103,7 +103,14 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
       <button className="btn ghost" onClick={onBack}>
         <ChevronLeft size={20} aria-hidden="true" /> Retour
       </button>
-      <p className="greeting" style={{ marginTop: 8 }}>{DEF.title}</p>
+      <div className="spread" style={{ marginTop: 8 }}>
+        <p className="greeting" style={{ margin: 0 }}>{DEF.title}</p>
+        {onStatus && (
+          <button className="btn ghost" onClick={onStatus} aria-label="Statut Winter Arc">
+            <Mountain size={18} aria-hidden="true" /> Statut
+          </button>
+        )}
+      </div>
       <p className="greeting-sub" style={{ fontSize: '1.1rem' }}>
         {started ? '1 → 30 nov.' : '🗓 Dès le 1er nov.'}
       </p>

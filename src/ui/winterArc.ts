@@ -29,9 +29,9 @@ export function winterInfo(mode: WinterMode, today: string, forced = false): Win
 }
 
 export function useWinterMode(repo: Repository) {
-  const [mode, setModeState] = useState<WinterMode>('on');
+  const [mode, setModeState] = useState<WinterMode>('auto');
   useEffect(() => {
-    repo.getKv<WinterMode>(KEY).then((m) => m && setModeState(m)); // défaut : activé (demande du 26/10)
+    repo.getKv<WinterMode>(KEY).then((m) => m && setModeState(m));
     // Synchronise toutes les instances (Réglages ↔ reste de l'app) sans rechargement.
     const onChange = (e: Event) => setModeState((e as CustomEvent<WinterMode>).detail);
     window.addEventListener(EVENT, onChange);
