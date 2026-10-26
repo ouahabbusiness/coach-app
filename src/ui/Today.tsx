@@ -356,7 +356,12 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           <p className="row-title num">{runKm !== undefined ? `${runKm.toLocaleString('fr-BE')} km` : '—'}</p>
         </div>
         {targets.ranToday ? (
+          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
           <span className="pill num">✓ {targets.runs.filter((r) => r.day === today).reduce((n, r) => n + r.km, 0).toLocaleString('fr-BE')} km</span>
+          <button className="icon-btn primary" aria-label="Lancer une autre course" onClick={() => go({ name: 'run' })}>
+            <Play size={16} aria-hidden="true" />
+          </button>
+          </div>
         ) : (
           <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
             <button className="btn sm ghost" onClick={() => setRunning(true)} aria-label="Saisir une course faite">

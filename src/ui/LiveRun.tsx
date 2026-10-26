@@ -3,7 +3,7 @@
 // Une course enregistrée par le GPS de l'app compte comme preuve (pas de photo).
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, MapPin, Pause, Play, Square, Volume2, VolumeX } from 'lucide-react';
+import { ChevronLeft, LocateFixed, MapPin, Pause, Play, Square, Volume2, VolumeX } from 'lucide-react';
 import type { Map as LMap, Polyline, CircleMarker } from 'leaflet';
 import { localDay } from '../engine/derive';
 import { advance, announce, pacesFrom, stepsFor, type GuideState, type GuidedStep } from '../engine/guided';
@@ -112,6 +112,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
       const line = L.polyline([], { color: '#f3ecdc', weight: 4 }).addTo(m);
       const dot = L.circleMarker([50.94, 4.04], { radius: 7, color: '#050505', weight: 2, fillColor: '#f3ecdc', fillOpacity: 1 }).addTo(m);
       map.current = { m, line, dot };
+      window.setTimeout(() => m.invalidateSize(), 50);
     })();
   }, [phase]);
 
@@ -210,7 +211,16 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
 
   const step = steps[guide.index];
   return (
-    <div className="app ob cq run-live">
+    <div className={`app ob cq run-live ${phase !== 'setup' ? 'full' : ''}`}>
+      {phase !== 'setup' && <div ref={mapEl} className="run-map-full" aria-label="Carte du tracé" />}
+      {phase !== 'setup' && (
+        <button className="run-recenter" aria-label="Recentrer sur ma position" onClick={() => {
+          const last = segments[segments.length - 1]?.points.slice(-1)[0];
+          if (map.current && last) map.current.m.setView([last.lat, last.lon], 17, { animate: true });
+        }}>
+          <LocateFixed size={20} aria-hidden="true" />
+        </button>
+      )}
       <main className="content" style={{ paddingBottom: 150 }}>
         <div className="ob-head">
           <span className="ob-step num">
@@ -311,7 +321,6 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
               </div>
             </div>
             {err && <p className="cq-warn">{err}</p>}
-            <div ref={mapEl} className="run-map" aria-label="Carte du tracé" />
             {st.splits.length > 0 && (
               <ol className="run-splits num">
                 {st.splits.map((s, i) => (

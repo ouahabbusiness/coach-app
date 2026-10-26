@@ -1158,3 +1158,24 @@ textarea { width: 100%; min-height: 84px; padding: 10px 12px; border: 1px solid 
 .run-splits li { padding: 4px 8px; border: 1px dashed #3a3833; border-radius: 8px; }
 .run-live .effort .chip { background: #050505; border-color: #2c2b28; color: var(--text); }
 .run-live .effort .chip[aria-pressed='true'] { background: #f3ecdc; color: #0a0a0a; }
+
+/* Course : carte plein écran, panneaux flottants par-dessus (façon Google Maps) */
+.run-live.full main.content { position: relative; z-index: 2; pointer-events: none; padding-top: 0; }
+.run-live.full main.content > * , .run-live.full .run-board > * { pointer-events: auto; }
+.run-live.full .run-board { pointer-events: none; }
+.run-map-full { position: fixed; inset: 0; z-index: 0; background: #121211; }
+.run-map-full .leaflet-tile-pane { filter: grayscale(1) invert(1) brightness(0.8) contrast(0.9); }
+.run-map-full .leaflet-control-attribution { background: rgb(5 5 5 / 0.6); color: #8f8b82; font-size: 9px; margin-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.run-map-full .leaflet-control-attribution a { color: #c9c2b2; }
+.run-live.full .ob-head { margin: 0 -16px; padding: calc(env(safe-area-inset-top) + 8px) 16px 8px; background: linear-gradient(180deg, rgb(5 5 5 / 0.85), rgb(5 5 5 / 0)); }
+.run-live.full .run-time { margin: 0 auto; padding: 4px 18px; border-radius: 16px; background: rgb(5 5 5 / 0.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 2.8rem; }
+.run-live.full .run-grid > div { background: rgb(5 5 5 / 0.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-color: rgb(243 236 220 / 0.18); }
+.run-live.full .run-step { box-shadow: 0 8px 24px rgb(0 0 0 / 0.5); }
+.run-live.full .run-step:not(.k-effort) { background: rgb(5 5 5 / 0.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.run-live.full .run-splits li { background: rgb(5 5 5 / 0.72); }
+.run-live.full .card.ob-card { background: rgb(12 12 11 / 0.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.run-live.full .controls { z-index: 3; }
+.run-recenter { position: fixed; right: 14px; bottom: calc(110px + env(safe-area-inset-bottom)); z-index: 3; width: 48px; height: 48px; border-radius: 999px; border: 1px solid rgb(243 236 220 / 0.25); background: rgb(5 5 5 / 0.8); color: #f3ecdc; display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+body:has(.run-live.full) { background-image: none; }
+.run-live.full .run-board { min-height: calc(100dvh - 200px); }
+.run-live.full .run-board > .card { margin-top: auto; }
