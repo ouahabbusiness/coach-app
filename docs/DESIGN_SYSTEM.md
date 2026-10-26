@@ -1,42 +1,37 @@
-# Design system
+# Design system — charte du 26/10/2026
 
-Direction validée par Hmidou le 26/10/2026 : **le plus proche possible des maquettes fournies** (app fitness « Juice Lab » :
-fond clair légèrement teinté, grandes cartes illustrées très arrondies, cercles de catégories, navigation flottante en pilule,
-bouton rond séparé, chrono en chiffres à points).
+Remplace toutes les directions précédentes (vert pétrole, personnages, forêt en blocs, Poppins).
+Inspiration : captures « smart home » (monochrome + orange) et « habit tracker » fournies par Hmidou.
 
-Outils : skills ui-ux-pro-max / brand / design. La palette « vibrant orange » proposée par l'outil a été écartée.
+## Principes
+- Interface claire, minimaliste, monochrome : noir, gris subtils, blanc.
+- Orange vif uniquement pour l'actif : bouton principal, onglet sélectionné, coches, jauges.
+- Cartes très arrondies (28 px), sans bordure, blocs aérés.
+- Zéro paragraphe : chiffres, badges courts, jauges, coches. Explications derrière un « ? » ou un détail repliable.
 
 ## Couleurs (tokens dans `src/ui/styles.css`)
-| Rôle | Clair | Sombre |
+| Rôle | Clair | Sombre / nuit |
 |---|---|---|
-| Fond | #F3F5F2 + dégradé léger vert → beige | #1C1F21 |
-| Surface | #FFFFFF | #262A2D |
-| Texte | #121413 | #EEF0EE |
-| Texte secondaire | #5A615D | #B3BAB6 |
-| Accent vert foncé | #1F5C4F (texte blanc) | #4CC2B2 (texte foncé) |
-| Étiquette (petit libellé) | #C23A26 | #FF8A75 |
-| Danger | #B42318 | #F97066 |
+| Fond | #ECECEA | #0E0E0E |
+| Carte | #FFFFFF | #1A1A1A |
+| Carte secondaire | #F3F3F1 | #242424 |
+| Texte | #111111 | #F2F2F0 |
+| Texte secondaire | #6E6E6B | #A3A3A0 |
+| Accent (actif) | #FF5A1F | #FF5A1F |
+| Danger | #D92D20 | #FF6B5E |
 
 ## Typographie
-Poppins (titres), Plus Jakarta Sans (texte), Doto (chrono à points) — auto-hébergées via @fontsource (licence OFL).
+Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). Chrono compris.
 
-## Illustrations
-- Pas de personnage (retiré à la demande de Hmidou, voir docs/CHARACTER.md).
-- Décors simples en SVG (salle, extérieur) avec une icône Lucide par catégorie d'exercice (`src/ui/Scene.tsx`).
-- Captures des écrans : `docs/maquettes/`.
-
-## Règles
-- Cibles tactiles ≥ 44–48 px ; actions de séance ≥ 56 px. Statuts = texte, jamais la couleur seule.
-- Icônes Lucide (ISC), pas d'emoji. Animations coupées si `prefers-reduced-motion`.
-- Les chiffres des cartes sont réels (exercices, séries, dernière fois). Pas de kcal ni de « score » inventés.
-
-## Règle de contenu (26/10/2026)
-Zéro paragraphe inutile : chiffres, badges, compteurs, icônes/emojis, cartes épurées. Explications derrière « ? » ou un détail repliable.
+## Composants
+- Navigation : pilule noire flottante, icônes seules (accueil, programme, nutrition, progrès, coach), rond orange sur l'actif.
+- Barre de séance : même pilule noire, action principale orange.
+- Icônes Lucide, trait fin (1,6).
+- Habitudes : barre en segments + ronds à cocher orange.
 
 ## Ambiance
-Fond = forêt en blocs pixel originale (`src/ui/PixelForest.tsx`, aucune texture de jeu existant), déclinée matin, jour, soir, nuit.
-Nuit = thème sombre bleu nuit, 1 h avant le coucher déclaré. Cartes en verre dépoli.
-Fonds personnels possibles (jour / nuit) dans Réglages, stockés sur l'appareil.
+Mode nuit (sombre) 1 h avant le coucher déclaré ; rappel « Au lit » après l'heure de coucher.
+Fond uni par défaut ; fond personnel jour / nuit possible (Réglages), stocké sur l'appareil.
 
-## Ton du coach
-Ferme, factuel, jamais humiliant. Dit ce qu'il sait et ce qu'il ne sait pas.
+## Ton
+Ferme, factuel, jamais humiliant.

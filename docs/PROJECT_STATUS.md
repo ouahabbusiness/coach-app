@@ -23,13 +23,15 @@
 - Fin de séance : durée, séries, kcal et bpm (déclarés), routine du jour, détail repliable.
 - Ambiance selon l'heure (matin, jour, soir, nuit) ; mode nuit 1 h avant le coucher déclaré ; rappel « Au lit » après l'heure de coucher.
 - Règle UI : textes réduits au minimum (badges, chiffres, icônes).
-- Polices Poppins / Plus Jakarta Sans ; fond forêt en blocs selon l'heure ; fonds personnels jour/nuit.
+- Charte du 26/10/2026 : monochrome + orange, Plus Jakarta Sans seule, pilule de navigation noire (voir DESIGN_SYSTEM).
+- Habitudes du jour sur l'accueil (coches, barre en segments).
+- Suivi du poids : pesées (balance/estimé), moyenne 7 j, tendance sur 2 semaines (≥ 3 pesées/semaine), courbe, historique, suppression.
 - Illustrations : décors simples + icônes d'exercice (personnages retirés).
 - Captures des écrans dans docs/maquettes/.
 - Catalogue de 15 variantes, consignes **non relues**, **aucun média**.
 
 ## Testé
-- 65 tests automatisés (moteur, stockage, défi, planning, objectifs, imprévus, données du jour, ambiance).
+- 70 tests automatisés (moteur, stockage, défi, planning, objectifs, imprévus, données du jour, ambiance, poids).
 - Parcours vérifiés dans le navigateur de bureau (vue mobile 375 px) : création de séance, série, saisie 11/8, double appui,
   rechargement en cours de repos, douleur → arrêt, bilan, écran du défi, onboarding quitté puis repris après rechargement,
   objectif modifié (raison obligatoire), ajout au planning avec conflit travail/trajet détecté, imprévus (retard → raccourcie,

@@ -17,21 +17,19 @@ export function Scene({ kind, icon: Icon = Dumbbell, iconSize = 28 }: { kind: 'g
       <svg className="scene-bg" viewBox="0 0 300 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         {kind === 'gym' ? (
           <>
-            <rect width="300" height="220" fill="#cfe0d8" />
-            <rect x="0" y="160" width="300" height="60" fill="#b9cbc2" />
-            <rect x="20" y="30" width="10" height="130" fill="#a9bbb2" />
-            <rect x="110" y="30" width="10" height="130" fill="#a9bbb2" />
-            <rect x="20" y="30" width="100" height="8" fill="#97aaa1" />
-            <rect x="230" y="60" width="12" height="100" fill="#a9bbb2" />
-            <circle cx="236" cy="90" r="22" fill="#8a9c94" />
-            <circle cx="236" cy="132" r="22" fill="#8a9c94" />
+            <rect width="300" height="220" style={{ fill: 'var(--surface-2)' }} />
+            <rect x="0" y="160" width="300" height="60" style={{ fill: 'var(--border)' }} />
+            <rect x="20" y="30" width="8" height="130" style={{ fill: 'var(--border)' }} />
+            <rect x="110" y="30" width="8" height="130" style={{ fill: 'var(--border)' }} />
+            <rect x="20" y="30" width="98" height="6" style={{ fill: 'var(--border)' }} />
+            <circle cx="236" cy="96" r="20" style={{ fill: 'var(--border)' }} />
+            <circle cx="236" cy="134" r="20" style={{ fill: 'var(--border)' }} />
           </>
         ) : (
           <>
-            <rect width="300" height="220" fill="#bfe0ef" />
-            <circle cx="250" cy="40" r="18" fill="#f6efcf" />
-            <path d="M0 150 Q80 120 160 145 T300 135 L300 220 L0 220 Z" fill="#a7cf9f" />
-            <path d="M0 175 Q120 160 300 178 L300 220 L0 220 Z" fill="#8dbd86" />
+            <rect width="300" height="220" style={{ fill: 'var(--surface-2)' }} />
+            <circle cx="250" cy="44" r="16" style={{ fill: 'var(--accent-soft)' }} />
+            <path d="M0 150 Q80 120 160 145 T300 135 L300 220 L0 220 Z" style={{ fill: 'var(--border)' }} />
           </>
         )}
       </svg>

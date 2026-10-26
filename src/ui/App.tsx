@@ -6,11 +6,12 @@ import { Program } from './Program';
 import { SessionScreen } from './SessionScreen';
 import { Settings } from './Settings';
 import { Challenge } from './Challenge';
+import { WeightCard } from './Weight';
 import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { useDayPhase } from './useDayPhase';
-import { PixelForest } from './PixelForest';
+import { AppBackground } from './AppBackground';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -34,6 +35,7 @@ const TABS = [
   { name: 'program', label: 'Programme', Icon: CalendarDays },
   { name: 'nutrition', label: 'Nutrition', Icon: Utensils },
   { name: 'progress', label: 'Progrès', Icon: ChartLine },
+  { name: 'coach', label: 'Coach', Icon: MessageSquare },
 ] as const;
 
 export function App() {
@@ -57,7 +59,7 @@ export function App() {
 
   return (
     <BackgroundProvider repo={repo}>
-      <PixelForest phase={day.phase} />
+      <AppBackground phase={day.phase} />
       {render()}
     </BackgroundProvider>
   );
@@ -114,17 +116,14 @@ export function App() {
           {TABS.map(({ name, label, Icon }) => (
             <button
               key={name}
+              aria-label={label}
               aria-current={route.name === name || (name === 'program' && route.name === 'planning') ? 'page' : undefined}
               onClick={() => go(name === 'program' ? { name: 'planning' } : { name })}
             >
-              <Icon size={20} aria-hidden="true" />
-              {label}
+              <Icon size={22} aria-hidden="true" />
             </button>
           ))}
         </div>
-        <button className="fab" aria-label="Coach" aria-current={route.name === 'coach' ? 'page' : undefined} onClick={() => go({ name: 'coach' })}>
-          <MessageSquare size={24} aria-hidden="true" />
-        </button>
       </nav>
     </div>
   );
@@ -140,6 +139,7 @@ function Progress({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
   return (
     <>
       <h1>Progression</h1>
+      <WeightCard repo={repo} />
       <div className="card">
         <h2>Historique des séances</h2>
         {rows === null && <p>Chargement…</p>}

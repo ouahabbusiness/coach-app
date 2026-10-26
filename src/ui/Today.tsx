@@ -2,7 +2,8 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ClipboardList, Droplet, Flame, Footprints, Minus, Moon, Play, Plus, Target, Trophy } from 'lucide-react';
+import { ClipboardList, Droplet, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { useWeightLog, WeightModal } from './Weight';
 import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
 import { addWater, challengeValues, dailyKey, daysUntil, type DailyMetrics } from '../engine/daily';
 import { localDay } from '../engine/derive';
@@ -56,6 +57,7 @@ function Ring({ value }: { value: number }) {
 }
 
 const fmtNum = (n: number) => n.toLocaleString('fr-BE');
+const fmtHours = (h: number) => `${Math.floor(h)}h${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
 
 const EDIT_META: Record<Field, { title: string; unit: string; hint: string; step: string }> = {
   sleepH: { title: 'Sommeil', unit: 'h', hint: 'Lu sur ta montre ou estimé par toi.', step: '0.25' },
@@ -79,7 +81,10 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const [hero, setHero] = useState<Hero | null>(null);
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState('');
-  const { entries } = useChallengeEntries(repo);
+  const { entries, update } = useChallengeEntries(repo);
+  const weight = useWeightLog(repo);
+  const lastWeight = weight.days[weight.days.length - 1];
+  const [weighing, setWeighing] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -220,7 +225,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
       <div className="tiles">
         <Tile icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')}>
           <div className="tile-value num">
-            {daily?.sleepH !== undefined ? `${Math.floor(daily.sleepH)}h${String(Math.round((daily.sleepH % 1) * 60)).padStart(2, '0')}` : '—'}
+            {daily?.sleepH !== undefined ? fmtHours(daily.sleepH) : '—'}
           </div>
           <div className="bars" aria-hidden="true">
             {Array.from({ length: 8 }, (_, i) => (
@@ -269,13 +274,67 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           {goal?.targetDate && <div className="muted num" style={{ fontSize: '0.8rem' }}>J−{Math.max(0, daysUntil(today, goal.targetDate))}</div>}
         </Tile>
 
-        <Tile icon={<Trophy size={16} aria-hidden="true" />} label="Défi" onClick={() => go({ name: 'challenge' })}>
-          <div className="tile-value num">
-            {challengeOn ? `${habitsDone}/${NOVEMBER_2026.daily.length}` : `J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}`}
+        <Tile icon={<Scale size={16} aria-hidden="true" />} label="Poids" onClick={() => setWeighing(true)}>
+          <div className="tile-value num">{lastWeight ? lastWeight.kg.toLocaleString('fr-BE', { maximumFractionDigits: 1 }) : '—'}</div>
+          <div className="muted" style={{ fontSize: '0.75rem' }}>
+            kg{lastWeight && lastWeight.day !== today ? ` · ${new Date(`${lastWeight.day}T12:00:00Z`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short', timeZone: 'UTC' })}` : ''}
           </div>
-          <div className="muted" style={{ fontSize: '0.75rem' }}>{challengeOn ? 'habitudes' : 'novembre'}</div>
         </Tile>
       </div>
+
+      <section className="hero-card" style={{ marginTop: 12 }} aria-label="Habitudes du jour">
+        <div className="spread">
+          <button className="tile-hit tile-label" onClick={() => go({ name: 'challenge' })}>
+            <Trophy size={16} aria-hidden="true" /> Habitudes du jour{!challengeOn ? ` · défi J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}` : ''}
+          </button>
+          <span className="num" style={{ fontWeight: 700 }}>
+            {habitsDone}/{NOVEMBER_2026.daily.length}
+          </span>
+        </div>
+        <div className="segments" aria-hidden="true">
+          {NOVEMBER_2026.daily.map((h, i) => (
+            <span key={h.id} className={i < habitsDone ? 'on' : ''} />
+          ))}
+        </div>
+        <ul className="habits">
+          {NOVEMBER_2026.daily.map((h) => {
+            const st = habitStatus(h, dayEntry);
+            const value = dayEntry.values[h.id];
+            const toggle = () =>
+              h.kind === 'check'
+                ? update(today, (e) => {
+                    const values = { ...e.values };
+                    if (values[h.id] === true) delete values[h.id];
+                    else values[h.id] = true;
+                    return { ...e, values };
+                  })
+                : openEditor(h.id === 'sleep' ? 'sleepH' : 'steps');
+            return (
+              <li key={h.id}>
+                <button className="habit" onClick={toggle} aria-pressed={st === 'done'}>
+                  <span className="habit-name">{h.label}</span>
+                  {h.kind === 'number' && (
+                    <span className="muted num">{typeof value !== 'number' ? '—' : h.id === 'sleep' ? fmtHours(value) : fmtNum(value)}</span>
+                  )}
+                  <span className={`check ${st === 'done' ? 'on' : ''}`} aria-hidden="true">
+                    {st === 'done' ? '✓' : ''}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <WeightModal
+        open={weighing}
+        onClose={() => setWeighing(false)}
+        last={lastWeight?.kg}
+        onSave={async (kg, status, day) => {
+          await weight.add(kg, status, day);
+          setWeighing(false);
+        }}
+      />
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing ? EDIT_META[editing].title : ''}>
         {editing && (

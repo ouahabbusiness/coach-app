@@ -187,7 +187,7 @@ function BackgroundCard() {
   return (
     <div className="card stack">
       <h2 style={{ margin: 0 }}>Fond d’écran</h2>
-      <span className="badge" style={{ alignSelf: 'flex-start' }}>🌲 Forêt par défaut · 🔒 reste sur l’appareil</span>
+      <span className="badge" style={{ alignSelf: 'flex-start' }}>Fond uni par défaut · 🔒 sur l’appareil</span>
       {slots.map(({ slot, label }) => (
         <div key={slot} className="spread">
           <div className="row" style={{ flexWrap: 'nowrap' }}>
@@ -195,7 +195,7 @@ function BackgroundCard() {
               className="thumb"
               style={{ width: 56, height: 56, background: images[slot] ? `center / cover url(${images[slot]})` : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              {!images[slot] && '🌲'}
+              {!images[slot] && '＋'}
             </div>
             <strong>{label}</strong>
           </div>
