@@ -146,11 +146,11 @@ export function FreeWorkPage({ repo, go }: { repo: Repository; go: (r: Route) =>
               </label>
             ))}
           </div>
-          {b.format === 'emom' && b.targetPerRound !== undefined && (
-            <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => set({ rounds: rounds.map(() => b.targetPerRound!) })}>
-              Je confirme : {b.targetPerRound} à chaque minute
-            </button>
-          )}
+          <label className="field">
+            Total réalisé (si tu n’as pas le détail)
+            <input inputMode="numeric" value={b.declaredTotal ?? ''} onChange={(e) => set({ declaredTotal: num(e.target.value) })} placeholder="ex. 72" />
+          </label>
+          <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Le total déclaré est gardé tel quel : il ne remplit aucune minute.</p>
           <Scale label="Difficulté au début" value={b.difficultyStart} onChange={(v) => set({ difficultyStart: v })} />
           <Scale label="Difficulté à la fin" value={b.difficultyEnd} onChange={(v) => set({ difficultyEnd: v })} />
           <label className="field">
@@ -158,7 +158,7 @@ export function FreeWorkPage({ repo, go }: { repo: Repository; go: (r: Route) =>
             <input value={b.pain ?? ''} onChange={(e) => set({ pain: e.target.value.trim() || undefined })} placeholder="ex. coude droit" />
           </label>
           {b.bodyWeightKg && <p className="muted num" style={{ margin: 0, fontSize: '0.8rem' }}>Poids du jour : {b.bodyWeightKg} kg (contexte)</p>}
-          <button className="btn primary block" disabled={rounds.every((r) => r === null)} onClick={save}>
+          <button className="btn primary block" disabled={rounds.every((r) => r === null) && b.declaredTotal === undefined} onClick={save}>
             Enregistrer comme travail effectué
           </button>
         </section>
@@ -193,7 +193,9 @@ export function FreeWorkPage({ repo, go }: { repo: Repository; go: (r: Route) =>
               <span className="pill num">{x.day.slice(5)}</span>
             </div>
             <p className="num" style={{ margin: 0, fontWeight: 700 }}>
-              {s.totalReps} rép.{x.loadKg ? ` · ${x.loadKg} kg` : ''}
+              {s.roundsUnknown < s.roundsTotal ? `${s.totalReps} rép. détaillées` : ''}
+              {s.declaredTotal !== undefined ? `${s.roundsUnknown < s.roundsTotal ? ' · ' : ''}${s.declaredTotal} rép. déclarées` : ''}
+              {x.loadKg ? ` · ${x.loadKg} kg` : ''}
               {x.targetPerRound ? ` · ${s.roundsDone}/${s.roundsTotal} min réussies` : ''}
               {s.restSeconds !== undefined ? ` · repos réel ${s.restSeconds} s` : ''}
             </p>

@@ -656,6 +656,7 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   const [light, setLight] = useState<LightLoad[]>([]);
   const [todayItems, setTodayItems] = useState<PlannedItem[]>([]);
   const [pullYesterday, setPullYesterday] = useState(0);
+  const [pullToday, setPullToday] = useState<string[]>([]);
   const [proposals, setProposals] = useState<JournalEntry[]>([]);
   const loadProposals = async () => {
     const resolved = new Set((await repo.getKv<string[]>('proposals.resolved')) ?? []);
@@ -682,7 +683,12 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
       const day = (new Date(`${t}T12:00:00Z`).getUTCDay() + 6) % 7;
       const yest = new Date(Date.parse(`${t}T12:00:00Z`) - 864e5).toISOString().slice(0, 10);
       const free = (await loadFree(repo)).filter((b) => (b.day === yest || b.day === t) && /pull|chinup|row/.test(b.variantId));
-      setPullYesterday(free.reduce((n, b) => n + b.rounds.reduce<number>((a, r) => a + (r ?? 0), 0), 0));
+      setPullYesterday(free.reduce((n, b) => n + (b.rounds.some((r) => r !== null) ? b.rounds.reduce<number>((a, r) => a + (r ?? 0), 0) : b.declaredTotal ?? 0), 0));
+      // Séance prévue aujourd'hui : quels exercices de tirage contient-elle ?
+      const wd = (new Date(`${t}T12:00:00Z`).getUTCDay() + 6) % 7;
+      const tpls = await loadTemplates(repo);
+      const its = (await loadPlanning(repo)).filter((i) => i.weekStart === weekStart(t) && i.day === wd && i.kind === 'seance');
+      setPullToday([...new Set(its.flatMap((i) => (i.adapted?.lines ?? tpls.find((x) => x.id === i.templateId)?.lines ?? []).filter((l) => /pull|chinup|row/.test(l.variantId)).map((l) => findVariant(l.variantId)?.variant.name ?? l.variantId)))]);
       setTodayItems((await loadPlanning(repo)).filter((i) => i.weekStart === weekStart(t) && i.day === day && !(i.adjustment && i.adjustment.decision !== 'adaptée')).sort((a, b) => a.start.localeCompare(b.start)));
     })();
   }, [repo]);
@@ -699,7 +705,14 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
         ) : (
           <p className="coach-msg">Pas de séance prévue. Repos actif : 30 min de marche, tes 10 000 pas, et tu dors tôt.</p>
         )}
-        {pullYesterday >= 40 && <p className="coach-note">Bloc de tirage récent ({pullYesterday} rép.) : aucun tirage en plus du programme aujourd’hui, pas de finisher.</p>}
+        {pullYesterday >= 40 && (
+          <p className="coach-note">
+            Bloc de tirage récent ({pullYesterday} rép.).{' '}
+            {pullToday.length
+              ? `Ta séance du jour contient : ${pullToday.join(', ')}. On la garde, mais réserve 3 sur ces exercices, pas d’échec ; si ta 1re série est sous la plage, saute la dernière (non comptée comme échec).`
+              : 'Pas de tirage prévu aujourd’hui : rien à ajouter, pas de finisher.'}
+          </p>
+        )}
       </section>
       {p ? (
         <section className="ui-card stack" aria-label="Programme en cours">

@@ -4,7 +4,7 @@ import { nextEmom, summarize, type FreeBlock } from '../src/engine/freeWork';
 import { availableLoads, DEFAULT_PIECES } from '../src/engine/progression';
 
 const loads = availableLoads(DEFAULT_PIECES);
-const emom = (extra: Partial<FreeBlock> = {}): FreeBlock => ({ id: 'e', day: '2026-10-26', at: 0, format: 'emom', variantId: 'pullup-weighted', grip: 'pronation', strict: true, loadKg: 12, targetPerRound: 6, rounds: Array(12).fill(6), secondsPerRound: 20, difficultyStart: 5, difficultyEnd: 8, ...extra });
+const emom = (extra: Partial<FreeBlock> = {}): FreeBlock => ({ id: 'e', day: '2026-10-26', at: 0, format: 'emom', variantId: 'pullup-weighted', grip: 'pronation', strict: true, loadKg: 12, targetPerRound: 6, rounds: Array(12).fill(6), secondsPerRound: 20, difficultyStart: 5, difficultyEnd: 7, ...extra });
 
 describe('EMOM saisi comme travail effectué', () => {
   it('72 rép. à 12 kg enregistrées, repos réel 40 s, incertitude affichée', () => {
@@ -28,5 +28,15 @@ describe('EMOM saisi comme travail effectué', () => {
   it('minutes ratées → une répétition de moins ; douleur → sécurité', () => {
     expect(nextEmom([emom({ rounds: [6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 4, 4] })], loads, true)).toMatchObject({ action: 'réduire les répétitions', next: { targetPerRound: 5 } });
     expect(nextEmom([emom({ pain: 'coude' })], loads, true).action).toBe('sécurité');
+  });
+  it('total déclaré sans détail : 72 rép. enregistrées, AUCUNE minute réussie inventée, décision = observer', () => {
+    const b = emom({ rounds: Array(12).fill(null), declaredTotal: 72 });
+    const s = summarize(b);
+    expect(s).toMatchObject({ totalReps: 0, declaredTotal: 72, roundsDone: 0, roundsUnknown: 12, tonnage: 864 });
+    expect(nextEmom([b], loads, true).action).toBe('maintenir et observer');
+  });
+
+  it('fin à 8/10 → on répète, pas de hausse (effort visé dépassé)', () => {
+    expect(nextEmom([emom({ difficultyEnd: 8 }), emom({ difficultyEnd: 8 })], loads, true).action).toBe('répéter');
   });
 });

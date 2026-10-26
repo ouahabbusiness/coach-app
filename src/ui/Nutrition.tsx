@@ -268,6 +268,14 @@ export function useDayPlan(repo: Repository) {
     return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers });
   }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apport RÉELLEMENT noté (repas cochés ou déclarés) : base du bilan calorique, distinct du plan.
+  useEffect(() => {
+    if (!plan) return;
+    const eatenMeals = plan.filter((e) => (e.kind === 'repas' && (e.unplanned || done.includes(e.id))) || (e.kind === 'complement' && done.includes(e.id) && e.kcal));
+    if (!eatenMeals.length) return;
+    repo.setKv(`intake.${today}`, { kcal: eatenMeals.reduce((t, e) => t + (e.kcal ?? 0), 0), protein: eatenMeals.reduce((t, e) => t + (e.protein ?? 0), 0), meals: eatenMeals.filter((e) => e.kind === 'repas').length });
+  }, [plan, done, repo, today]);
+
   /** Imprévu : un repas remplacé par autre chose (estimation), les suivants sont recalculés. */
   const setEaten = useCallback(
     async (id: string, m: EatenMeal | undefined) => {

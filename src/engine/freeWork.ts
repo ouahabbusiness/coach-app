@@ -19,8 +19,10 @@ export interface FreeBlock {
   loadKg?: number;
   /** EMOM : répétitions visées par minute. */
   targetPerRound?: number;
-  /** Répétitions réellement faites par minute (EMOM) ou par série ; null = non noté. */
+  /** Répétitions réellement faites par minute (EMOM) ou par série ; null = non noté (jamais inventé). */
   rounds: (number | null)[];
+  /** Total déclaré quand le détail n'est pas connu. Ne remplit aucune minute. */
+  declaredTotal?: number;
   /** Temps moyen pour faire les répétitions d'une minute (s) → repos réel restant. */
   secondsPerRound?: number;
   /** Difficulté ressentie 1–10 au début et à la fin. */
@@ -32,7 +34,10 @@ export interface FreeBlock {
 }
 
 export interface FreeSummary {
+  /** Total observé dans le détail saisi. */
   totalReps: number;
+  /** Total déclaré (si fourni). */
+  declaredTotal?: number;
   roundsDone: number;
   roundsTotal: number;
   roundsUnknown: number;
@@ -51,13 +56,15 @@ export function summarize(b: FreeBlock): FreeSummary {
   if (b.format === 'emom') uncertain.push(`${b.rounds.length} passages ≠ ${b.rounds.length} séries équivalentes pour le muscle : l’effort réel de chaque minute est inconnu.`);
   if (b.difficultyEnd === undefined) uncertain.push('Difficulté de fin non notée.');
   if (b.strict === undefined) uncertain.push('Amplitude (stricte ou non) non précisée.');
-  if (known.length < b.rounds.length) uncertain.push(`${b.rounds.length - known.length} minute(s) non renseignée(s).`);
+  if (known.length < b.rounds.length) uncertain.push(`${b.rounds.length - known.length} minute(s) sans détail : aucune n’est comptée comme réussie.`);
+  if (b.declaredTotal !== undefined && known.length < b.rounds.length) uncertain.push(`Total déclaré : ${b.declaredTotal} rép. (non détaillé).`);
   return {
     totalReps,
+    declaredTotal: b.declaredTotal,
     roundsDone: target !== undefined ? known.filter((r) => r >= target).length : known.length,
     roundsTotal: b.rounds.length,
     roundsUnknown: b.rounds.length - known.length,
-    tonnage: b.loadKg ? totalReps * b.loadKg : undefined,
+    tonnage: b.loadKg ? (known.length ? totalReps : b.declaredTotal ?? 0) * b.loadKg : undefined,
     restSeconds: b.format === 'emom' && b.secondsPerRound !== undefined ? Math.max(0, 60 - b.secondsPerRound) : undefined,
     uncertain,
   };
@@ -85,13 +92,14 @@ export function nextEmom(history: FreeBlock[], loads: number[], recoveredWell?: 
   if (b.difficultyEnd === undefined) missing.push('difficulté de fin');
   if (b.strict === undefined) missing.push('amplitude stricte ?');
   if (recoveredWell === undefined) missing.push('récupération les jours suivants');
-  if (s.roundsUnknown) missing.push('répétitions de chaque minute');
+  if (s.roundsUnknown) missing.push('détail de chaque minute (le total déclaré ne suffit pas)');
   const same = { loadKg: b.loadKg, targetPerRound: b.targetPerRound, minutes };
   if (missing.length) return { action: 'maintenir et observer', next: same, reason: 'Données incomplètes : on refait le même protocole avant de décider.', missing };
   if (s.roundsDone < minutes) {
     return { action: 'réduire les répétitions', next: { ...same, targetPerRound: Math.max(1, b.targetPerRound - 1) }, reason: `${minutes - s.roundsDone} minute(s) sous la cible : même lest, une répétition de moins par minute.`, missing: [] };
   }
-  if (recoveredWell === false || (b.difficultyEnd ?? 10) >= 9) return { action: 'répéter', next: same, reason: 'Réussi mais très dur ou récupération difficile : on répète à l’identique.', missing: [] };
+  // Hausse seulement si la charge suivante reste compatible avec l'effort visé : fin ≤ 7/10 (choix de conception).
+  if (recoveredWell === false || (b.difficultyEnd ?? 10) >= 8) return { action: 'répéter', next: same, reason: `Réussi, mais fin à ${b.difficultyEnd}/10 ou récupération difficile : on répète à l’identique.`, missing: [] };
   // Reproductibilité : deux réussites comparables d'affilée, fin pas trop dure → plus petit incrément de lest.
   const prev = history[1];
   const prevOk = prev && prev.format === 'emom' && prev.targetPerRound === b.targetPerRound && prev.loadKg === b.loadKg && summarize(prev).roundsDone === prev.rounds.length;

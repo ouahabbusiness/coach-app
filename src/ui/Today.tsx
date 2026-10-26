@@ -15,6 +15,7 @@ import { NextStepCard } from './Nutrition';
 import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { nextPrayer, PRAYER_LABELS } from '../engine/prayer';
+import { TRAJECTORY } from '../engine/targets';
 import { useReading } from './Reading';
 import { localDay } from '../engine/derive';
 import { estimateMinutes } from '../engine/disruption';
@@ -536,11 +537,12 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         {kcal && (
           <section className="why-card">
             <span className="why-label">Stratégie : {kcal.strategy}</span>
+            <p className="why-missing" style={{ margin: 0 }}>Trajectoire visée : {TRAJECTORY[kcal.strategy].label} · {TRAJECTORY[kcal.strategy].tolerance}</p>
             <p className="why-missing num" style={{ margin: 0 }}>
               P {kcal.proteinG} g · L {kcal.fatG} g · G {kcal.carbG} g
             </p>
             {targets.review && <p className="why-missing" style={{ margin: 0 }}>Dernier bilan : {targets.review.reason}</p>}
-            <p className="why-missing" style={{ margin: 0 }}>Estimation provisoire, corrigée seulement sur une tendance de 2 semaines (± 125 kcal).</p>
+            <p className="why-missing" style={{ margin: 0 }}>Estimation provisoire. Correction (± 125 kcal) seulement avec 2 semaines de pesées ET 7 jours de repas notés, jamais si tu manges déjà sous la cible ou si tu récupères mal.</p>
           </section>
         )}
         <section className={`why-card ${targets.sex ? '' : 'need'}`}>

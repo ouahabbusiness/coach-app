@@ -72,4 +72,12 @@ describe('programme', () => {
     expect(b.lines.some((l) => l.variantId === 'glute-bridge-kb')).toBe(true);
     expect(p.notes.join(' ')).toContain('jamais sur une seule zone');
   });
+  it('échec : jamais par défaut ; si accepté, seulement assistance au poids du corps, jamais avec lest ni sur les principaux', () => {
+    const lines = (failureOk?: boolean) => buildProgram({ ...base, priority: 'muscle', intensity: 'tres_exigeant', failureOk }, loads).templates.flatMap((t) => t.lines);
+    expect(lines().some((l) => l.lastSetToFailure)).toBe(false);
+    const withFail = lines(true).filter((l) => l.lastSetToFailure);
+    expect(withFail.length).toBeGreaterThan(0);
+    expect(withFail.every((l) => !l.loadKg)).toBe(true);
+    expect(lines(true).filter((l) => l.sets >= 4 && l.targetRir === 1).every((l) => !l.lastSetToFailure)).toBe(true);
+  });
 });

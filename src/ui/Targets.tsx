@@ -88,7 +88,15 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
     reviewLock = (async () => {
       if ((await repo.getKv<string>(REVIEWED)) === today) return;
       const last = adjustments[adjustments.length - 1]?.at;
-      const r = reviewCalories(strat, weights, today, last);
+      const days = Array.from({ length: 14 }, (_, k) => new Date(Date.parse(`${today}T12:00:00Z`) - k * 864e5).toISOString().slice(0, 10));
+      const intake: { day: string; kcal: number }[] = [];
+      for (const d of days) {
+        const x = await repo.getKv<{ kcal: number }>(`intake.${d}`);
+        if (x) intake.push({ day: d, kcal: x.kcal });
+      }
+      const rlog = (await repo.getKv<{ day: string; tired: boolean }[]>('readiness.log')) ?? [];
+      const fatigueDays = new Set(rlog.filter((x) => x.tired && days.includes(x.day)).map((x) => x.day)).size;
+      const r = reviewCalories(strat, weights, today, last, { intake, targetKcal: calories.value?.kcal ?? 0, fatigueDays });
       if (r.delta) {
         const next = [...adjustments, { at: today, delta: r.delta, reason: r.reason }];
         await repo.setKv(ADJUST, next);

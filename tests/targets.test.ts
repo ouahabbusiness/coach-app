@@ -131,7 +131,23 @@ describe('bilan calorique sur 2 semaines', () => {
   it('réduction trop lente → −125 ; changement récent → on observe', async () => {
     const { reviewCalories } = await import('../src/engine/targets');
     const ws = [w(1, 77), w(3, 77.1), w(5, 77), w(8, 77.1), w(10, 77), w(12, 77.1)];
-    expect(reviewCalories('réduction', ws, '2026-11-20').delta).toBe(-125);
-    expect(reviewCalories('réduction', ws, '2026-11-20', '2026-11-12').delta).toBe(0);
+    const intake = (kcal: number, n = 10) => Array.from({ length: n }, (_, k) => ({ day: w(k, 0).day, kcal }));
+    expect(reviewCalories('réduction', ws, '2026-11-20', undefined, { intake: intake(2400), targetKcal: 2400, fatigueDays: 0 }).delta).toBe(-125);
+    expect(reviewCalories('réduction', ws, '2026-11-20', '2026-11-12', { intake: intake(2400), targetKcal: 2400, fatigueDays: 0 }).delta).toBe(0);
+  });
+
+  it('blocages : alimentation non notée, déjà sous la cible, récupération difficile → aucune réduction', async () => {
+    const { reviewCalories } = await import('../src/engine/targets');
+    const ws = [w(1, 77), w(3, 77.1), w(5, 77), w(8, 77.1), w(10, 77), w(12, 77.1)];
+    const intake = (kcal: number, n = 10) => Array.from({ length: n }, (_, k) => ({ day: w(k, 0).day, kcal }));
+    expect(reviewCalories('réduction', ws, '2026-11-20')).toMatchObject({ delta: 0, uncertain: true });
+    expect(reviewCalories('réduction', ws, '2026-11-20', undefined, { intake: intake(2000), targetKcal: 2400, fatigueDays: 0 }).reason).toContain('sous la cible');
+    expect(reviewCalories('réduction', ws, '2026-11-20', undefined, { intake: intake(2400), targetKcal: 2400, fatigueDays: 4 }).delta).toBe(0);
+  });
+
+  it('idempotence : un ajustement enregistré deux fois le même jour ne compte qu’une fois', () => {
+    const a = { at: '2026-11-15', delta: -125, reason: 'x' };
+    const b = { sex: 'homme' as const, age: 25, heightCm: 178, weightKg: 77, sessionsPerWeek: 4 };
+    expect(calorieTarget({ ...b, strategy: 'réduction', adjustments: [a, a] }).value?.kcal).toBe(2300);
   });
 });

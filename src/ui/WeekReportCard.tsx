@@ -49,7 +49,7 @@ export function WeekReportCard({ repo }: { repo: Repository }) {
           weightAvg: average7(weights, today)?.kg,
           weightAvgPrev: average7(weights, shiftWeek(today, -1))?.kg,
           pagesRead: reading.reduce((t, e) => t + Math.max(0, e.toPage - e.fromPage), 0),
-          freeReps: (await loadFree(repo)).filter((b) => days.includes(b.day)).reduce((t, b) => t + b.rounds.reduce<number>((a, r) => a + (r ?? 0), 0), 0),
+          freeReps: (await loadFree(repo)).filter((b) => days.includes(b.day)).reduce((t, b) => t + (b.rounds.some((r) => r !== null) ? b.rounds.reduce<number>((a, r) => a + (r ?? 0), 0) : b.declaredTotal ?? 0), 0),
         }),
       );
     })();

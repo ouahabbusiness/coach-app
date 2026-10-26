@@ -4,6 +4,8 @@ import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
 import { liveLoad } from '../engine/progression';
+import { deviceTimeZone } from './support';
+import { localDay } from '../engine/derive';
 import type { ReadinessDecision, ReadinessInput } from '../engine/readiness';
 import { ReadinessCheck } from './ReadinessCheck';
 import { loadsFor, useEquipment } from './equipment';
@@ -82,6 +84,8 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
 
   const applyReadiness = async (input: ReadinessInput, d: ReadinessDecision) => {
     await repo.setKv(`readiness.${sessionId}`, { input, d, at: Date.now() });
+    const rlog = (await repo.getKv<{ day: string; tired: boolean }[]>('readiness.log')) ?? [];
+    await repo.setKv('readiness.log', [...rlog, { day: localDay(Date.now(), deviceTimeZone()), tired: input.sleepBad || input.fatigue }].slice(-120));
     setCheck({ d });
     if (!state) return;
     const work = state.sets.filter((x) => x.status === 'pending');

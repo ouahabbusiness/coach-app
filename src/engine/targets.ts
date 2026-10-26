@@ -94,8 +94,10 @@ export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   const pct = strategy === 'développement' ? 0.05 : strategy === 'réduction' ? -0.12 : 0;
   if (pct) why.push(`${strategy} : ${pct > 0 ? '+' : '−'}${Math.round(Math.abs(pct) * 100)} %`);
   else why.push('maintien : observation avant de décider');
-  const adjusted = (i.adjustments ?? []).reduce((t, a) => t + a.delta, 0);
-  for (const a of i.adjustments ?? []) why.push(`${a.delta > 0 ? '+' : '−'} ${Math.abs(a.delta)} kcal (${a.at}) : ${a.reason}`);
+  // Un seul ajustement par date (idempotence : un doublon enregistré ne compte pas deux fois).
+  const uniq = [...new Map((i.adjustments ?? []).map((a) => [a.at, a])).values()];
+  const adjusted = uniq.reduce((t, a) => t + a.delta, 0);
+  for (const a of uniq) why.push(`${a.delta > 0 ? '+' : '−'} ${Math.abs(a.delta)} kcal (${a.at}) : ${a.reason}`);
   const kcal = roundTo(maintenance * (1 + pct) + adjusted, 50);
   const perKg = strategy === 'réduction' ? 2.0 : 1.8;
   const proteinG = Math.round(perKg * i.weightKg!);
@@ -105,12 +107,29 @@ export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   return { value: { kcal, proteinG, fatG, carbG, maintenance: roundTo(maintenance, 50), strategy, adjusted }, why, missing: [] };
 }
 
+/** Trajectoire visée et zone de tolérance par stratégie (choix de conception, à valider avec l'utilisateur). */
+export const TRAJECTORY: Record<Strategy, { label: string; tolerance: string }> = {
+  réduction: { label: 'baisse de 0,25 à 1 % du poids par semaine', tolerance: 'entre −0,25 % et −1 %/sem. : aucun changement' },
+  développement: { label: 'prise de 0,1 à 0,35 kg par semaine', tolerance: 'entre +0,1 et +0,35 kg/sem. : aucun changement' },
+  maintien: { label: 'poids stable', tolerance: 'à ±0,25 kg/sem. : aucun changement' },
+};
+
+export interface ReviewContext {
+  /** Apports réellement notés (repas cochés / déclarés), un par jour noté. */
+  intake: { day: string; kcal: number }[];
+  /** Cible actuelle (kcal). */
+  targetKcal: number;
+  /** Jours avec mauvaise nuit ou fatigue déclarée (contrôle avant séance) sur la période. */
+  fatigueDays: number;
+}
+
 /**
- * Bilan calorique : seulement après ≥ 14 jours depuis le dernier changement et ≥ 3 pesées par semaine sur 2 semaines.
- * Fourchettes de rythme (choix de conception) : réduction −0,25 à −1 %/sem. ; développement +0,1 à +0,35 kg/sem. ;
- * maintien ±0,25 kg/sem. Pas de 125 kcal. Données insuffisantes → aucun changement, « bilan incertain ».
+ * Bilan calorique : seulement après ≥ 14 jours depuis le dernier changement, ≥ 3 pesées par semaine sur 2 semaines,
+ * et ≥ 7 jours d'alimentation réellement notée. Pas de 125 kcal. Blocages :
+ *  - tu manges déjà nettement sous (ou au-dessus de) la cible → d'abord respecter la cible, pas de correction ;
+ *  - récupération difficile (≥ 3 jours) → aucune réduction.
  */
-export function reviewCalories(strategy: Strategy, weights: { day: string; kg: number }[], today: string, lastChange?: string): { delta: number; reason: string; uncertain: boolean } {
+export function reviewCalories(strategy: Strategy, weights: { day: string; kg: number }[], today: string, lastChange?: string, ctx?: ReviewContext): { delta: number; reason: string; uncertain: boolean } {
   const since = (d: string) => Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${d}T12:00:00Z`)) / 86_400_000);
   if (lastChange && since(lastChange) < 14) return { delta: 0, reason: 'Dernier changement il y a moins de 2 semaines : on observe.', uncertain: false };
   const recent = weights.filter((w) => since(w.day) <= 13 && since(w.day) >= 0);
@@ -122,16 +141,26 @@ export function reviewCalories(strategy: Strategy, weights: { day: string; kg: n
   const pct = (change / avg(wk2)) * 100;
   const kg = Math.round(change * 100) / 100;
   const sign = kg >= 0 ? '+' : '';
+  let wanted = 0;
+  let why = '';
   if (strategy === 'réduction') {
-    if (pct > -0.25) return { delta: -125, reason: `Poids ${sign}${fmt(kg)} kg/sem. : la baisse est trop lente.`, uncertain: false };
-    if (pct < -1) return { delta: 125, reason: `Poids ${fmt(kg)} kg/sem. : la baisse est trop rapide (muscle à protéger).`, uncertain: false };
+    if (pct > -0.25) [wanted, why] = [-125, `Poids ${sign}${fmt(kg)} kg/sem. : la baisse est plus lente que visé.`];
+    else if (pct < -1) [wanted, why] = [125, `Poids ${fmt(kg)} kg/sem. : la baisse est trop rapide (muscle à protéger).`];
   } else if (strategy === 'développement') {
-    if (kg < 0.1) return { delta: 125, reason: `Poids ${sign}${fmt(kg)} kg/sem. : pas assez d’énergie pour construire.`, uncertain: false };
-    if (kg > 0.35) return { delta: -125, reason: `Poids +${fmt(kg)} kg/sem. : prise trop rapide.`, uncertain: false };
-  } else if (Math.abs(kg) > 0.25) {
-    return { delta: kg > 0 ? -125 : 125, reason: `Poids ${sign}${fmt(kg)} kg/sem. alors que l’objectif est le maintien.`, uncertain: false };
-  }
-  return { delta: 0, reason: `Rythme ${sign}${fmt(kg)} kg/sem. conforme : on ne change rien.`, uncertain: false };
+    if (kg < 0.1) [wanted, why] = [125, `Poids ${sign}${fmt(kg)} kg/sem. : prise plus lente que visé.`];
+    else if (kg > 0.35) [wanted, why] = [-125, `Poids +${fmt(kg)} kg/sem. : prise trop rapide.`];
+  } else if (Math.abs(kg) > 0.25) [wanted, why] = [kg > 0 ? -125 : 125, `Poids ${sign}${fmt(kg)} kg/sem. alors que l’objectif est le maintien.`];
+  if (!wanted) return { delta: 0, reason: `Rythme ${sign}${fmt(kg)} kg/sem. dans la zone visée : on ne change rien.`, uncertain: false };
+
+  // Vérifications avant toute correction.
+  const intake = (ctx?.intake ?? []).filter((x) => since(x.day) <= 13 && since(x.day) >= 0);
+  if (intake.length < 7) return { delta: 0, reason: `${why} Mais alimentation réelle notée sur ${intake.length} jour(s) seulement (7 requis) : aucune correction.`, uncertain: true };
+  const eaten = Math.round(intake.reduce((t, x) => t + x.kcal, 0) / intake.length);
+  const target = ctx!.targetKcal;
+  if (eaten < target * 0.9) return { delta: 0, reason: `${why} Tu manges en moyenne ${eaten} kcal, sous la cible ${target} : d’abord atteindre la cible, pas de correction.`, uncertain: false };
+  if (eaten > target * 1.1) return { delta: 0, reason: `${why} Tu manges en moyenne ${eaten} kcal, au-dessus de la cible ${target} : d’abord respecter la cible.`, uncertain: false };
+  if (wanted < 0 && (ctx?.fatigueDays ?? 0) >= 3) return { delta: 0, reason: `${why} Mais récupération difficile (${ctx!.fatigueDays} jours de fatigue) : aucune réduction.`, uncertain: false };
+  return { delta: wanted, reason: `${why} Apports notés ≈ ${eaten} kcal (cible respectée).`, uncertain: false };
 }
 
 export interface RunEntry {
