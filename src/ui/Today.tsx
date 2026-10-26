@@ -231,7 +231,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
       const sessions = (await repo.listSessions()).filter((r) => localDay(r.startedAt, tz) === today);
       const templates = await loadTemplates(repo);
       const next = (await loadPlanning(repo))
-        .filter((i) => i.weekStart === weekStart(today) && i.day === day && (i.kind === 'seance' || i.kind === 'course') && !i.adjustment)
+        .filter((i) => i.weekStart === weekStart(today) && i.day === day && (i.kind === 'seance' || i.kind === 'course') && (!i.adjustment || i.adjustment.decision === 'adaptée'))
         .filter((i) => itemStatus(i, today, today, sessions) === 'prévu')
         .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
       setHero(next ? { kind: 'planned', item: next, tpl: templates.find((t) => t.id === next.templateId) } : { kind: 'none' });

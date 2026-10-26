@@ -25,6 +25,7 @@ import {
 import { weekStart } from '../engine/challenge';
 import type { Repository } from '../storage/db';
 import { loadKettlebells, loadPieces } from './equipment';
+import { fitPlanning } from './agenda';
 import { loadPlanning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { deviceTimeZone, newId } from './support';
@@ -394,6 +395,7 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
   const [kbs, setKbs] = useState<number[]>([6, 12]);
   const [startNext, setStartNext] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [placed, setPlaced] = useState<string[]>([]);
   const [tone, setTone] = useState<'dur' | 'neutre'>('dur');
   const today = localDay(Date.now(), deviceTimeZone());
 
@@ -454,7 +456,9 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
         added.push({ id: newId(), weekStart: ws, day: it.day, start: it.start, durationMin: it.durationMin, kind: it.kind, title: it.title, detail: it.detail, km: it.km, templateId: it.templateKey ? tplId(it.templateKey) : undefined, moves: [], programId: id });
       }
     }
-    await repo.setKv(PLANNING, [...kept, ...added]);
+    const fit = await fitPlanning(repo, [...kept, ...added], today);
+    await repo.setKv(PLANNING, fit.items);
+    setPlaced(fit.notes);
     await repo.setKv(CURRENT, { id, program, answers: a, startWeek: start, at: Date.now() } satisfies SavedProgram);
     setSaved(true);
   };
@@ -583,6 +587,15 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
             <p className="cq-who">Coach</p>
             <h1 className="ob-title">{tone === 'dur' ? 'C’est signé.' : 'Programme enregistré.'}</h1>
             <p className="cq-line">Ton planning est rempli. Les charges montent toutes seules quand c’est trop facile.{tone === 'dur' ? ' Maintenant, tu exécutes.' : ''}</p>
+            {placed.length > 0 && (
+              <ul className="cq-rules">
+                {placed.slice(0, 8).map((r) => (
+                  <li key={r} className="note">
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            )}
             <button className="btn primary block" onClick={() => go({ name: 'planning' })}>
               <CalendarCheck size={18} aria-hidden="true" /> Voir ma semaine
             </button>

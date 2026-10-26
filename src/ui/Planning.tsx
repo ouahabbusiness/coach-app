@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, CalendarDays, ChevronLeft, ChevronRight, CircleCheck, Clock, CloudLightning, Moon, MoreHorizontal, Play, Plus, RotateCw, Timer, Zap } from 'lucide-react';
+import { Briefcase, CalendarDays, CalendarX, ChevronLeft, ChevronRight, CircleCheck, Clock, CloudLightning, Moon, MoreHorizontal, Play, Plus, RotateCw, Timer, Zap } from 'lucide-react';
 import { weekStart as mondayOf } from '../engine/challenge';
 import { localDay } from '../engine/derive';
 import {
@@ -23,6 +23,8 @@ import { deviceTimeZone, newId } from './support';
 import { loadTemplates, type SessionTemplate } from './templates';
 import { startSessionFromTemplate } from './actions';
 import { DisruptionPanel } from './Disruption';
+import { busy, replanDay, ONE_OFF_LABELS, type Move, type OneOff, type OneOffKind } from '../engine/availability';
+import { loadAllFixed, loadOneOffs, saveOneOffs } from './agenda';
 import { REASON_LABELS, type DisruptionReason } from '../engine/disruption';
 import type { Strictness } from '../engine/programBuilder';
 import type { Route } from './App';
@@ -65,6 +67,9 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
   const [week, setWeek] = useState(() => mondayOf(today));
   const [items, setItems] = useState<PlannedItem[]>([]);
   const [fixed, setFixed] = useState<FixedEvent[] | null>(null);
+  const [oneOffs, setOneOffs] = useState<OneOff[]>([]);
+  const [busyDraft, setBusyDraft] = useState<OneOff | null>(null);
+  const [moved, setMoved] = useState<Move[]>([]);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
   const [sessions, setSessions] = useState<SessionSummaryRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -76,7 +81,8 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
     loadPlanning(repo).then(setItems);
     loadTemplates(repo).then(setTemplates);
     repo.listSessions().then(setSessions);
-    loadOnboarding(repo).then((o) => setFixed(fixedEventsFromAnswers(o.answers)));
+    loadAllFixed(repo).then(setFixed);
+    loadOneOffs(repo).then(setOneOffs);
     repo.getKv<{ id: string; answers: { strictness?: Strictness } }>('program.current').then((p) => p && setProgram({ id: p.id, strictness: p.answers.strictness }));
   }, [repo]);
 
@@ -122,6 +128,22 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
     setDraft(null);
   };
 
+  const addOneOff = async (o: OneOff) => {
+    const list = [...oneOffs.filter((x) => x.id !== o.id), o];
+    await saveOneOffs(repo, list);
+    setOneOffs(list);
+    const r = replanDay(items, o.date, fixed ?? [], list, Date.now());
+    if (r.moves.length) await persist(r.items);
+    setMoved(r.moves);
+    setBusyDraft(null);
+  };
+
+  const removeOneOff = async (id: string) => {
+    const list = oneOffs.filter((x) => x.id !== id);
+    await saveOneOffs(repo, list);
+    setOneOffs(list);
+  };
+
   const replaceItem = async (next: PlannedItem) => {
     await persist(items.map((i) => (i.id === next.id ? next : i)));
   };
@@ -155,12 +177,31 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
       <div className="week-sum">
         <span className="pill num"><CalendarDays size={12} aria-hidden="true" /> {planned} prévues</span>
         <span className="pill num"><CircleCheck size={12} aria-hidden="true" /> {realized} faites</span>
+        <button className="pill" onClick={() => setBusyDraft({ id: newId(), date: today >= week && today <= dateOf(week, 6) ? today : week, start: '19:00', end: '22:00', kind: 'soiree', label: ONE_OFF_LABELS.soiree })}>
+          <CalendarX size={12} aria-hidden="true" /> Indispo
+        </button>
+        <button className="pill" onClick={() => go({ name: 'agenda' })}>
+          <Clock size={12} aria-hidden="true" /> Ma semaine
+        </button>
         {fixed && fixed.length === 0 && (
           <button className="pill" onClick={() => go({ name: 'onboarding' })}>
             <Clock size={12} aria-hidden="true" /> Horaires ?
           </button>
         )}
       </div>
+
+      {moved.length > 0 && (
+        <div className="moved" role="status">
+          {moved.map((m) => (
+            <p key={m.itemId}>
+              <RotateCw size={12} aria-hidden="true" /> {m.title} : {m.from} → {m.to ?? 'aucun créneau libre ce jour'} <span className="muted">({m.because})</span>
+            </p>
+          ))}
+          <button className="btn ghost sm" onClick={() => setMoved([])}>
+            OK
+          </button>
+        </div>
+      )}
 
       {DAY_NAMES.map((name, day) => {
         const date = dateOf(week, day);
@@ -195,6 +236,12 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
               </button>
             </div>
 
+            <GapBar spans={busy(date, day, fixed ?? [], oneOffs)} items={dayItems} />
+            {oneOffs.filter((o) => o.date === date).map((o) => (
+              <button key={o.id} className="busy-chip" onClick={() => window.confirm(`Retirer « ${o.label} » ?`) && removeOneOff(o.id)}>
+                <CalendarX size={12} aria-hidden="true" /> {o.start}–{o.end} · {o.label}
+              </button>
+            ))}
             {(dayItems.length > 0 || unplanned.length > 0) && (
               <ul className="slots">
                 {dayItems.map((i) => {
@@ -234,6 +281,42 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
           </section>
         );
       })}
+
+      <Modal open={!!busyDraft} onClose={() => setBusyDraft(null)} title="Indisponible">
+        {busyDraft && (
+          <div className="stack">
+            <div className="chips" role="group" aria-label="Type">
+              {(Object.keys(ONE_OFF_LABELS) as OneOffKind[]).map((k) => (
+                <button key={k} className="chip" aria-pressed={busyDraft.kind === k} onClick={() => setBusyDraft({ ...busyDraft, kind: k, label: ONE_OFF_LABELS[k] })}>
+                  {ONE_OFF_LABELS[k]}
+                </button>
+              ))}
+            </div>
+            <label className="field">
+              Libellé
+              <input value={busyDraft.label} onChange={(e) => setBusyDraft({ ...busyDraft, label: e.target.value })} />
+            </label>
+            <label className="field">
+              Jour
+              <input type="date" value={busyDraft.date} min={today} onChange={(e) => setBusyDraft({ ...busyDraft, date: e.target.value })} />
+            </label>
+            <div className="grid2">
+              <label className="field">
+                De
+                <input type="time" value={busyDraft.start} onChange={(e) => setBusyDraft({ ...busyDraft, start: e.target.value })} />
+              </label>
+              <label className="field">
+                À
+                <input type="time" value={busyDraft.end} onChange={(e) => setBusyDraft({ ...busyDraft, end: e.target.value })} />
+              </label>
+            </div>
+            <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>Ce qui tombe dessus est déplacé au créneau libre le plus proche, le même jour.</p>
+            <button className="btn primary block" disabled={!busyDraft.label.trim() || !busyDraft.date} onClick={() => addOneOff(busyDraft)}>
+              Enregistrer et replacer
+            </button>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={!!menu} onClose={() => setMenu(null)} title={menu?.title ?? ''}>
         {menu &&
@@ -390,5 +473,50 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
         )}
       </Modal>
     </>
+  );
+}
+
+/** Journée de 06:00 à 23:00 : occupé (gris), séances/courses (accent), trous libres (blanc) avec leur durée. */
+export function GapBar({ spans, items }: { spans: [number, number][]; items: PlannedItem[] }) {
+  const from = 360;
+  const to = 1380;
+  const span = to - from;
+  const clip = ([s, e]: [number, number]): [number, number] | null => (e <= from || s >= to ? null : [Math.max(s, from), Math.min(e, to)]);
+  const busyC = spans.map(clip).filter((x): x is [number, number] => !!x).sort((a, b) => a[0] - b[0]);
+  const itemsC = items.map((i) => clip([toMin(i.start), toMin(i.start) + i.durationMin])).filter((x): x is [number, number] => !!x);
+  // Trous : complément des occupations (≥ 30 min).
+  const merged: [number, number][] = [];
+  for (const b of [...busyC, ...itemsC].sort((a, b) => a[0] - b[0])) {
+    const last = merged[merged.length - 1];
+    if (last && b[0] <= last[1]) last[1] = Math.max(last[1], b[1]);
+    else merged.push([...b]);
+  }
+  const gaps: [number, number][] = [];
+  let cur = from;
+  for (const [s, e] of merged) {
+    if (s - cur >= 30) gaps.push([cur, s]);
+    cur = Math.max(cur, e);
+  }
+  if (to - cur >= 30) gaps.push([cur, to]);
+  const free = gaps.reduce((t, [s, e]) => t + e - s, 0);
+  const pct = (m: number) => `${((m - from) / span) * 100}%`;
+  const w = ([s, e]: [number, number]) => `${((e - s) / span) * 100}%`;
+  const fmtH = (m: number) => `${Math.floor(m / 60)} h${m % 60 ? String(m % 60).padStart(2, '0') : ''}`;
+  return (
+    <div className="gapbar-wrap" aria-label={`Temps libre : ${fmtH(free)}`}>
+      <div className="gapbar" aria-hidden="true">
+        {busyC.map((b, i) => (
+          <span key={`b${i}`} className="gb-busy" style={{ left: pct(b[0]), width: w(b) }} />
+        ))}
+        {itemsC.map((b, i) => (
+          <span key={`i${i}`} className="gb-item" style={{ left: pct(b[0]), width: w(b) }} />
+        ))}
+      </div>
+      <div className="gapbar-legend num">
+        <span>6 h</span>
+        <span className="gb-free-txt">libre {fmtH(free)}</span>
+        <span>23 h</span>
+      </div>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, Shuffle, Utensils } from 'lucide-react';
 import { Modal } from './common';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
 import { buildDayPlan, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
@@ -228,6 +228,7 @@ const ICON: Record<PlanEntry['kind'], React.ReactNode> = {
   repas: <Utensils size={15} aria-hidden="true" />,
   complement: <Pill size={15} aria-hidden="true" />,
   seance: <Dumbbell size={15} aria-hidden="true" />,
+  sommeil: <Moon size={15} aria-hidden="true" />,
   coucher: <Bed size={15} aria-hidden="true" />,
 };
 
@@ -248,7 +249,7 @@ export function useDayPlan(repo: Repository) {
       setEatenState((await repo.getKv<Record<string, EatenMeal>>(eatenKey(today))) ?? {});
       const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
       const monday = new Date(Date.parse(`${today}T12:00:00Z`) - day * 86_400_000).toISOString().slice(0, 10);
-      const item = (await loadPlanning(repo)).filter((i) => i.weekStart === monday && i.day === day && (i.kind === 'seance' || i.kind === 'course') && !i.adjustment).sort((x, y) => toMin(x.start) - toMin(y.start))[0];
+      const item = (await loadPlanning(repo)).filter((i) => i.weekStart === monday && i.day === day && (i.kind === 'seance' || i.kind === 'course') && (!i.adjustment || i.adjustment.decision === 'adaptée')).sort((x, y) => toMin(x.start) - toMin(y.start))[0];
       if (item) setWorkout({ start: item.start, durationMin: item.durationMin, title: item.title });
     })();
   }, [repo, today]);

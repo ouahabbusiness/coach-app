@@ -1091,3 +1091,24 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .measure { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+
+/* Trous de l'horaire (planning) */
+.gapbar-wrap { margin: 6px 0 4px; }
+.gapbar { position: relative; height: 10px; border-radius: 6px; background: repeating-linear-gradient(90deg, var(--surface) 0 6px, var(--accent-soft) 6px 7px); border: 1px solid var(--border); overflow: hidden; }
+.gb-busy { position: absolute; top: 0; bottom: 0; background: var(--text-2); opacity: 0.35; }
+.gb-item { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; }
+.gapbar-legend { display: flex; justify-content: space-between; font-size: 0.66rem; color: var(--text-2); margin-top: 3px; }
+.gb-free-txt { color: var(--accent); font-weight: 700; }
+.busy-chip { display: inline-flex; align-items: center; gap: 5px; margin: 4px 6px 0 0; padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--text-2); background: transparent; color: var(--text-2); font: 600 0.74rem var(--font-body); cursor: pointer; }
+.moved { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 0.85rem; }
+.moved p { margin: 0 0 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.daypick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.daypick button { min-height: 44px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: 700 0.85rem var(--font-body); cursor: pointer; }
+.daypick button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ob .daypick button { background: #050505; border-color: #2c2b28; color: var(--text); }
+.ob .daypick button[aria-pressed='true'] { background: #f3ecdc; color: #0a0a0a; border-color: #f3ecdc; }
+.rec-row { padding: 8px 0; border-bottom: 1px dashed var(--border); gap: 8px; }
+.ob .gapbar { background: repeating-linear-gradient(90deg, #050505 0 6px, #1c1c1a 6px 7px); border-color: #2c2b28; }
+.ob .gb-busy { background: #8f8b82; opacity: 0.45; }
+.ob .gb-free-txt { color: var(--text); }

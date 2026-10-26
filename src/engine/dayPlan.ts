@@ -74,7 +74,7 @@ export interface NutritionAnswers {
   cooking?: 'rapide' | 'normal';
 }
 
-export type PlanKind = 'eau' | 'repas' | 'complement' | 'seance' | 'coucher';
+export type PlanKind = 'eau' | 'repas' | 'complement' | 'seance' | 'sommeil' | 'coucher';
 
 export interface PlanEntry {
   id: string;
@@ -176,7 +176,9 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const a = i.answers;
   const ok = (ids: string[]) => ids.filter((x) => !a.exclude.includes(x));
   const wake = toMin(a.wake ?? '07:00');
-  const bed = toMin(a.bedtime ?? '23:00');
+  // Coucher après minuit : compté sur le lendemain (ex. 00:30 → 24:30).
+  const bedRaw = toMin(a.bedtime ?? '23:00');
+  const bed = bedRaw <= wake ? bedRaw + 1440 : bedRaw;
   const meals = a.meals ?? 4;
   const d = i.dayIndex;
   const out: PlanEntry[] = [];
@@ -258,8 +260,15 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
     const t = startW + ((endW - startW) * (k + 0.5)) / slots;
     out.push({ id: `eau-${k}`, time: fromMin(Math.round(t / 15) * 15), kind: 'eau', title: 'Eau', items: [`${Math.round(left / slots / 50) * 50} ml`], waterMl: Math.round(left / slots / 50) * 50 });
   }
-  out.push({ id: 'coucher', time: fromMin(bed), kind: 'coucher', title: 'Au lit', items: ['Écrans coupés 30 min avant'] });
-  return out.sort((x, y) => toMin(x.time) - toMin(y.time));
+  // Sommeil : hygiène du sommeil (conseils généraux, pas un diagnostic). Objectif 8 h : coucher = lever − 8 h.
+  const bedTarget = Math.min(bed, wake + 16 * 60);
+  out.push({ id: 'lumiere', time: fromMin(wake + 15), kind: 'sommeil', title: 'Lumière du jour', items: ['10 min dehors ou à la fenêtre : cale ton horloge interne'] });
+  out.push({ id: 'cafe', time: fromMin(Math.max(wake, bedTarget - 8 * 60)), kind: 'sommeil', title: 'Dernier café', items: ['Plus de caféine après : elle reste des heures dans le corps'] });
+  out.push({ id: 'ecrans', time: fromMin(bedTarget - 45), kind: 'sommeil', title: 'Écrans coupés', items: ['Lumière tamisée, chambre fraîche (~18 °C) et sombre'] });
+  out.push({ id: 'coucher', time: fromMin(bedTarget), kind: 'coucher', title: 'Au lit', items: [bedTarget < bed ? `Pour 8 h de sommeil (au lieu de ${a.bedtime})` : 'Même heure chaque soir, week-end compris'] });
+  // Ordre de la journée : ce qui tombe après minuit passe à la fin.
+  const key = (t: string) => (toMin(t) < wake - 60 ? toMin(t) + 1440 : toMin(t));
+  return out.sort((x, y) => key(x.time) - key(y.time));
 }
 
 /**

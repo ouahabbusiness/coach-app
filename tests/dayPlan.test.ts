@@ -66,3 +66,12 @@ describe('imprévu de repas', () => {
     expect(Math.abs(t.kcal - 2600) / 2600).toBeLessThan(0.12);
   });
 });
+
+describe('sommeil dans le plan du jour', () => {
+  it('lever 07:00, coucher déclaré 00:30 → coucher conseillé 23:00, dernier café 15:00', () => {
+    const p = buildDayPlan({ answers: { ...answers, bedtime: '00:30' }, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 0 });
+    expect(p.find((e) => e.id === 'coucher')!.time).toBe('23:00');
+    expect(p.find((e) => e.id === 'cafe')!.time).toBe('15:00');
+    expect(p.find((e) => e.id === 'lumiere')!.time).toBe('07:15');
+  });
+});
