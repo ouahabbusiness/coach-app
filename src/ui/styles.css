@@ -937,3 +937,24 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 .run-goal strong { font-size: 1.5rem; color: var(--text); }
 .effort { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
 .effort .chip { padding: 0; justify-content: center; min-width: 0; }
+
+/* Fenêtre de calcul : cartes alignées, une seule colonne, espacement régulier */
+.why { display: flex; flex-direction: column; gap: 12px; }
+.why-card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); }
+.why-card.need { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.why-head { display: flex; align-items: center; gap: 10px; }
+.why-head strong { margin-left: auto; font-size: 1rem; }
+.why-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+.why-head .why-label { color: var(--text); font-size: 0.9rem; letter-spacing: 0; text-transform: none; }
+.why-bar { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.why-bar span { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width 400ms ease; }
+.why-missing { margin: 0; font-size: 0.85rem; color: var(--text-2); }
+.why-result { display: flex; align-items: baseline; gap: 6px; font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.why-result small { font-size: 0.9rem; font-weight: 600; color: var(--text-2); }
+.why-result .pill { margin-left: auto; align-self: center; }
+.why .why-list li { background: var(--surface); }
+.seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.seg2 button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; transition: background 200ms ease, color 200ms ease; }
+.seg2 button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent, #fff); }
+.why-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.why-foot { margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.74rem; color: var(--text-2); }

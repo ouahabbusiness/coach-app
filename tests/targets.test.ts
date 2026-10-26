@@ -30,7 +30,7 @@ describe('calories', () => {
   it('données manquantes listées, aucune valeur', () => {
     const c = calorieTarget({ weightKg: 77 });
     expect(c.value).toBeUndefined();
-    expect(c.missing).toContain('âge');
+    expect(c.missing).toEqual(['formule', 'âge', 'taille']);
   });
 });
 

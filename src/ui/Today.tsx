@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Camera, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -486,29 +486,51 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         </Kpi>
       </div>
 
-      <WhyModal open={why === 'water'} onClose={() => setWhy(null)} title="Eau" c={targets.water} />
-      <WhyModal open={why === 'run'} onClose={() => setWhy(null)} title="Course" c={targets.run} />
-      <WhyModal open={why === 'kcal'} onClose={() => setWhy(null)} title="Calories" c={targets.calories}>
-        <div className="chips" role="group" aria-label="Formule">
-          {(['homme', 'femme'] as const).map((x) => (
-            <button key={x} className="chip" aria-pressed={targets.sex === x} onClick={() => targets.setSex(x)}>
-              Formule {x}
-            </button>
-          ))}
-        </div>
-        {targets.calories.missing.some((m) => m !== 'formule homme/femme') && (
-          <button className="btn ghost" onClick={() => go({ name: 'onboarding' })}>
-            Compléter mon profil
-          </button>
-        )}
+      <WhyModal
+        open={why === 'water'}
+        onClose={() => setWhy(null)}
+        title="Eau"
+        c={targets.water}
+        profileFields={['poids']}
+        onComplete={() => {
+          setWhy(null);
+          setWeighing(true);
+        }}
+        result={waterL ? <>{(waterL / 1000).toLocaleString('fr-BE')} <small>L</small></> : undefined}
+      />
+      <WhyModal open={why === 'run'} onClose={() => setWhy(null)} title="Course" c={targets.run} result={runKm !== undefined ? <>{runKm.toLocaleString('fr-BE')} <small>km</small></> : undefined} />
+      <WhyModal
+        open={why === 'kcal'}
+        onClose={() => setWhy(null)}
+        title="Calories"
+        c={targets.calories}
+        profileFields={['âge', 'taille', 'poids']}
+        onComplete={() => go({ name: 'onboarding' })}
+        result={kcal ? <>{fmtNum(kcal.kcal)} <small>kcal</small> <span className="pill num">P {kcal.proteinG} g</span></> : undefined}
+      >
+        <section className={`why-card ${targets.sex ? '' : 'need'}`}>
+          <span className="why-label">Formule</span>
+          <div className="seg2" role="group" aria-label="Formule de calcul">
+            {(['homme', 'femme'] as const).map((x) => (
+              <button key={x} aria-pressed={targets.sex === x} onClick={() => targets.setSex(x)}>
+                {x === 'homme' ? 'Homme' : 'Femme'}
+              </button>
+            ))}
+          </div>
+        </section>
         <button
-          className="btn ghost"
+          className="why-row"
           onClick={() => {
             setWhy(null);
             openEditor('activeKcal');
           }}
         >
-          <Watch size={14} aria-hidden="true" /> Actives montre
+          <span className="icon-chip sm">
+            <Watch size={14} aria-hidden="true" />
+          </span>
+          <span className="grow">Calories actives · montre</span>
+          <span className="pill num">{daily?.activeKcal !== undefined ? fmtNum(daily.activeKcal) : '—'}</span>
+          <ChevronRight size={16} aria-hidden="true" />
         </button>
       </WhyModal>
       <RunModal open={running} onClose={() => setRunning(false)} repo={repo} t={targets} onProved={() => habits.setCheck('run', true)} />

@@ -54,7 +54,7 @@ export function activityFactor(sessionsPerWeek = 0): number {
 /** Calories du jour : Mifflin-St Jeor × activité, ajustées à l'objectif puis à la tendance du poids. */
 export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   const missing: string[] = [];
-  if (!i.sex) missing.push('formule homme/femme');
+  if (!i.sex) missing.push('formule');
   if (!i.age) missing.push('âge');
   if (!i.heightCm) missing.push('taille');
   if (!i.weightKg) missing.push('poids');

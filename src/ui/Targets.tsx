@@ -1,7 +1,7 @@
 // Cibles du jour calculées par l'app (eau, calories, course) et saisie d'une course avec preuve.
 
 import { useCallback, useEffect, useState } from 'react';
-import { Camera, Check, Info } from 'lucide-react';
+import { Camera, Check, Info, UserRound } from 'lucide-react';
 import { localDay } from '../engine/derive';
 import { calorieTarget, runTarget, waterTarget, type Computed, type FormulaSex, type RunEntry } from '../engine/targets';
 import { trend, type WeighIn } from '../engine/weight';
@@ -64,32 +64,77 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
 
 export type Targets = ReturnType<typeof useTargets>;
 
-/** Fenêtre « pourquoi ce chiffre » : le calcul, ligne par ligne. */
-export function WhyModal({ open, onClose, title, c, children }: { open: boolean; onClose: () => void; title: string; c: Computed<unknown>; children?: React.ReactNode }) {
+/** Fenêtre « pourquoi ce chiffre » : résultat + calcul, ou indicateur unique de ce qui manque. */
+export function WhyModal({
+  open,
+  onClose,
+  title,
+  c,
+  result,
+  profileFields = [],
+  onComplete,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  c: Computed<unknown>;
+  result?: React.ReactNode;
+  /** Champs du profil requis (pour l'indicateur « Profil x/n »). */
+  profileFields?: string[];
+  onComplete?: () => void;
+  children?: React.ReactNode;
+}) {
+  const missingProfile = profileFields.filter((f) => c.missing.includes(f));
+  const otherMissing = c.missing.filter((m) => !profileFields.includes(m));
+  const have = profileFields.length - missingProfile.length;
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      <div className="stack">
-        {c.missing.length > 0 ? (
-          <div className="why-list">
-            {c.missing.map((m) => (
-              <span key={m} className="pill warn-pill">
-                manque : {m}
-              </span>
-            ))}
-          </div>
+      <div className="why">
+        {c.missing.length === 0 ? (
+          <section className="why-card">
+            {result && <div className="why-result num">{result}</div>}
+            <ol className="why-list">
+              {c.why.map((w) => (
+                <li key={w} className="num">
+                  {w}
+                </li>
+              ))}
+            </ol>
+          </section>
         ) : (
-          <ol className="why-list">
-            {c.why.map((w) => (
-              <li key={w} className="num">
-                {w}
-              </li>
-            ))}
-          </ol>
+          profileFields.length > 0 && (
+            <section className="why-card">
+              <div className="why-head">
+                <span className="icon-chip sm">
+                  <UserRound size={14} aria-hidden="true" />
+                </span>
+                <span className="why-label">Profil</span>
+                <strong className="num">
+                  {have}/{profileFields.length}
+                </strong>
+              </div>
+              <div className="why-bar" aria-hidden="true">
+                <span style={{ width: `${(have / profileFields.length) * 100}%` }} />
+              </div>
+              {missingProfile.length > 0 && <p className="why-missing">À compléter : {missingProfile.join(' · ')}</p>}
+              {missingProfile.length > 0 && onComplete && (
+                <button className="btn primary block" onClick={onComplete}>
+                  Compléter mon profil
+                </button>
+              )}
+            </section>
+          )
         )}
-        <span className="pill" style={{ alignSelf: 'flex-start' }}>
-          <Info size={12} aria-hidden="true" /> estimation · pas un avis médical
-        </span>
+        {c.missing.length > 0 && profileFields.length === 0 && otherMissing.length > 0 && (
+          <section className="why-card">
+            <p className="why-missing">À compléter : {otherMissing.join(' · ')}</p>
+          </section>
+        )}
         {children}
+        <p className="why-foot">
+          <Info size={12} aria-hidden="true" /> Estimation · pas un avis médical
+        </p>
       </div>
     </Modal>
   );
