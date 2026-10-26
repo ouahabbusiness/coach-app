@@ -38,6 +38,9 @@ export interface PlannedItem {
   adapted?: { lines: PlanLine[]; estimatedMin: number; removed: string[] };
   /** Élément créé par un programme du coach (remplacé si le programme est refait). */
   programId?: string;
+  /** Course : distance prescrite et contenu (fractionné, allure). */
+  km?: number;
+  detail?: string;
 }
 
 export interface Adjustment {

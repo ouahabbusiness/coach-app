@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
 import { liveLoad } from '../engine/progression';
-import { useLoads } from './equipment';
+import { loadsFor, useEquipment } from './equipment';
 import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
 import type { Repository } from '../storage/db';
@@ -45,7 +45,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const now = useNow(250);
   const wake = useWakeLock(!!state && state.phase !== 'ended');
   const [history, setHistory] = useState<SessionState[]>([]);
-  const loads = useLoads(repo);
+  const equipment = useEquipment(repo);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [entryId, setEntryId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | 'menu' | null>(null);
@@ -102,7 +102,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const focusInfo = focus ? findVariant(focus.planned.variantId) : undefined;
   const comparable = focus ? lastComparable(history, focus.planned.variantId, state.startedAt) : undefined;
   // Consigne en direct : si la série d'avant était trop facile, la suivante monte.
-  const order = focus && focus.status === 'pending' ? liveLoad(state, focus.planned, loads) : undefined;
+  const order = focus && focus.status === 'pending' ? liveLoad(state, focus.planned, loadsFor(focus.planned.variantId, equipment)) : undefined;
   const setsDone = state.sets.filter((s) => s.status === 'done' || s.status === 'skipped').length;
   const blocks: { blockId: string; name: string; icon?: LucideIcon; done: number; total: number }[] = [];
   for (const s of state.sets) {
@@ -170,7 +170,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
             <h1 className="hud-title">{focusInfo?.variant.name ?? focus.planned.variantId}</h1>
 
             <div className="hud-target num" key={focus.planned.id}>
-              {focus.planned.kind === 'reps' ? focus.planned.targetReps ?? '?' : focus.planned.targetSeconds ?? '?'}
+              {focus.planned.kind === 'reps' ? focus.planned.targetReps ?? (focus.planned.role === 'test' ? 'MAX' : '?') : focus.planned.targetSeconds ?? '?'}
               <span>{focus.planned.kind === 'reps' ? 'rép.' : 's'}</span>
             </div>
             {order && (
@@ -243,7 +243,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
           </section>
         )}
 
-        {entry && <ResultEntry key={entry.planned.id + entry.entries.length} state={state} set={entry} act={act} loads={loads} />}
+        {entry && <ResultEntry key={entry.planned.id + entry.entries.length} state={state} set={entry} act={act} loads={loadsFor(entry.planned.variantId, equipment)} />}
 
         <section className="ui-card" aria-label="Plan de mission">
           <p className="hud-label">Plan</p>

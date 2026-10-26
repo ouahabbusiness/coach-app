@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Download, Upload } from 'lucide-react';
+import { ChevronLeft, Download, Upload, X } from 'lucide-react';
 import { availableLoads } from '../engine/progression';
-import { loadPieces, savePieces } from './equipment';
+import { loadKettlebells, loadPieces, saveKettlebells, savePieces } from './equipment';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
 import { GOAL_LABELS, goalChanges, type GoalVersion } from '../engine/profile';
@@ -80,10 +80,10 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
-        <span className="badge ok" style={{ alignSelf: 'flex-start' }}>🔒 100 % sur cet appareil</span>
+        <span className="badge ok" style={{ alignSelf: 'flex-start' }}>100 % sur cet appareil</span>
         {persisted === false && (
           <Notice tone="warn">
-            ⚠️ Le navigateur peut effacer ces données : exporte souvent.
+            Le navigateur peut effacer ces données : exporte souvent.
           </Notice>
         )}
         {persisted === true && <Notice>Stockage persistant accordé par le navigateur.</Notice>}
@@ -188,8 +188,8 @@ function BackgroundCard() {
   const { images, setImage } = useBackgrounds();
   const [error, setError] = useState<string | null>(null);
   const slots: { slot: BgSlot; label: string }[] = [
-    { slot: 'jour', label: '☀️ Jour' },
-    { slot: 'nuit', label: '🌙 Nuit' },
+    { slot: 'jour', label: 'Jour' },
+    { slot: 'nuit', label: 'Nuit' },
   ];
   return (
     <div className="card stack">
@@ -249,7 +249,7 @@ function WinterCard({ repo }: { repo: Repository }) {
   ];
   return (
     <div className="card stack">
-      <h2 style={{ margin: 0 }}>❄ Winter Arc</h2>
+      <h2 style={{ margin: 0 }}>Winter Arc</h2>
       <div className="chips" role="group" aria-label="Thème Winter Arc">
         {options.map((o) => (
           <button key={o.v} className="chip" aria-pressed={mode === o.v} onClick={() => setMode(o.v)}>
@@ -261,47 +261,55 @@ function WinterCard({ repo }: { repo: Repository }) {
   );
 }
 
-/** Mon lest : pièces disponibles ; l'app ne propose que des charges réalisables avec elles. */
-function LoadCard({ repo }: { repo: Repository }) {
-  const [pieces, setPieces] = useState<number[] | null>(null);
+/** Liste de poids éditable (pièces de lest ou kettlebells). */
+function WeightsEditor({ label, values, onSave }: { label: string; values: number[]; onSave: (v: number[]) => void }) {
   const [draft, setDraft] = useState('');
-  useEffect(() => {
-    loadPieces(repo).then(setPieces);
-  }, [repo]);
-  if (!pieces) return null;
-  const save = async (next: number[]) => {
-    const sorted = [...next].sort((a, b) => a - b);
-    await savePieces(repo, sorted);
-    setPieces(sorted);
-  };
   const kg = Number(draft.replace(',', '.'));
-  const loads = availableLoads(pieces).filter((l) => l > 0);
   return (
-    <div className="card stack">
-      <h2 style={{ margin: 0 }}>Mon lest</h2>
-      <div className="chips" aria-label="Pièces de lest">
-        {pieces.map((p, i) => (
-          <button key={`${p}-${i}`} className="chip num" aria-label={`Retirer ${p} kg`} onClick={() => save(pieces.filter((_, j) => j !== i))}>
-            {p.toLocaleString('fr-BE')} kg ✕
+    <div className="stack" style={{ gap: 8 }}>
+      <p className="eyebrow" style={{ margin: 0 }}>{label}</p>
+      <div className="chips">
+        {values.map((p, i) => (
+          <button key={`${p}-${i}`} className="chip num" aria-label={`Retirer ${p} kg`} onClick={() => onSave(values.filter((_, j) => j !== i))}>
+            {p.toLocaleString('fr-BE')} kg <X size={12} aria-hidden="true" />
           </button>
         ))}
       </div>
       <div className="row" style={{ flexWrap: 'nowrap' }}>
-        <input aria-label="Ajouter une pièce en kg" placeholder="kg" type="text" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)} />
+        <input aria-label={`Ajouter (${label}) en kg`} placeholder="kg" type="text" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)} />
         <button
           className="btn"
           disabled={!(kg > 0 && kg <= 60)}
           onClick={() => {
-            save([...pieces, kg]);
+            onSave([...values, kg].sort((a, b) => a - b));
             setDraft('');
           }}
         >
           Ajouter
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Mon matériel de charge : lest (pièces combinables) et kettlebells (une à la fois). */
+function LoadCard({ repo }: { repo: Repository }) {
+  const [pieces, setPieces] = useState<number[] | null>(null);
+  const [kbs, setKbs] = useState<number[] | null>(null);
+  useEffect(() => {
+    loadPieces(repo).then(setPieces);
+    loadKettlebells(repo).then(setKbs);
+  }, [repo]);
+  if (!pieces || !kbs) return null;
+  const loads = availableLoads(pieces).filter((l) => l > 0);
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>Mon matériel</h2>
+      <WeightsEditor label="Ceinture de lest : pièces" values={pieces} onSave={async (v) => (await savePieces(repo, v), setPieces(v))} />
       <p className="muted num" style={{ margin: 0, fontSize: '0.85rem' }}>
-        Charges possibles : {loads.map((l) => l.toLocaleString('fr-BE')).join(' · ')} kg
+        Lest possible : {loads.map((l) => l.toLocaleString('fr-BE')).join(' · ')} kg
       </p>
+      <WeightsEditor label="Kettlebells" values={kbs} onSave={async (v) => (await saveKettlebells(repo, v), setKbs(v))} />
     </div>
   );
 }

@@ -50,4 +50,16 @@ describe('programme', () => {
     const p = buildProgram({ ...base, maxPullups: null }, loads);
     expect(p.notes.join(' ')).toContain('test');
   });
+
+  it('bloc de 4 semaines : courses qui progressent, re-test la dernière semaine', () => {
+    const p = buildProgram({ ...base, runGoal: '5k', intensity: 'dure', weeks: 4 }, loads);
+    expect(p.weekly).toHaveLength(4);
+    const endurance = (w: number) => p.weekly[w]!.find((x) => x.title.startsWith('Course · endurance'))?.km ?? 0;
+    expect(endurance(1)).toBeGreaterThan(endurance(0));
+    expect(p.weekly[0]!.some((x) => x.title.includes('fractionné 6 × 400 m'))).toBe(true);
+    const last = p.weekly[3]!;
+    expect(last.some((x) => x.templateKey === 'T')).toBe(true);
+    expect(last.some((x) => x.title.includes('test 5 km chrono'))).toBe(true);
+    expect(p.templates.some((t) => t.key === 'T')).toBe(true);
+  });
 });

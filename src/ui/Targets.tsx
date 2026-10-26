@@ -8,7 +8,7 @@ import { trend, type WeighIn } from '../engine/weight';
 import type { Repository } from '../storage/db';
 import { Modal } from './common';
 import { saveProof } from './Habits';
-import { loadGoals, loadOnboarding } from './profileStore';
+import { loadGoals, loadOnboarding, patchAnswers } from './profileStore';
 import { deviceTimeZone, newId } from './support';
 
 const SEX = 'targets.sex';
@@ -22,7 +22,8 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
 
   useEffect(() => {
     (async () => {
-      setSexState(await repo.getKv<FormulaSex>(SEX));
+      const a0 = (await loadOnboarding(repo)).answers;
+      setSexState(a0.body.formulaSex ?? (await repo.getKv<FormulaSex>(SEX)));
       setRuns((await repo.getKv<RunEntry[]>(RUNS)) ?? []);
       const a = (await loadOnboarding(repo)).answers;
       const goals = await loadGoals(repo);
@@ -39,6 +40,7 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   const setSex = useCallback(
     async (s: FormulaSex) => {
       await repo.setKv(SEX, s);
+      await patchAnswers(repo, (x) => void (x.body.formulaSex = s));
       setSexState(s);
     },
     [repo],

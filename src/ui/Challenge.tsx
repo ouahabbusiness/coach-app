@@ -123,13 +123,13 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
         )}
       </div>
       <p className="greeting-sub" style={{ fontSize: '1.1rem' }}>
-        {started ? '1 → 30 nov.' : '🗓 Dès le 1er nov.'}
+        {started ? '1 → 30 nov.' : 'Dès le 1er nov.'}
       </p>
 
       <div className="row" style={{ gap: 6, marginBottom: 12 }}>
-        <span className="badge warn">⚠️ Gros volume : adapte</span>
-        <span className="badge">🚫 Pas de rattrapage</span>
-        <span className="badge">🤒 Jour excusé = 0 pénalité</span>
+        <span className="badge warn">Gros volume : adapte</span>
+        <span className="badge">Pas de rattrapage</span>
+        <span className="badge">Jour excusé = 0 pénalité</span>
       </div>
 
       {week && (
@@ -180,7 +180,7 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
         <div className="spread">
           <h2 style={{ margin: 0, textTransform: 'capitalize' }}>{fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
         </div>
-        {!editable && <p className="muted" style={{ margin: 0 }}>🔒 Jour futur</p>}
+        {!editable && <p className="muted" style={{ margin: 0 }}>Jour futur</p>}
         <label className="row" style={{ minHeight: 44 }}>
           <input
             type="checkbox"
@@ -208,7 +208,7 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
             <Camera size={16} aria-hidden="true" /> Objectifs du jour
           </button>
         ) : (
-          editable && <span className="badge">📷 Preuve = photo du jour même</span>
+          editable && <span className="badge">Preuve = photo du jour même</span>
         )}
         <HabitsSheet
           open={sheet}
@@ -250,7 +250,7 @@ export function Challenge({ repo, onBack, onStatus, onReading }: { repo: Reposit
             </div>
           );
         })}
-        <span className="badge" style={{ alignSelf: 'flex-start' }}>📷 Compté seulement avec photo</span>
+        <span className="badge" style={{ alignSelf: 'flex-start' }}>Compté seulement avec photo</span>
       </div>
     </>
   );

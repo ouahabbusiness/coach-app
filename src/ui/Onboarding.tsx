@@ -185,6 +185,16 @@ export const STEPS: Step[] = [
     optional: true,
     render: (a, set) => (
       <>
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="field-label">Formule de calcul des calories</span>
+          <div className="seg2" role="group" aria-label="Formule de calcul des calories">
+            {(['homme', 'femme'] as const).map((x) => (
+              <button key={x} aria-pressed={a.body.formulaSex === x} onClick={() => set((y) => void (y.body.formulaSex = x))}>
+                {x === 'homme' ? 'Homme' : 'Femme'}
+              </button>
+            ))}
+          </div>
+        </div>
         <ValuedNum label="Âge" unit="ans" v={a.body.age} onChange={(v) => set((x) => void (x.body.age = v))} />
         <ValuedNum label="Taille" unit="cm" v={a.body.heightCm} onChange={(v) => set((x) => void (x.body.heightCm = v))} />
         <ValuedNum label="Poids" unit="kg" v={a.body.weightKg} onChange={(v) => set((x) => void (x.body.weightKg = v))} />
@@ -448,8 +458,16 @@ function Recap({ a, goTo }: { a: OnboardingAnswers; goTo: (i: number) => void })
 
 /* ---------- Écran ---------- */
 
-export function Onboarding({ repo, onExit }: { repo: Repository; onExit: () => void }) {
+export function Onboarding({ repo, onExit, startAt }: { repo: Repository; onExit: () => void; startAt?: string }) {
   const { state, save, complete } = useOnboarding(repo);
+  // Lien direct vers une étape (ex. « Compléter mon profil » → Profil physique).
+  const [jumped, setJumped] = useState(false);
+  useEffect(() => {
+    if (!state || jumped || !startAt) return;
+    const i = STEPS.findIndex((s) => s.id === startAt);
+    setJumped(true);
+    if (i >= 0 && state.step !== i) save({ ...state, step: i });
+  }, [state, jumped, startAt, save]);
   const [showWhy, setShowWhy] = useState(false);
   const [lastGoal, setLastGoal] = useState<GoalVersion | undefined>();
   const [reason, setReason] = useState('');

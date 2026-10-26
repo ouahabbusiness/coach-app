@@ -97,7 +97,7 @@ export interface GenLine {
 }
 
 export interface GenTemplate {
-  key: 'A' | 'B' | 'C';
+  key: 'A' | 'B' | 'C' | 'T';
   title: string;
   lines: GenLine[];
 }
@@ -109,13 +109,19 @@ export interface GenItem {
   kind: 'seance' | 'course';
   title: string;
   templateKey?: GenTemplate['key'];
+  km?: number;
+  /** Contenu de la course (structure du fractionné, allure). */
+  detail?: string;
 }
 
 export interface Program {
   title: string;
   weeks: number;
   templates: GenTemplate[];
+  /** Semaine type (semaine 1). */
   week: GenItem[];
+  /** Toutes les semaines du bloc : courses qui progressent, re-test la dernière semaine. */
+  weekly: GenItem[][];
   rules: string[];
   notes: string[];
 }
@@ -149,7 +155,7 @@ export function estimateLineMinutes(lines: GenLine[]): number {
 }
 
 /** Construit le programme à partir des réponses validées. `loads` = charges de lest réalisables. */
-export function buildProgram(a: ProgramAnswers, loads: number[]): Program {
+export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: number[] = [6, 12]): Program {
   const s = scheme(a.priority);
   const intensity = a.intensity ?? recIntensity(a).value;
   const rir = RIR[intensity];
@@ -191,7 +197,8 @@ export function buildProgram(a: ProgramAnswers, loads: number[]): Program {
   const pushAcc = acc(pushups >= 30 && !pain.has('poignets') ? 'pushup-diamond' : 'pushup-standard');
   const legsOk = !pain.has('genoux');
   const backOk = !pain.has('dos');
-  const kb = fit(12, loads); // la kettlebell la plus utile pour les jambes
+  const kbs = [...kettlebells].sort((x, y) => x - y);
+  const kb = kbs[kbs.length - 1] ?? 12; // la plus lourde pour les jambes et le tirage
   if (!legsOk) notes.push('Genoux : pas de squat bulgare ni de fentes.');
   if (!backOk) notes.push('Dos : pas de swing ni de soulevé de terre.');
 
@@ -216,7 +223,7 @@ export function buildProgram(a: ProgramAnswers, loads: number[]): Program {
     lines: [
       main(pull !== null && pull !== undefined && pull >= 5 ? 'chinup-strict' : pullLine.variantId, { targetReps: pullLine.targetReps, loadKg: undefined, cue: undefined }),
       pushAcc,
-      ...(pain.has('epaules') ? [] : [acc('kb-press-1arm', { loadKg: fit(6, loads.filter((l) => l > 0)), cue: 'Par bras' })]),
+      ...(pain.has('epaules') ? [] : [acc('kb-press-1arm', { loadKg: kbs[0] ?? 6, cue: 'Par bras' })]),
       acc('knee-raise-hanging', { targetReps: 12 }),
     ],
   };
@@ -229,7 +236,7 @@ export function buildProgram(a: ProgramAnswers, loads: number[]): Program {
 
   const days = Math.min(6, Math.max(2, a.days ?? recDays(a).value));
   const order: GenTemplate[] = [A, B, C, A, B, C].slice(0, days);
-  const templates = days === 2 ? [A, B] : [A, B, C];
+  const templates: GenTemplate[] = days === 2 ? [A, B] : [A, B, C];
   const slot = a.slot ?? 'soir';
   const sDays = DAYS[days]!;
   const week: GenItem[] = order.map((t, i) => ({ day: sDays[i]!, start: START[slot], durationMin: estimateLineMinutes(t.lines), kind: 'seance', title: t.title, templateKey: t.key }));
@@ -239,13 +246,50 @@ export function buildProgram(a: ProgramAnswers, loads: number[]): Program {
   const free = [6, 5, 2, 3, 1, 4, 0].filter((d) => !sDays.includes(d));
   const runDays = [...free, ...[0, 1, 2, 3, 4, 5, 6].filter((d) => !free.includes(d))].slice(0, runs).sort((x, y) => x - y);
   const quality = intensity !== 'controlee' && (a.runGoal === '5k' || a.runGoal === '10k');
-  runDays.forEach((d, i) => {
-    const long = d >= 5 && i === runDays.length - 1;
-    const type = long ? 'sortie longue' : quality && i === 0 ? 'fractionné' : 'endurance';
-    const sameDay = sDays.includes(d);
-    week.push({ day: d, start: d >= 5 ? '09:30' : sameDay ? '07:00' : START[slot], durationMin: long ? 50 : 35, kind: 'course', title: `Course · ${type}` });
-  });
+  const weeksN = a.weeks ?? recWeeks().value;
+  // Base : plus longue course déclarée (3 km si inconnue) ; +10 % par semaine, arrondi au 0,5 km.
+  const baseKm = Math.max(2, a.longestRunKm ?? 3);
+  const half = (n: number) => Math.round(n * 2) / 2;
+  const runItems = (w: number, test: boolean): GenItem[] =>
+    runDays.map((d, i) => {
+      const long = d >= 5 && i === runDays.length - 1;
+      const sameDay = sDays.includes(d);
+      const start = d >= 5 ? '09:30' : sameDay ? '07:00' : START[slot];
+      const easy = half(baseKm * 0.8 * Math.pow(1.1, w));
+      if (test && i === 0) {
+        const km = a.runGoal === '10k' ? 10 : a.runGoal === '5k' ? 5 : half(baseKm * Math.pow(1.1, w));
+        return { day: d, start, durationMin: Math.round(km * 7) + 10, kind: 'course', title: `Course · test ${km.toLocaleString('fr-BE')} km chrono`, km, detail: 'Re-test : à fond, temps noté' };
+      }
+      if (long) {
+        const km = half(baseKm * 1.2 * Math.pow(1.1, w));
+        return { day: d, start, durationMin: Math.round(km * 7.5), kind: 'course', title: `Course · sortie longue ${km.toLocaleString('fr-BE')} km`, km, detail: 'Allure facile : tu peux parler' };
+      }
+      if (quality && i === 0) {
+        const reps = (a.runGoal === '10k' ? 4 : 6) + w;
+        const dist = a.runGoal === '10k' ? '1 km' : '400 m';
+        return { day: d, start, durationMin: 40, kind: 'course', title: `Course · fractionné ${reps} × ${dist}`, detail: `Échauffement 10 min · ${reps} × ${dist} vite · récup ${a.runGoal === '10k' ? '2 min' : '90 s'} trot · retour au calme 5 min` };
+      }
+      return { day: d, start, durationMin: Math.round(easy * 7), kind: 'course', title: `Course · endurance ${easy.toLocaleString('fr-BE')} km`, km: easy, detail: 'Allure facile : tu peux parler' };
+    });
+  week.push(...runItems(0, false));
   week.sort((x, y) => x.day - y.day || x.start.localeCompare(y.start));
+
+  // Re-test la dernière semaine : la 1re séance devient le test des maxima.
+  const T: GenTemplate = {
+    key: 'T',
+    title: 'Re-test des maxima',
+    lines: [
+      { variantId: 'pullup-strict', kind: 'reps', role: 'test', sets: 1, restSeconds: 240, cue: 'Max strict, une seule série' },
+      { variantId: pain.has('epaules') ? 'pushup-standard' : 'dips-bars', kind: 'reps', role: 'test', sets: 1, restSeconds: 240, cue: 'Max propre' },
+      { variantId: 'pushup-standard', kind: 'reps', role: 'test', sets: 1, restSeconds: 180, cue: 'Max, poitrine au sol' },
+    ],
+  };
+  const weekly: GenItem[][] = Array.from({ length: weeksN }, (_, w) => {
+    const last = w === weeksN - 1 && weeksN > 1;
+    const force = week.filter((x) => x.kind === 'seance').map((x, i) => (last && i === 0 ? { ...x, title: T.title, templateKey: 'T' as const, durationMin: 25 } : x));
+    return [...force, ...runItems(w, last)].sort((x, y) => x.day - y.day || x.start.localeCompare(y.start));
+  });
+  templates.push(T);
 
   const strict = a.strictness ?? recStrictness(a).value;
   const rules =
@@ -258,5 +302,5 @@ export function buildProgram(a: ProgramAnswers, loads: number[]): Program {
   rules.push('Trop facile → la charge monte (matériel réel)');
 
   const label: Record<Priority, string> = { force: 'Force', muscle: 'Muscle', seche: 'Sèche', course: 'Course', hybride: 'Hybride' };
-  return { title: `Winter Arc · ${label[a.priority ?? 'hybride']}`, weeks: a.weeks ?? recWeeks().value, templates, week, rules, notes };
+  return { title: `Winter Arc · ${label[a.priority ?? 'hybride']}`, weeks: weeksN, templates, week, weekly, rules, notes };
 }

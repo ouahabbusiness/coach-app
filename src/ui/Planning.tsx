@@ -207,6 +207,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
                         {i.title}
                         {i.adapted && <Zap className="slot-flag" size={13} aria-label="Version adaptée" />}
                         {i.moves.length > 0 && <RotateCw className="slot-flag" size={13} aria-label="Déplacé" />}
+                        {i.detail && <small className="slot-detail">{i.detail}</small>}
                       </span>
                       {st !== 'prévu' && <span className="slot-status">{st}</span>}
                       {isToday && st === 'prévu' && tpl && (

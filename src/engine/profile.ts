@@ -36,7 +36,7 @@ export interface OnboardingAnswers {
   coachAck?: boolean;
   privacyAck?: boolean;
   devices: { iphone?: string; watch?: string; apps?: string };
-  body: { age: Valued<number>; heightCm: Valued<number>; weightKg: Valued<number>; waistCm: Valued<number> };
+  body: { age: Valued<number>; heightCm: Valued<number>; weightKg: Valued<number>; waistCm: Valued<number>; formulaSex?: 'homme' | 'femme' };
   history: { sports?: string; breakDuration?: string; runningBefore?: string; pullupsMax: Valued<number>; pushupsMax: Valued<number> };
   safety: { pains?: string; restrictions?: string; medicalFollowUp?: Answer3 };
   goal: GoalDraft;

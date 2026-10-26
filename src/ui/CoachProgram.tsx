@@ -21,7 +21,7 @@ import {
 } from '../engine/programBuilder';
 import { weekStart } from '../engine/challenge';
 import type { Repository } from '../storage/db';
-import { loadPieces } from './equipment';
+import { loadKettlebells, loadPieces } from './equipment';
 import { loadPlanning } from './Planning';
 import { loadOnboarding } from './profileStore';
 import { deviceTimeZone, newId } from './support';
@@ -48,8 +48,10 @@ type Choice<T> = { v: T; l: string; sub?: string };
 
 interface Step {
   id: string;
-  /** Ce que dit le coach. */
+  /** Ce que dit le coach (ton dur). */
   say: string;
+  /** Même question, ton neutre. */
+  calm?: string;
   render: (a: ProgramAnswers, set: (p: Partial<ProgramAnswers>) => void) => ReactNode;
   done: (a: ProgramAnswers) => boolean;
 }
@@ -120,6 +122,7 @@ const PAINS: Choice<Pain>[] = [
 const STEPS: Step[] = [
   {
     id: 'priority',
+    calm: 'Choisis une priorité pour ce bloc : c’est elle qui guide le programme.',
     say: 'Une seule priorité pour ces 4 semaines. Celui qui court après tout ne rattrape rien.',
     done: (a) => !!a.priority,
     render: (a, set) => (
@@ -138,30 +141,35 @@ const STEPS: Step[] = [
   },
   {
     id: 'pull',
+    calm: 'Combien de tractions strictes peux-tu faire d’affilée ?',
     say: 'Tractions strictes. Bras tendus en bas, menton au-dessus de la barre. Pas d’élan. Ton vrai max, pas celui de tes rêves.',
     done: (a) => a.maxPullups !== undefined,
     render: (a, set) => <NumberQ value={a.maxPullups} onChange={(v) => set({ maxPullups: v })} unit="tractions" />,
   },
   {
     id: 'dips',
+    calm: 'Combien de dips propres d’affilée sur ta barre ?',
     say: 'Dips sur ta barre. Épaule qui descend au niveau du coude. Combien d’affilée, propres ?',
     done: (a) => a.maxDips !== undefined,
     render: (a, set) => <NumberQ value={a.maxDips} onChange={(v) => set({ maxDips: v })} unit="dips" />,
   },
   {
     id: 'push',
+    calm: 'Combien de pompes au sol d’affilée ?',
     say: 'Pompes au sol, corps gainé, poitrine au sol. Ton max.',
     done: (a) => a.maxPushups !== undefined,
     render: (a, set) => <NumberQ value={a.maxPushups} onChange={(v) => set({ maxPushups: v })} unit="pompes" />,
   },
   {
     id: 'run',
+    calm: 'Ta plus longue course ces 4 dernières semaines ?',
     say: 'Ta plus longue course ces 4 dernières semaines. Sans marcher.',
     done: (a) => a.longestRunKm !== undefined,
     render: (a, set) => <NumberQ value={a.longestRunKm} onChange={(v) => set({ longestRunKm: v })} unit="km" />,
   },
   {
     id: 'pains',
+    calm: 'As-tu une douleur ou une gêne articulaire ? Je construis autour.',
     say: 'Douleurs. Ici, on ne joue pas les durs. Une articulation qui gêne, tu la cites, et je construis autour.',
     done: () => true,
     render: (a, set) => (
@@ -182,6 +190,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'sleep',
+    calm: 'Combien d’heures dors-tu en moyenne ?',
     say: 'Combien d’heures tu dors vraiment, en moyenne ? La récupération décide de l’intensité, pas l’ego.',
     done: (a) => a.sleepH !== undefined,
     render: (a, set) => <NumberQ value={a.sleepH} onChange={(v) => set({ sleepH: v ?? undefined })} unit="h / nuit" unknown={false} />,
@@ -204,6 +213,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'job',
+    calm: 'Ton travail est-il physique ?',
     say: 'Ton travail est physique ? Debout, port de charges, beaucoup de marche ?',
     done: (a) => a.physicalJob !== undefined,
     render: (a, set) => (
@@ -219,6 +229,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'quit',
+    calm: 'Qu’est-ce qui t’a fait arrêter un programme la dernière fois ?',
     say: 'Dernière fois que tu as lâché un programme. Pourquoi ? Sois honnête, c’est là que je verrouille.',
     done: (a) => !!a.quitReason,
     render: (a, set) => (
@@ -237,6 +248,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'minutes',
+    calm: 'Combien de minutes as-tu par séance ?',
     say: 'Combien de minutes par séance, réellement, sans te raconter d’histoire ?',
     done: (a) => !!a.minutes,
     render: (a, set) => (
@@ -276,6 +288,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'runs',
+    calm: 'Combien de sorties de course par semaine ?',
     say: 'Sorties de course par semaine. Au parc d’Alost, il n’y a pas d’excuse.',
     done: (a) => a.runsPerWeek !== undefined,
     render: (a, set) => <Choices value={a.runsPerWeek} onPick={(v) => set({ runsPerWeek: v })} rec={recRuns(a)} options={[0, 1, 2, 3, 4].map((n) => ({ v: n, l: n === 0 ? 'Aucune' : `${n} sortie${n > 1 ? 's' : ''}` }))} />,
@@ -299,6 +312,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'intensity',
+    calm: 'Quelle intensité ? Voici ce que je te conseille, et pourquoi.',
     say: 'Intensité. Je te dis ce que je recommande, et pourquoi. Tu choisis, mais tu assumes.',
     done: (a) => !!a.intensity,
     render: (a, set) => (
@@ -316,6 +330,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'strict',
+    calm: 'Que fait-on quand un imprévu arrive ?',
     say: 'Rigueur. Qu’est-ce qui se passe quand la vie se met en travers ?',
     done: (a) => !!a.strictness,
     render: (a, set) => (
@@ -343,17 +358,21 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
   const [a, setA] = useState<ProgramAnswers | null>(null);
   const [step, setStep] = useState(-1);
   const [loads, setLoads] = useState<number[]>([]);
+  const [kbs, setKbs] = useState<number[]>([6, 12]);
   const [startNext, setStartNext] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [tone, setTone] = useState<'dur' | 'neutre'>('dur');
   const today = localDay(Date.now(), deviceTimeZone());
 
   useEffect(() => {
     (async () => {
       setLoads(availableLoads(await loadPieces(repo)));
+      setKbs(await loadKettlebells(repo));
+      const ob = (await loadOnboarding(repo)).answers;
+      setTone(ob.coaching.tone && ob.coaching.tone !== 'ferme' ? 'neutre' : 'dur');
       const prev = await repo.getKv<ProgramAnswers>(ANSWERS);
       if (prev) return setA(prev);
       // Pré-remplissage avec ce qui est déjà connu (onboarding).
-      const ob = (await loadOnboarding(repo)).answers;
       setA({
         pains: [],
         maxPullups: ob.history.pullupsMax.value,
@@ -371,7 +390,7 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
       return next;
     });
 
-  const program = useMemo(() => (a && step >= STEPS.length ? buildProgram(a, loads) : undefined), [a, step, loads]);
+  const program = useMemo(() => (a && step >= STEPS.length ? buildProgram(a, loads, kbs) : undefined), [a, step, loads, kbs]);
   if (!a) return null;
 
   const total = STEPS.length;
@@ -398,8 +417,8 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
     const added: PlannedItem[] = [];
     for (let w = 0; w < program.weeks; w++) {
       const ws = shiftWeek(start, w);
-      for (const it of program.week) {
-        added.push({ id: newId(), weekStart: ws, day: it.day, start: it.start, durationMin: it.durationMin, kind: it.kind, title: it.title, templateId: it.templateKey ? tplId(it.templateKey) : undefined, moves: [], programId: id });
+      for (const it of program.weekly[w] ?? program.week) {
+        added.push({ id: newId(), weekStart: ws, day: it.day, start: it.start, durationMin: it.durationMin, kind: it.kind, title: it.title, detail: it.detail, km: it.km, templateId: it.templateKey ? tplId(it.templateKey) : undefined, moves: [], programId: id });
       }
     }
     await repo.setKv(PLANNING, [...kept, ...added]);
@@ -428,15 +447,26 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
           <section className="cq-say" key="intro">
             <p className="cq-who">Coach</p>
             <h1 className="ob-title">On construit ton programme.</h1>
-            <p className="cq-line">{total} questions. Tu réponds vrai. Si tu mens ici, c’est toi que tu voles.</p>
+            <p className="cq-line">{tone === 'dur' ? `${total} questions. Tu réponds vrai. Si tu mens ici, c’est toi que tu voles.` : `${total} questions pour adapter le programme à toi.`}</p>
             <p className="cq-line">À la fin, je te recommande le meilleur plan pour toi, avec mes raisons. Tu valides, et on ne discute plus.</p>
+            <div className="card ob-card">
+              <p className="cq-who">Ton du coach</p>
+              <div className="seg2">
+                <button aria-pressed={tone === 'dur'} onClick={() => setTone('dur')}>
+                  Dur
+                </button>
+                <button aria-pressed={tone === 'neutre'} onClick={() => setTone('neutre')}>
+                  Neutre
+                </button>
+              </div>
+            </div>
           </section>
         )}
 
         {cur && (
           <section key={cur.id} className="cq-say">
             <p className="cq-who">Coach</p>
-            <p className="cq-q">{cur.say}</p>
+            <p className="cq-q">{tone === 'neutre' ? cur.calm ?? cur.say : cur.say}</p>
             <div className="card ob-card">{cur.render(a, set)}</div>
           </section>
         )}
@@ -454,7 +484,10 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
                 <div key={i} className="cq-day">
                   <span className="cq-day-name">{DAY_NAMES[w.day]!.slice(0, 3)}</span>
                   <span className="cq-day-ico">{w.kind === 'course' ? <Footprints size={14} aria-hidden="true" /> : <Dumbbell size={14} aria-hidden="true" />}</span>
-                  <span className="grow">{w.title}</span>
+                  <span className="grow">
+                    {w.title}
+                    {w.detail && <small className="cq-day-detail">{w.detail}</small>}
+                  </span>
                   <span className="num cq-day-meta">
                     {w.start} · {w.durationMin} min
                   </span>
@@ -515,8 +548,8 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
         {saved && (
           <section className="cq-say" key="saved">
             <p className="cq-who">Coach</p>
-            <h1 className="ob-title">C’est signé.</h1>
-            <p className="cq-line">Ton planning est rempli. Les charges montent toutes seules quand c’est trop facile. Maintenant, tu exécutes.</p>
+            <h1 className="ob-title">{tone === 'dur' ? 'C’est signé.' : 'Programme enregistré.'}</h1>
+            <p className="cq-line">Ton planning est rempli. Les charges montent toutes seules quand c’est trop facile.{tone === 'dur' ? ' Maintenant, tu exécutes.' : ''}</p>
             <button className="btn primary block" onClick={() => go({ name: 'planning' })}>
               <CalendarCheck size={18} aria-hidden="true" /> Voir ma semaine
             </button>

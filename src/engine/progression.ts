@@ -12,6 +12,19 @@ import { currentResult } from './derive';
 /** Pièces de lest déclarées par Hmidou le 26/10/2026 : 2 disques de 5 kg, kettlebells 6 et 12 kg. */
 export const DEFAULT_PIECES = [5, 5, 6, 12];
 
+/** Kettlebells déclarées : une kettlebell ne s'additionne pas (goblet, rowing, swing : une seule à la fois). */
+export const DEFAULT_KETTLEBELLS = [6, 12];
+
+/**
+ * Charges possibles pour un exercice selon son matériel :
+ * ceinture de lest → combinaisons de pièces ; kettlebell → une des kettlebells ; sinon aucune (on progresse en répétitions).
+ */
+export function loadsForEquipment(equipment: string[], pieces: number[], kettlebells: number[]): number[] {
+  if (equipment.includes('ceinture de lest')) return availableLoads(pieces);
+  if (equipment.includes('kettlebell')) return [...kettlebells].sort((a, b) => a - b);
+  return [];
+}
+
 /** Toutes les charges réalisables en combinant les pièces (0 compris), triées. */
 export function availableLoads(pieces: number[]): number[] {
   let sums = new Set<number>([0]);

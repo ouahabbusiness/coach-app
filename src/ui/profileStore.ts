@@ -13,6 +13,14 @@ export async function loadOnboarding(repo: Repository): Promise<OnboardingState>
   return { version: 1, step: 0, answers: emptyAnswers(), updatedAt: 0 };
 }
 
+/** Modifie le profil hors du parcours de configuration (ex. depuis la fenêtre Calories). */
+export async function patchAnswers(repo: Repository, fn: (a: OnboardingAnswers) => void): Promise<void> {
+  const s = await loadOnboarding(repo);
+  const answers = structuredClone(s.answers);
+  fn(answers);
+  await repo.setKv(KEY, { ...s, answers, updatedAt: Date.now() });
+}
+
 export function useOnboarding(repo: Repository) {
   const [state, setState] = useState<OnboardingState | null>(null);
   useEffect(() => {

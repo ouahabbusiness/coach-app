@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -19,7 +19,6 @@ import { GOAL_LABELS, type GoalVersion } from '../engine/profile';
 import { project } from '../engine/session';
 import type { Repository } from '../storage/db';
 import { Modal } from './common';
-import { useChallengeEntries } from './Challenge';
 import { STEPS } from './Onboarding';
 import { loadPlanning, startPlanned } from './Planning';
 import { loadGoals, loadOnboarding } from './profileStore';
@@ -27,10 +26,9 @@ import { deviceTimeZone } from './support';
 import { loadTemplates, type SessionTemplate } from './templates';
 import type { Route } from './App';
 
-const WATER_GOAL_KEY = 'settings.waterGoalMl';
 const STEPS_GOAL = 10000; // objectif du défi de novembre (choisi par Hmidou)
 
-type Field = 'sleepH' | 'steps' | 'activeKcal' | 'waterGoal';
+type Field = 'sleepH' | 'steps' | 'activeKcal';
 
 function Kpi({
   icon,
@@ -125,7 +123,7 @@ function HeroHeader({ date, greeting, score, done, total, chips, winter }: { dat
         <div className="hero-text">
           {winter?.active && (
             <span className="winter-tag">
-              ❄ Winter Arc · {winter.day ? `Jour ${winter.day}/${winter.total}` : `J−${winter.daysLeft ?? 0}`}
+              <Snowflake size={12} aria-hidden="true" /> Winter Arc · {winter.day ? `Jour ${winter.day}/${winter.total}` : `J−${winter.daysLeft ?? 0}`}
             </span>
           )}
           <p className="hero-date">{date}</p>
@@ -141,8 +139,8 @@ function HeroHeader({ date, greeting, score, done, total, chips, winter }: { dat
         </div>
         <div className="hero-ring" role="img" aria-label={`Journée : ${done} habitudes sur ${total}`}>
           <svg width="88" height="88" viewBox="0 0 88 88">
-            <circle cx="44" cy="44" r={r} fill="none" stroke={winter?.active ? "rgb(29 78 216 / 0.14)" : "rgb(226 73 15 / 0.14)"} strokeWidth="8" />
-            <circle className="hero-ring-fill" cx="44" cy="44" r={r} fill="none" stroke={winter?.active ? "#1d4ed8" : "#e2490f"} strokeWidth="8" strokeLinecap="round" strokeDasharray={c} style={ringStyle} transform="rotate(-90 44 44)" />
+            <circle cx="44" cy="44" r={r} fill="none" stroke="rgb(37 99 235 / 0.14)" strokeWidth="8" />
+            <circle className="hero-ring-fill" cx="44" cy="44" r={r} fill="none" stroke="#2563eb" strokeWidth="8" strokeLinecap="round" strokeDasharray={c} style={ringStyle} transform="rotate(-90 44 44)" />
           </svg>
           <span className="hero-ring-value num">
             {Math.round(score * 100)}
@@ -186,7 +184,6 @@ const EDIT_META: Record<Field, { title: string; unit: string; hint: string; step
   sleepH: { title: 'Sommeil', unit: 'h', hint: 'Lu sur ta montre ou estimé par toi.', step: '0.25' },
   steps: { title: 'Pas', unit: 'pas', hint: 'Lu sur ta montre.', step: '100' },
   activeKcal: { title: 'Calories actives', unit: 'kcal', hint: 'Lues sur ta montre. Ce n’est pas un crédit alimentaire.', step: '10' },
-  waterGoal: { title: 'Objectif eau', unit: 'L', hint: 'Ton objectif personnel.', step: '0.25' },
 };
 
 type Hero =
@@ -197,7 +194,6 @@ type Hero =
 export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) => void; night: { phase: string; pastBed: boolean; bedtime?: string; now: Date } }) {
   const tz = deviceTimeZone();
   const today = localDay(Date.now(), tz);
-  const [waterGoal, setWaterGoal] = useState<number | undefined>();
   const [goal, setGoal] = useState<GoalVersion | undefined>();
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
   const [hero, setHero] = useState<Hero | null>(null);
@@ -219,7 +215,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   useEffect(() => {
     (async () => {
-      setWaterGoal(await repo.getKv<number>(WATER_GOAL_KEY));
       const goals = await loadGoals(repo);
       setGoal(goals[goals.length - 1]);
       const ob = await loadOnboarding(repo);
@@ -235,7 +230,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
       const sessions = (await repo.listSessions()).filter((r) => localDay(r.startedAt, tz) === today);
       const templates = await loadTemplates(repo);
       const next = (await loadPlanning(repo))
-        .filter((i) => i.weekStart === weekStart(today) && i.day === day && i.kind === 'seance')
+        .filter((i) => i.weekStart === weekStart(today) && i.day === day && (i.kind === 'seance' || i.kind === 'course') && !i.adjustment)
         .filter((i) => itemStatus(i, today, today, sessions) === 'prévu')
         .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
       setHero(next ? { kind: 'planned', item: next, tpl: templates.find((t) => t.id === next.templateId) } : { kind: 'none' });
@@ -243,7 +238,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   }, [repo, today, tz]);
 
   const openEditor = (field: Field) => {
-    const current = field === 'waterGoal' ? (waterGoal === undefined ? undefined : waterGoal / 1000) : daily?.[field];
+    const current = daily?.[field];
     setDraft(current === undefined ? '' : String(current));
     setEditing(field);
   };
@@ -252,13 +247,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
     if (!editing) return;
     const value = clear || draft.trim() === '' ? undefined : Number(draft.replace(',', '.'));
     if (value !== undefined && (!Number.isFinite(value) || value < 0)) return;
-    if (editing === 'waterGoal') {
-      const ml = value === undefined ? undefined : Math.round(value * 1000);
-      await repo.setKv(WATER_GOAL_KEY, ml);
-      setWaterGoal(ml);
-    } else {
-      await saveDaily({ ...(daily ?? {}), [editing]: value, updatedAt: Date.now() });
-    }
+
+    await saveDaily({ ...(daily ?? {}), [editing]: value, updatedAt: Date.now() });
     setEditing(null);
   };
 
@@ -320,10 +310,11 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         </span>
         <div className="grow">
           <p className="eyebrow">
-            {hero?.kind === 'open' ? 'En cours' : hero?.kind === 'planned' ? `Séance · ${hero.item.start}${hero.item.adapted ? ' · adaptée' : ''}` : 'Séance du jour'}
+            {hero?.kind === 'open' ? 'En cours' : hero?.kind === 'planned' ? `${hero.item.kind === 'course' ? 'Course' : 'Séance'} · ${hero.item.start}${hero.item.adapted ? ' · adaptée' : ''}` : 'Séance du jour'}
           </p>
           <p className="row-title">{hero?.kind === 'open' ? hero.title : hero?.kind === 'planned' ? hero.item.title : 'Rien de prévu'}</p>
           {hero?.kind === 'open' && <p className="row-meta num">{hero.done}/{hero.total} séries</p>}
+          {hero?.kind === 'planned' && hero.item.detail && <p className="row-meta">{hero.item.detail}</p>}
           {hero?.kind === 'planned' && hero.tpl && (
             <p className="row-meta num">
               {(hero.item.adapted?.lines ?? hero.tpl.lines).length} exos · {(hero.item.adapted?.lines ?? hero.tpl.lines).reduce((n, l) => n + l.sets, 0)} séries · ≈
@@ -334,6 +325,11 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         {hero?.kind === 'open' && (
           <button className="icon-btn primary" aria-label="Reprendre la séance" onClick={() => go({ name: 'session', id: hero.id })}>
             <Play size={18} aria-hidden="true" />
+          </button>
+        )}
+        {hero?.kind === 'planned' && hero.item.kind === 'course' && !targets.ranToday && (
+          <button className="btn sm" onClick={() => setRunning(true)}>
+            <Camera size={14} aria-hidden="true" /> J’ai couru
           </button>
         )}
         {hero?.kind === 'planned' && hero.tpl && (
@@ -505,7 +501,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         title="Calories"
         c={targets.calories}
         profileFields={['âge', 'taille', 'poids']}
-        onComplete={() => go({ name: 'onboarding' })}
+        onComplete={() => go({ name: 'onboarding', step: 'body' })}
         result={kcal ? <>{fmtNum(kcal.kcal)} <small>kcal</small> <span className="pill num">P {kcal.proteinG} g</span></> : undefined}
       >
         <section className={`why-card ${targets.sex ? '' : 'need'}`}>

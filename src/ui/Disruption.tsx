@@ -73,7 +73,9 @@ export function DisruptionPanel({
   const [option, setOption] = useState<OptionId | null>(null);
   const baseLines = template?.lines ?? [];
   const fullMin = estimateMinutes(baseLines);
-  const [minutes, setMinutes] = useState(() => Math.max(5, Math.round(fullMin / 2)));
+  // Mode militaire : la version courte ne descend jamais sous 20 min (règle du programme).
+  const minFloor = strictness === 'militaire' ? Math.min(20, fullMin) : 5;
+  const [minutes, setMinutes] = useState(() => Math.max(minFloor, Math.round(fullMin / 2)));
   const [onSite, setOnSite] = useState<string[]>([]);
   const isWorkout = item.kind === 'seance' && !!template;
 
@@ -174,7 +176,7 @@ export function DisruptionPanel({
         <label className="field">
           Temps disponible (min)
           <span className="hint">Séance complète estimée à {fullMin} min.</span>
-          <input type="number" inputMode="numeric" min={5} value={minutes} onChange={(e) => setMinutes(Math.max(1, Number(e.target.value) || 1))} />
+          <input type="number" inputMode="numeric" min={minFloor} value={minutes} onChange={(e) => setMinutes(Math.max(minFloor, Number(e.target.value) || minFloor))} />
         </label>
       )}
       {option === 'sans_materiel' && (

@@ -94,4 +94,11 @@ describe('lest', () => {
     const st = { sets: [{ planned: ps('s1'), status: 'done', entries: [{ eventId: 'x', at: 0, undone: false, result: { reps: 8, loadKg: 12, rir: 4 } }] }] } as unknown as SessionState;
     expect(liveLoad(st, ps('s2'), loads)).toEqual({ loadKg: 16, targetReps: 6, reason: 'facile' });
   });
+
+  it('kettlebell : on ne monte pas à 16 kg (une seule KB de 12 kg) → répétitions', () => {
+    const kbLoads = [6, 12];
+    expect(nextSessionAdjust([{ reps: 10, rir: 3, loadKg: 12 }], { targetReps: 10, loadKg: 12 }, kbLoads)).toMatchObject({ loadKg: 12, targetReps: 11 });
+    expect(nextSessionAdjust([{ reps: 10, rir: 3, loadKg: 6 }], { targetReps: 10, loadKg: 6 }, kbLoads)).toMatchObject({ loadKg: 6, targetReps: 11 });
+    expect(nextSessionAdjust([{ reps: 12, rir: 3, loadKg: 6 }], { targetReps: 10, loadKg: 6 }, kbLoads)).toMatchObject({ loadKg: 12, targetReps: 10 });
+  });
 });

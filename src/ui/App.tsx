@@ -31,7 +31,7 @@ export type Route =
   | { name: 'coach' }
   | { name: 'settings' }
   | { name: 'challenge' }
-  | { name: 'onboarding' }
+  | { name: 'onboarding'; step?: string }
   | { name: 'planning' }
   | { name: 'arc' }
   | { name: 'reading' }
@@ -89,7 +89,7 @@ export function App() {
   );
 
   function render() {
-  if (route.name === 'onboarding') return <Onboarding repo={repo} onExit={() => go({ name: 'today' })} />;
+  if (route.name === 'onboarding') return <Onboarding repo={repo} startAt={route.step} onExit={() => go({ name: 'today' })} />;
 
   if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;
   if (route.name === 'reading') return <Reading repo={repo} go={go} />;
