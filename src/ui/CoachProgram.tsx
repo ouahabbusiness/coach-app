@@ -27,6 +27,7 @@ import type { Repository } from '../storage/db';
 import { loadKettlebells, loadOwned, loadPieces } from './equipment';
 import { adaptToEquipment } from '../engine/trip';
 import { fitPlanning } from './agenda';
+import { loadFree } from './FreeWork';
 import { lightLoadsReport } from './actions';
 import type { LightLoad } from '../engine/progression';
 import { loadPlanning } from './Planning';
@@ -636,11 +637,15 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   }, [repo]);
   const [light, setLight] = useState<LightLoad[]>([]);
   const [todayItems, setTodayItems] = useState<PlannedItem[]>([]);
+  const [pullYesterday, setPullYesterday] = useState(0);
   useEffect(() => {
     lightLoadsReport(repo).then(setLight);
     (async () => {
       const t = localDay(Date.now(), deviceTimeZone());
       const day = (new Date(`${t}T12:00:00Z`).getUTCDay() + 6) % 7;
+      const yest = new Date(Date.parse(`${t}T12:00:00Z`) - 864e5).toISOString().slice(0, 10);
+      const free = (await loadFree(repo)).filter((b) => (b.day === yest || b.day === t) && /pull|chinup|row/.test(b.variantId));
+      setPullYesterday(free.reduce((n, b) => n + b.rounds.reduce<number>((a, r) => a + (r ?? 0), 0), 0));
       setTodayItems((await loadPlanning(repo)).filter((i) => i.weekStart === weekStart(t) && i.day === day && !(i.adjustment && i.adjustment.decision !== 'adaptée')).sort((a, b) => a.start.localeCompare(b.start)));
     })();
   }, [repo]);
@@ -657,6 +662,7 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
         ) : (
           <p className="coach-msg">Pas de séance prévue. Repos actif : 30 min de marche, tes 10 000 pas, et tu dors tôt.</p>
         )}
+        {pullYesterday >= 40 && <p className="coach-note">Bloc de tirage récent ({pullYesterday} rép.) : aucun tirage en plus du programme aujourd’hui, pas de finisher.</p>}
       </section>
       {p ? (
         <section className="ui-card stack" aria-label="Programme en cours">
@@ -712,6 +718,16 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           )}
         </section>
       )}
+      <button className="ui-card list-row" onClick={() => go({ name: 'free' })} style={{ marginTop: 10 }}>
+        <span className="icon-chip accent">
+          <Dumbbell size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Hors programme</p>
+          <p className="row-title">Séance libre / EMOM</p>
+        </div>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
       <button className="ui-card list-row" onClick={() => go({ name: 'agenda' })} style={{ marginTop: 10 }}>
         <span className="icon-chip accent">
           <CalendarCheck size={16} aria-hidden="true" />

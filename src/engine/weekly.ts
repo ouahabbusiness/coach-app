@@ -11,6 +11,8 @@ export interface WeekInput {
   weightAvg?: number;
   weightAvgPrev?: number;
   pagesRead: number;
+  /** Travail hors programme (EMOM, séries libres) : répétitions déclarées. */
+  freeReps?: number;
 }
 
 export interface WeekReport {
@@ -21,6 +23,7 @@ export interface WeekReport {
   weightDelta?: number;
   pages: number;
   verdict: string;
+  free?: string;
 }
 
 export function weekReport(w: WeekInput): WeekReport {
@@ -34,5 +37,6 @@ export function weekReport(w: WeekInput): WeekReport {
       : missed === 0
         ? 'Semaine tenue. Rien n’a sauté.'
         : `${missed} séance${missed > 1 ? 's' : ''} manquée${missed > 1 ? 's' : ''}. On ne rattrape pas en double : on tient la suivante.`;
-  return { sessions: `${w.doneSessions}/${w.plannedSessions}`, runs: `${w.runsKm.length}/${w.plannedRuns}`, km, habits, weightDelta, pages: w.pagesRead, verdict };
+  const free = w.freeReps ? `Hors programme : ${w.freeReps} rép. déclarées, intégrées à la charge de la semaine.` : undefined;
+  return { free, sessions: `${w.doneSessions}/${w.plannedSessions}`, runs: `${w.runsKm.length}/${w.plannedRuns}`, km, habits, weightDelta, pages: w.pagesRead, verdict };
 }

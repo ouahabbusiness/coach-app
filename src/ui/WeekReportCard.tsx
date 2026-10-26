@@ -14,6 +14,7 @@ import { weekReport, type WeekReport } from '../engine/weekly';
 import type { Repository } from '../storage/db';
 import type { Entries } from '../engine/challenge';
 import { loadPlanning } from './Planning';
+import { loadFree } from './FreeWork';
 import { deviceTimeZone } from './support';
 
 export function WeekReportCard({ repo }: { repo: Repository }) {
@@ -48,6 +49,7 @@ export function WeekReportCard({ repo }: { repo: Repository }) {
           weightAvg: average7(weights, today)?.kg,
           weightAvgPrev: average7(weights, shiftWeek(today, -1))?.kg,
           pagesRead: reading.reduce((t, e) => t + Math.max(0, e.toPage - e.fromPage), 0),
+          freeReps: (await loadFree(repo)).filter((b) => days.includes(b.day)).reduce((t, b) => t + b.rounds.reduce<number>((a, r) => a + (r ?? 0), 0), 0),
         }),
       );
     })();
@@ -86,6 +88,7 @@ export function WeekReportCard({ repo }: { repo: Repository }) {
         </div>
       </div>
       <p className="wr-verdict">{r.verdict}</p>
+      {r.free && <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{r.free}</p>}
     </section>
   );
 }
