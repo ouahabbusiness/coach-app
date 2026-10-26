@@ -1241,7 +1241,7 @@ body:has(.run-live.full) { background-image: none; }
 .round small { color: var(--text-2); font-size: 0.66rem; }
 .round input { min-height: 44px; text-align: center; font-weight: 700; padding: 0 4px; }
 .free-decision { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
-.free-decision strong { text-transform: capitalize; }
+.free-decision strong::first-letter { text-transform: uppercase; }
 .free-decision span { font-size: 0.85rem; }
 .coach-note { margin: 0; font-size: 0.82rem; color: #c9c2b2; }
 

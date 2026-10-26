@@ -74,7 +74,8 @@ export function FreeWorkPage({ repo, go }: { repo: Repository; go: (r: Route) =>
   if (b) {
     const n = Math.max(1, Math.min(60, num(minutes) ?? 12));
     const rounds = b.rounds.length === n ? b.rounds : Array.from({ length: n }, (_, i) => b.rounds[i] ?? null);
-    const set = (p: Partial<FreeBlock>) => setB({ ...b, ...p, rounds: p.rounds ?? rounds });
+    // Mise à jour fonctionnelle : deux réponses rapides ne s'écrasent pas.
+    const set = (p: Partial<FreeBlock>) => setB((cur) => (cur ? { ...cur, ...p, rounds: p.rounds ?? (cur.rounds.length === n ? cur.rounds : Array.from({ length: n }, (_, i) => cur.rounds[i] ?? null)) } : cur));
     return (
       <>
         <button className="btn ghost" onClick={() => setB(null)}>
@@ -196,7 +197,7 @@ export function FreeWorkPage({ repo, go }: { repo: Repository; go: (r: Route) =>
               {s.roundsUnknown < s.roundsTotal ? `${s.totalReps} rép. détaillées` : ''}
               {s.declaredTotal !== undefined ? `${s.roundsUnknown < s.roundsTotal ? ' · ' : ''}${s.declaredTotal} rép. déclarées` : ''}
               {x.loadKg ? ` · ${x.loadKg} kg` : ''}
-              {x.targetPerRound ? ` · ${s.roundsDone}/${s.roundsTotal} min réussies` : ''}
+              {x.targetPerRound && s.roundsUnknown < s.roundsTotal ? ` · ${s.roundsDone}/${s.roundsTotal - s.roundsUnknown} min détaillées réussies` : ''}
               {s.restSeconds !== undefined ? ` · repos réel ${s.restSeconds} s` : ''}
             </p>
             {s.uncertain.map((u) => (
