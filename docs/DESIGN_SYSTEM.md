@@ -1,47 +1,44 @@
-# Design system — charte du 26/10/2026
+# Design system — état du 26/10/2026
 
-Remplace toutes les directions précédentes (vert pétrole, personnages, forêt en blocs, Poppins).
-Inspiration : captures « smart home » (monochrome + orange) et « habit tracker » fournies par Hmidou.
+Deux ambiances, décidées par Hmidou (25–26/10) :
+- **Quotidien clair** (accueil, planning, nutrition, progrès, lecture, défi, réglages) : monochrome + **bleu électrique** pour l'actif. Plus aucun orange.
+- **Zone Winter Arc sombre** (séance, page Winter Arc, configuration, entretiens du coach : programme, nutrition, « Ma semaine ») : noir, crème, pointillés, typographie mono.
 
 ## Principes
-- Interface claire, minimaliste, monochrome : noir, gris subtils, blanc.
-- Orange vif uniquement pour l'actif : bouton principal, onglet sélectionné, coches, jauges.
-- Cartes compactes façon shadcn : radius 14 px, bordure fine #EBEBE8, ombre très légère, padding 12 px.
-- Chaque indicateur : icône SVG fine dans une pastille 28–36 px, libellé 0,75 rem gris, valeur 1,35 rem gras, jauge fine 4 px.
-- Zéro paragraphe : chiffres, badges courts, jauges, coches. Explications derrière un « ? » ou un détail repliable.
+- Zéro paragraphe : chiffres, badges courts, jauges, coches, icônes. Explications derrière un « ? » ou un détail repliable.
+- Cartes compactes façon shadcn : radius 14 px, bordure fine, ombre très légère.
+- Icônes Lucide à la place des emojis.
+- Chaque chiffre estimé est marqué (« ≈ », « estimation ») ; une donnée manquante s'affiche « — » ou « manque : … ».
 
-## Couleurs (tokens dans `src/ui/styles.css`)
+## Couleurs — quotidien clair (`:root` dans `src/ui/styles.css`)
 | Rôle | Valeur |
 |---|---|
-| Fond | #F6F6F4 + halo chaud léger (nuit : #EEF0F5 bleuté) |
+| Fond | #F6F6F4 + halo bleu très léger |
 | Carte | #FFFFFF, bordure #EBEBE8 |
-| Carte secondaire | #F3F3F1 |
-| Texte | #111111 |
-| Texte secondaire | #6E6E6B |
-| Accent (actif) | #FF5A1F |
-| Danger | #D92D20 |
+| Texte / secondaire | #111111 / #6E6E6B |
+| Accent (actif) | #2563EB (blanc dessus 5,2:1) |
+| Pastille accent | #E6EEFF |
+| Danger | #D92D20 (sécurité uniquement) |
 
-## Thème du mois — Novembre / Winter Arc
-Actif automatiquement du 1er au 30/11 (réglable : auto / activé / désactivé), sur **toutes** les pages.
-- Accent unique bleu #1D4ED8 (blanc dessus 6,7:1 ; sur pastille #E3ECFF 5,65:1). Zéro orange.
-- Fond #F3F6FA, statuts « partiel / suspendu » en ardoise #334155 sur #E8EDF5 (8,8:1). Rouge réservé à la sécurité.
-- Emojis colorés remplacés par des icônes vectorielles qui suivent l'accent.
+Novembre (`data-theme='winter'`, auto du 1er au 30/11, réglable) : même bleu, fond bleuté, neige sur l'en-tête de l'accueil.
+
+## Couleurs — zone Winter Arc (`data-theme='zone'`)
+Fond #050505 (texture de points crème dans les entretiens), surfaces #0C0C0B / #121211, texte crème #F3ECDC, secondaire #8F8B82,
+bordures #262624. Bouton principal crème, texte noir. Progression en marches pointillées. Libellés en JetBrains Mono majuscules.
 
 ## Typographie
-Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). Chrono compris.
+Plus Jakarta Sans (texte et titres) ; JetBrains Mono pour les libellés techniques de la zone sombre. Auto-hébergées (@fontsource, OFL).
 
 ## Composants
-- En-tête héro (accueil) : pleine largeur, passe sous la barre d'état, fondu dans la page par une vague. Dégradé clair pêche + texte sombre (contraste ≥ 10:1 titre, ≥ 5:1 date). Formes organiques floues animées, anneau « Journée », pastilles. Variante Winter Arc glacée (auto du 1er au 30/11, réglable) avec flocons.
-- Planning : carte jour minimaliste (date empilée, 2 icônes travail/coucher, une ligne par séance, statut en petit badge) ; détails et actions derrière « ⋯ ».
-- Navigation : pilule compacte (42 px), translucide.
-- Animations : apparition décalée des blocs sur toutes les pages, jauges qui se remplissent, coches qui rebondissent ; coupées si mouvement réduit.
-- Écran de séance HUD minimal : en-tête (retour, mission, icône douleur, menu ⋯ avec Pause / Passer / Corriger / Consignes / Terminer), barre de progression fine, carte centrale (étiquette exo/série, statut, cible en très grand, consigne, chrono, une seule action), plan compact (1 ligne par exercice + points). Animations : apparition de carte, flash bleu + pulsation du bouton à la validation, chrono qui respire, barres avec reflet, points qui rebondissent.
-- Icônes Lucide, trait fin (1,6).
-- Habitudes : barre en segments + ronds à cocher orange.
-
-## Ambiance
-Nuit : fond clair légèrement bleuté (plus de thème sombre, demande du 26/10) ; rappel « Au lit » après l'heure de coucher.
-Fond uni par défaut ; fond personnel jour / nuit possible (Réglages), stocké sur l'appareil.
+- En-tête héro de l'accueil : pleine largeur, dégradé bleu glacé, formes organiques animées, anneau « Journée ».
+- Tuiles : Objectifs 0/6 (ouvre la fenêtre des objectifs avec preuve photo), Lecture, Sommeil, Pas, Eau (cible calculée), Calories (cible calculée).
+- Prochaine étape du plan du jour, carte Course (cible km), carte Winter Arc.
+- Fenêtre de calcul : cartes alignées, indicateur « Profil x/n », sélecteur en deux colonnes, ligne d'action.
+- Planning : carte jour avec **barre des trous** (6 h → 23 h : occupé gris, séances bleues, libre en clair, temps libre total).
+- Plan du jour : frise horaire (repas, eau, compléments déclarés, séance, sommeil), étape suivante qui respire.
+- Séance HUD sombre : cible géante, chrono, consigne de charge « Trop facile · 16 kg × 6 », menu ⋯.
+- Entretiens du coach : une question par écran, option recommandée en pointillés avec sa raison.
+- Animations : apparition décalée, jauges qui se remplissent, coches qui rebondissent ; coupées si mouvement réduit.
 
 ## Ton
-Ferme, factuel, jamais humiliant.
+Coach ferme (« dur ») ou neutre, au choix. Jamais humiliant, jamais de sanction : la rigueur porte sur l'organisation.

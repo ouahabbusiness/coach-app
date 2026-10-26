@@ -27,4 +27,13 @@ Fixtures fictives uniquement (jamais présentées comme performances réelles).
 | — | Écran verrouillé / arrière-plan sur iPhone | **Non testé** | nécessite l'iPhone |
 | — | Hors ligne réel (service worker) | **Non testé** | nécessite HTTPS + iPhone |
 
-Dernière exécution : 70 tests passés (`npm test`), 26/10/2026.
+| — | Preuve photo d'un autre jour refusée | Automatisé ✔ | tests/proof.test.ts |
+| — | Cibles sans données → « manque », jamais inventées | Automatisé ✔ | tests/targets.test.ts |
+| — | Lest limité au matériel réel | Automatisé ✔ | tests/targets.test.ts |
+| — | Programme : douleurs, temps, re-test, courses progressives | Automatisé ✔ + navigateur ✔ | tests/programBuilder.test.ts |
+| — | Rigueur : strict / militaire / maladie | Automatisé ✔ | tests/disruption.test.ts |
+| — | Plan du jour, imprévu de repas, sommeil | Automatisé ✔ | tests/dayPlan.test.ts |
+| — | Indisponibilité → replacement même jour ; séjour → exercices adaptés | Automatisé ✔ | tests/availability.test.ts, tests/trip.test.ts |
+| — | Caméra des preuves sur iPhone | **Non testé** | nécessite l'iPhone |
+
+Dernière exécution : 124 tests passés (`npm test`), 26/10/2026.

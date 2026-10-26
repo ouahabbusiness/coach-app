@@ -22,5 +22,15 @@ Chaque événement : `id` (UUID, clé d'idempotence), `sessionId`, `at` (UTC ms)
   Champs ajoutés : `sessionId?` (lien), `adjustment? { reason, decision: adaptée | annulée | suspendue | remplacée, at, note? }`,
   `adapted? { lines, estimatedMin, removed[] }`, `moves[].reason?`. Statuts calculés : prévu, réalisé, adapté, partiel, annulé, suspendu, non confirmé.
 
+## Coach, cibles et journée (clé-valeur locale)
+- `program.answers` / `program.current` : réponses de l'entretien et programme validé `{ id, program (templates, week, weekly, rules, notes), answers, startWeek, at }`.
+  Les éléments de planning créés portent `programId`, `km?`, `detail?` (contenu d'une course).
+- `equipment.loadPieces` (pièces de lest combinables), `equipment.kettlebells` (une à la fois).
+- `nutrition.answers` ; `dayplan.done.<jour>` (étapes cochées) ; `dayplan.eaten.<jour>` (imprévus de repas `{ label, kcal, protein }`).
+- `proof.<jour>` : photos-preuves `{ habitId, photo (data URL réduite), takenAt, savedAt }`.
+- `reading.books`, `reading.current`, `reading.log` (`fromPage → toPage`), `run.log` (`km, minutes?, effort?`), `measures.log`.
+- `agenda.recurring` (événements récurrents), `planning.oneoffs` (indisponibilités datées), `agenda.trips` (`from, to, label, equipment[]`).
+- `targets.sex` (repli ; la formule est dans `onboarding.answers.body.formulaSex`).
+
 ## À concevoir (phases suivantes)
-Consentements versionnés, historique des mesures corporelles, nutrition, course, règles de progression versionnées, séance plus longue que prévu, reprise après interruption.
+Consentements versionnés, données Apple Santé (app native), notifications, séance plus longue que prévu.

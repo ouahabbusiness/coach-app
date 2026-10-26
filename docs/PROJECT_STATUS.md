@@ -1,55 +1,50 @@
-# État du projet — 26/10/2026
+# État du projet — 26/10/2026 (soir)
+
+En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publication automatique à chaque envoi sur `main`, tests obligatoires).
 
 ## Construit
-- Moteur de séance événementiel (séries, maintiens, repos réel, interruptions, douleur, corrections, fin partielle).
-- Stockage IndexedDB, reprise automatique d'une séance ouverte, export/import JSON.
-- Interface façon maquettes : Aujourd'hui (défi, catégories, cartes de séances, dernières séances), Programme (modèles),
-  mode séance (chrono à points, barre de contrôle), bilan, historique, réglages avec l'état réel des fonctions.
-- Défi de novembre (01–30/11/2026) : 6 habitudes quotidiennes déclarées + salle 4×/sem (comptée automatiquement si séance dans l'app) + course 3×/sem.
-- Onboarding en 13 étapes (coach et limites, confidentialité, appareils, profil avec statut mesuré/de mémoire/estimé/inconnu,
-  historique, sécurité, objectif, matériel, alimentation, travail, sommeil, ton, récapitulatif). Sauvegarde à chaque saisie,
-  reprise depuis Aujourd'hui, « Je ne sais pas » et « Passer » sur les étapes facultatives.
-- Objectifs versionnés : chaque modification crée une version avec sa raison (demandée), historique dans Réglages.
-- Planning de la semaine : horaires fixes déduits de l'onboarding (travail, trajets, sommeil), ajout et déplacement de
-  séances/courses/marches avec conséquences affichées avant confirmation, statut réel (prévu, réalisé, partiel, non confirmé).
-- Planning du jour sur Aujourd'hui.
-- Imprévus : retard, mauvaise nuit, malade, douleur, déplacement, lieu indisponible, matériel manquant.
-  Options selon le cas (raccourcir, alléger, garder les exercices faisables, reporter, remplacer par une marche, annuler),
-  aperçu de la version adaptée avant confirmation, raison conservée, « Rétablir » possible. Malade/douleur : seulement annuler
-  ou reporter, statut « suspendu », aucune pénalité. Une séance adaptée est marquée « adaptée », jamais « réalisée ».
-- Séance lancée depuis le planning liée par identifiant.
-- Accueil = tableau de bord : séance du jour, sommeil, pas, eau (+/− 250 ml), calories actives, objectif (J−), défi.
-  Sommeil/pas/kcal déclarés (lus sur la montre) ; une seule saisie partagée avec le défi.
-- Fin de séance : durée, séries, kcal et bpm (déclarés), routine du jour, détail repliable.
-- Ambiance selon l'heure (matin, jour, soir, nuit) ; mode nuit 1 h avant le coucher déclaré ; rappel « Au lit » après l'heure de coucher.
-- Règle UI : textes réduits au minimum (badges, chiffres, icônes).
-- Charte du 26/10/2026 : monochrome + orange, Plus Jakarta Sans seule, pilule de navigation noire (voir DESIGN_SYSTEM).
-- Habitudes du jour sur l'accueil (coches, barre en segments).
-- Suivi du poids : pesées (balance/estimé), moyenne 7 j, tendance sur 2 semaines (≥ 3 pesées/semaine), courbe, historique, suppression.
-- Illustrations : décors simples + icônes d'exercice (personnages retirés).
-- Captures des écrans dans docs/maquettes/.
-- Catalogue de 15 variantes, consignes **non relues**, **aucun média**.
+**Séance et progression**
+- Moteur de séance événementiel (séries, maintiens, repos réel, interruptions, douleur, corrections, fin partielle), reprise automatique.
+- Lest : progression limitée aux charges réalisables (pièces 5, 5, 6, 12 kg ; kettlebells 6 et 12 kg séparées), gros saut → +2 répétitions d'abord.
+- Au lancement : charge/répétitions ajustées d'après la dernière séance ; en séance : « Trop facile → monte » en direct.
+
+**Coach**
+- Entretien programme (20 questions) : zones du corps, priorité, tests, douleurs, sommeil, stress, travail, raison d'abandon, temps, créneau,
+  fréquences, intensité, rigueur, durée, ton dur ou neutre. Option recommandée argumentée. Vérité sur la perte localisée.
+- Programme A/B/C + re-test (semaine finale), courses progressives (+10 %/sem., fractionné détaillé, sortie longue, course chrono finale).
+- Validation → modèles + planning du bloc, **placés dans les trous** de l'agenda, séjours adaptés au matériel.
+- Rigueur appliquée aux imprévus : strict = pas de report ; militaire = ni report ni annulation, version courte ≥ 20 min (maladie/douleur toujours libres).
+
+**Cibles calculées**
+- Eau 35 ml/kg + 0,5 L/h de séance ; calories Mifflin-St Jeor × activité, ajustées à l'objectif du programme et à la tendance du poids ; protéines 1,8 g/kg.
+- Course : +10 % sur la plus longue récente, maintien si effort ≥ 9/10, baisse après pause.
+
+**Nutrition et journée**
+- Entretien nutrition (horaires, repas, aliments aimés, exclusions, compléments **déclarés** : créatine Creapure, whey Native Protimuscle).
+- Plan du jour : repas avec quantités (valeurs moyennes, estimation), créatine après le petit-déj avec 300 ml d'eau, eau répartie,
+  lumière du matin, dernier café, écrans coupés, coucher conseillé pour 8 h. Cocher l'eau remplit le compteur.
+- Imprévu de repas (plat préparé par quelqu'un, resto, fast-food, sandwich, sauté) : estimation + repas suivants recalculés.
+
+**Agenda**
+- « Ma semaine » : travail, trajet, lever/coucher, engagements récurrents (ex. analyse Amazon), soirées, séjours avec matériel sur place.
+- Indisponibilité ponctuelle → séance/course replacée le même jour sur le créneau libre le plus proche.
+
+**Suivi**
+- Défi de novembre : 6 habitudes, salle 4×/sem., course 3×/sem. ; chaque objectif réussi **compte seulement avec une photo du jour**.
+- Page Winter Arc (montagne, sentier de 30 jours, série, semaines tenues).
+- Poids (pesées, moyenne, tendance), mensurations (taille, hanches, cuisse), lecture (Atomic Habits, pages, journal avec photo).
+- Onboarding 13 étapes (zone sombre) ; formule de calcul dans le profil ; objectifs versionnés ; export/import complet.
 
 ## Testé
-- 70 tests automatisés (moteur, stockage, défi, planning, objectifs, imprévus, données du jour, ambiance, poids).
-- Parcours vérifiés dans le navigateur de bureau (vue mobile 375 px) : création de séance, série, saisie 11/8, double appui,
-  rechargement en cours de repos, douleur → arrêt, bilan, écran du défi, onboarding quitté puis repris après rechargement,
-  objectif modifié (raison obligatoire), ajout au planning avec conflit travail/trajet détecté, imprévus (retard → raccourcie,
-  mauvaise nuit → marche ou allégée lancée et liée, malade → suspendue, déplacement → reportée).
+- 124 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
+- Navigateur de bureau (vue mobile) : accueil bleu, entretien programme complet → planning rempli, entretien nutrition jusqu'aux compléments,
+  configuration sombre, fenêtre Calories.
 
 ## Non testé
-- Safari iOS, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran.
-
-## En ligne
-- https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publication automatique à chaque envoi sur `main`, tests obligatoires).
-- Vérifié le 26/10/2026 : page servie en HTTPS, service worker actif, cache hors ligne créé.
-
-## Action requise de Hmidou
-- Installer l'app sur l'iPhone (Safari → Partager → Sur l'écran d'accueil) et tester : chrono écran verrouillé, hors ligne, saisie.
+- Sur iPhone : caméra des preuves photo, écran verrouillé, hors ligne réel, texte agrandi, lecteur d'écran.
+- Plan du jour et « Ma semaine » affichés avec un vrai profil complet (testés par le moteur, pas encore à l'écran).
 
 ## Limites
-- Icône PNG pour l'écran d'accueil iOS non générée (SVG seulement).
-- Séance lancée hors planning (depuis Aujourd'hui) : rattachée à l'élément prévu par le nom et le jour.
-- Durée d'une version adaptée = estimation (45 s par série à répétitions, règle produit), à confirmer par l'usage réel.
-- Pas encore gérés : séance plus longue que prévu, reprise après une longue interruption, semaine type différente le week-end.
-- Pas de nutrition, pas de module course, pas de notifications.
+- Valeurs nutritionnelles moyennes, imprévus de repas = ordres de grandeur. Aucune recommandation de complément.
+- Règles d'entraînement générales, **non relues par un professionnel** ; catalogue sans média.
+- Pas d'accès Apple Santé (fréquence cardiaque, Watch, balance) : nécessite l'app native (prochaine étape, xtool).
