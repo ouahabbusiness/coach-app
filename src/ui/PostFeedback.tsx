@@ -9,6 +9,7 @@ import { project } from '../engine/session';
 import type { SessionState, SetResult } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { loadsFor, useEquipment } from './equipment';
+import { samplesFor } from './actions';
 
 interface Row {
   name: string;
@@ -29,6 +30,8 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
         .map((e) => project(e))
         .filter((s): s is SessionState => !!s && s.sessionId !== st.sessionId && s.startedAt < st.startedAt)
         .sort((a, b) => b.startedAt - a.startedAt);
+      const ws = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];
+      const bw = ws.length ? [...ws].sort((a, b) => (a.day < b.day ? -1 : 1)).pop()!.kg : undefined;
       const blocks = [...new Set(st.sets.filter((x) => x.planned.role === 'work').map((x) => x.planned.blockId))];
       const out: Row[] = [];
       for (const b of blocks) {
@@ -42,8 +45,10 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
         if (skipped.length) watch.push(`${skipped.length} série(s) sautée(s) : ${skipped[0]!.skipReason ?? ''}`);
         let decision: Decision | undefined;
         if (p.kind === 'reps' && p.repRange && results.length) {
-          const prev = others.map((s) => s.sets.filter((x) => x.planned.variantId === p.variantId && x.planned.role === 'work' && x.status === 'done').map(currentResult).filter((r): r is SetResult => !!r)).find((r) => r.length);
-          decision = decide(p.variantId, { lo: p.repRange[0], hi: p.repRange[1], rir: p.targetRir ?? 2, loadKg: p.loadKg, target: p.targetReps ?? p.repRange[0] }, prev ? [results, prev] : [results], loadsFor(p.variantId, eq), { pain: watch.includes('douleur signalée') });
+          // Même règle qu'au lancement : cette séance d'abord, puis les précédentes, avec leur comparabilité.
+          const { samples, pain } = await samplesFor(repo, [st, ...others], p);
+          const addedLoad = (findVariant(p.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
+          decision = decide(p.variantId, { lo: p.repRange[0], hi: p.repRange[1], rir: p.targetRir ?? 2, loadKg: p.loadKg, target: p.targetReps ?? p.repRange[0] }, samples, loadsFor(p.variantId, eq), { pain, addedLoad, bodyweightKg: bw });
         }
         out.push({
           name: findVariant(p.variantId)?.variant.name ?? p.variantId,
@@ -76,7 +81,10 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
           </p>
           {r.decision && (
             <p className="pf-line">
-              <span className={`pf-tag ${r.decision.progressionAllowed ? 'ok' : ''}`}>{r.decision.progressionAllowed ? 'progression validée' : r.decision.targetReached ? 'cible atteinte' : 'à consolider'}</span> {r.decision.reason}
+              <span className={`pf-tag ${r.decision.progressionAllowed ? 'ok' : ''}`}>
+                {r.decision.progressionAllowed ? 'progression validée' : r.decision.action === 'transition' ? 'essai de charge' : r.decision.proposal ? 'à valider' : r.decision.rule === 'séance non comparable' ? 'non comparable' : r.decision.targetReached ? 'cible atteinte' : 'à consolider'}
+              </span>{' '}
+              {r.decision.reason}
             </p>
           )}
           {r.watch.length > 0 && <p className="pf-line muted">À surveiller : {r.watch.join(' · ')}</p>}

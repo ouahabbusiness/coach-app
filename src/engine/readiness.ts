@@ -17,15 +17,15 @@ export interface ReadinessDecision {
   decision: 'normale' | 'adaptée' | 'reporter' | 'arrêt';
   /** Pas d'échec aujourd'hui (même si prévu sur la dernière série). */
   noFailure: boolean;
-  /** Retirer la dernière série de chaque exercice. */
-  dropLastSet: boolean;
+  /** Retirer une série aux exercices SECONDAIRES seulement (jamais jusqu'à zéro) ; les principaux s'ajustent en séance. */
+  trimSecondary: boolean;
   /** Version courte : priorités gardées, assistance retirée en partant de la fin. */
   shorten: boolean;
   reason: string;
 }
 
 export function readiness(i: ReadinessInput): ReadinessDecision {
-  const base = { noFailure: false, dropLastSet: false, shorten: false };
+  const base = { noFailure: false, trimSecondary: false, shorten: false };
   if (i.redFlag) return { ...base, decision: 'arrêt', reason: 'Signal d’alerte : arrête l’effort. En cas de douleur thoracique, malaise ou essoufflement anormal : appelle le 112.' };
   if (i.ill) return { ...base, decision: 'reporter', reason: 'Malade : pas d’entraînement aujourd’hui, aucune pénalité, rien à rattraper en double.' };
   const out = { ...base, decision: 'normale' as ReadinessDecision['decision'], reason: 'Feu vert : séance prévue.' };
@@ -38,8 +38,8 @@ export function readiness(i: ReadinessInput): ReadinessDecision {
   if (i.sleepBad && i.fatigue) {
     out.decision = 'adaptée';
     out.noFailure = true;
-    out.dropLastSet = true;
-    notes.push('Mauvaise nuit + fatigue : une série de moins par exercice, pas d’échec.');
+    out.trimSecondary = true;
+    notes.push('Mauvaise nuit + fatigue : échauffement d’abord ; les exercices secondaires perdent une série, les principaux s’ajustent selon tes premières séries. Pas d’échec.');
   } else if (i.sleepBad || i.fatigue) {
     out.noFailure = true;
     notes.push(`${i.sleepBad ? 'Mauvaise nuit' : 'Fatigue'} : séance normale, mais pas d’échec aujourd’hui.`);

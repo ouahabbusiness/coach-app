@@ -98,7 +98,8 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
         for (const x of sets) await send({ type: 'skip_set', plannedSetId: x.planned.id, reason: 'version courte (contrôle avant séance)' });
         continue;
       }
-      if (d.dropLastSet && sets.length > 1) await send({ type: 'skip_set', plannedSetId: sets[sets.length - 1]!.planned.id, reason: 'allégée (contrôle avant séance)' });
+      // Principaux (2 premiers blocs) intacts ; secondaires −1 série, jamais jusqu'à zéro.
+      if (d.trimSecondary && bi >= 2 && sets.length > 1) await send({ type: 'skip_set', plannedSetId: sets[sets.length - 1]!.planned.id, reason: 'allégée : exercice secondaire (contrôle avant séance)' });
     }
   };
 

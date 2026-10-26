@@ -28,7 +28,8 @@ import { loadKettlebells, loadOwned, loadPieces } from './equipment';
 import { adaptToEquipment } from '../engine/trip';
 import { fitPlanning } from './agenda';
 import { loadFree } from './FreeWork';
-import { lightLoadsReport } from './actions';
+import { lightLoadsReport, OVERRIDES } from './actions';
+import { loadJournal, type JournalEntry } from './journal';
 import type { LightLoad } from '../engine/progression';
 import { loadPlanning } from './Planning';
 import { loadOnboarding } from './profileStore';
@@ -361,7 +362,24 @@ const STEPS: Step[] = [
         options={[
           { v: 'controlee', l: 'Contrôlée', sub: '2 répétitions en réserve' },
           { v: 'dure', l: 'Dure', sub: '1 répétition en réserve' },
-          { v: 'echec', l: 'À l’échec', sub: 'Dernière série jusqu’au bout' },
+          { v: 'tres_exigeant', l: 'Très exigeant', sub: '≈ 1 répétition en réserve' },
+        ]}
+      />
+    ),
+  },
+  {
+    id: 'failure',
+    calm: 'Autorises-tu l’échec technique sur certaines séries ?',
+    say: 'L’échec, c’est une option, pas une obligation. Je le limite à l’assistance au poids du corps. Jamais avec du lest.',
+    done: (a) => a.failureOk !== undefined,
+    render: (a, set) => (
+      <Choices
+        value={a.failureOk === undefined ? undefined : a.failureOk ? 'oui' : 'non'}
+        onPick={(v) => set({ failureOk: v === 'oui' })}
+        rec={{ value: 'non', why: 'Pas indispensable aux résultats, et ça ajoute de la fatigue. Tu peux l’activer plus tard.' }}
+        options={[
+          { v: 'non', l: 'Non', sub: 'Toujours au moins 1 répétition en réserve' },
+          { v: 'oui', l: 'Oui, sur l’assistance', sub: 'Dernière série, poids du corps, technique propre' },
         ]}
       />
     ),
@@ -638,8 +656,27 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   const [light, setLight] = useState<LightLoad[]>([]);
   const [todayItems, setTodayItems] = useState<PlannedItem[]>([]);
   const [pullYesterday, setPullYesterday] = useState(0);
+  const [proposals, setProposals] = useState<JournalEntry[]>([]);
+  const loadProposals = async () => {
+    const resolved = new Set((await repo.getKv<string[]>('proposals.resolved')) ?? []);
+    const j = await loadJournal(repo);
+    // Une seule proposition ouverte par exercice : la plus récente.
+    const latest = new Map<string, JournalEntry>();
+    for (const e of j) if (e.proposal && !resolved.has(e.id)) latest.set(e.variantId, e);
+    setProposals([...latest.values()]);
+  };
+  const resolve = async (e: JournalEntry, accept: boolean) => {
+    const resolved = (await repo.getKv<string[]>('proposals.resolved')) ?? [];
+    await repo.setKv('proposals.resolved', [...new Set([...resolved, e.id])]);
+    if (accept && e.after.loadKg !== undefined) {
+      const ov = (await repo.getKv<Record<string, { loadKg: number }>>(OVERRIDES)) ?? {};
+      await repo.setKv(OVERRIDES, { ...ov, [e.variantId]: { loadKg: e.after.loadKg } });
+    }
+    await loadProposals();
+  };
   useEffect(() => {
     lightLoadsReport(repo).then(setLight);
+    loadProposals();
     (async () => {
       const t = localDay(Date.now(), deviceTimeZone());
       const day = (new Date(`${t}T12:00:00Z`).getUTCDay() + 6) % 7;
@@ -699,6 +736,21 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       )}
+      {proposals.map((e) => (
+        <section key={e.id} className="ui-card stack light-card" aria-label="Proposition à valider" style={{ marginTop: 10 }}>
+          <p className="eyebrow" style={{ margin: 0 }}>Coach · à valider</p>
+          <p className="row-title" style={{ margin: 0 }}>{findVariant(e.variantId)?.variant.name ?? e.variantId}</p>
+          <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{e.reason}</p>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn sm primary" onClick={() => resolve(e, true)}>
+              Valider la baisse
+            </button>
+            <button className="btn sm ghost" onClick={() => resolve(e, false)}>
+              Garder la charge
+            </button>
+          </div>
+        </section>
+      ))}
       {light.length > 0 && (
         <section className="ui-card stack light-card" aria-label="Charges trop légères" style={{ marginTop: 10 }}>
           <p className="eyebrow" style={{ margin: 0 }}>Coach · charges trop légères</p>

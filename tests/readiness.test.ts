@@ -16,9 +16,9 @@ describe('contrôle avant séance', () => {
     expect(d).toMatchObject({ decision: 'adaptée', noFailure: true });
     expect(d.reason).toContain('professionnel');
   });
-  it('mauvaise nuit seule → normale sans échec ; + fatigue → une série de moins', () => {
-    expect(readiness({ ...ok, sleepBad: true })).toMatchObject({ decision: 'normale', noFailure: true, dropLastSet: false });
-    expect(readiness({ ...ok, sleepBad: true, fatigue: true })).toMatchObject({ decision: 'adaptée', dropLastSet: true });
+  it('mauvaise nuit seule → normale sans échec ; + fatigue → secondaires allégés, principaux intacts', () => {
+    expect(readiness({ ...ok, sleepBad: true })).toMatchObject({ decision: 'normale', noFailure: true, trimSecondary: false });
+    expect(readiness({ ...ok, sleepBad: true, fatigue: true })).toMatchObject({ decision: 'adaptée', trimSecondary: true });
   });
   it('peu de temps → version courte', () => expect(readiness({ ...ok, shortTime: true })).toMatchObject({ decision: 'adaptée', shorten: true }));
 });

@@ -20,9 +20,11 @@ export async function loadJournal(repo: Repository): Promise<JournalEntry[]> {
 }
 
 export async function appendJournal(repo: Repository, decisions: Decision[], context: string, programVersion?: string): Promise<JournalEntry[]> {
-  const entries = decisions.map((d) => ({ ...d, id: newId(), at: Date.now(), context, programVersion }));
+  // Identifiant déterministe (plan + variante) : rejouer le même lancement ne crée pas de doublon.
+  const entries = decisions.map((d) => ({ ...d, id: programVersion ? `${programVersion}:${d.variantId}` : newId(), at: Date.now(), context, programVersion }));
   const all = await loadJournal(repo);
+  const ids = new Set(entries.map((e) => e.id));
   // On garde les 500 dernières décisions (largement assez pour relire un bloc).
-  await repo.setKv(KEY, [...all, ...entries].slice(-500));
+  await repo.setKv(KEY, [...all.filter((e) => !ids.has(e.id)), ...entries].slice(-500));
   return entries;
 }

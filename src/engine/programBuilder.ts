@@ -5,7 +5,8 @@
 import type { SetRole } from './types';
 
 export type Priority = 'force' | 'muscle' | 'seche' | 'course' | 'hybride';
-export type Intensity = 'controlee' | 'dure' | 'echec';
+/** Effort prescrit (réserve visée). « echec » = ancien nom, lu comme « très exigeant » (~1 rép. en réserve). */
+export type Intensity = 'controlee' | 'dure' | 'tres_exigeant' | 'echec';
 export type Strictness = 'souple' | 'strict' | 'militaire';
 export type Pain = 'epaules' | 'coudes' | 'poignets' | 'dos' | 'genoux';
 export type Slot = 'matin' | 'midi' | 'soir';
@@ -49,6 +50,8 @@ export interface ProgramAnswers {
   intensity?: Intensity;
   strictness?: Strictness;
   weeks?: number;
+  /** Échec technique autorisé (assistance au poids du corps uniquement). */
+  failureOk?: boolean;
 }
 
 export interface Rec<T> {
@@ -74,7 +77,7 @@ export function recIntensity(a: ProgramAnswers): Rec<Intensity> {
     return { value: 'controlee', why: `${cause} : on garde 2 répétitions en réserve. Tu progresses sans te cramer.` };
   }
   if (a.pains.length > 0) return { value: 'dure', why: 'Tu as signalé une douleur : dur, mais jamais à l’échec sur les mouvements chargés.' };
-  if (a.priority === 'muscle') return { value: 'echec', why: 'Pour le muscle, la dernière série va au bout. Les autres restent propres.' };
+  if (a.priority === 'muscle') return { value: 'tres_exigeant', why: 'Très exigeant : environ 1 répétition en réserve. Aller à l’échec n’est pas indispensable aux résultats et ajoute de la fatigue.' };
   return { value: 'dure', why: 'Dur : 1 répétition en réserve. Assez lourd pour progresser, assez propre pour durer 4 semaines.' };
 }
 
@@ -156,7 +159,7 @@ export interface Program {
 }
 
 /** Réserve visée par intensité ; « à l'échec » = 1 rép. de réserve, échec seulement à la dernière série. */
-const RIR: Record<Intensity, number> = { controlee: 3, dure: 2, echec: 1 };
+const RIR: Record<Intensity, number> = { controlee: 3, dure: 2, tres_exigeant: 1, echec: 1 };
 
 /**
  * Réglages de départ (choix de conception, ajustables après calibration) :
@@ -202,9 +205,10 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     const range: [number, number] = l.targetReps !== undefined && l.targetReps !== def[0] ? [lo, lo + Math.max(3, def[1] - def[0] > 6 ? 5 : 3)] : def;
     return { ...l, targetReps: range[0], repRange: range };
   };
-  const failLast = intensity === 'echec';
-  const main = (variantId: string, extra: Partial<GenLine> = {}): GenLine => withRange({ variantId, kind: 'reps', role: 'work', sets: s.main.sets, targetRir: rir, restSeconds: s.main.rest, lastSetToFailure: failLast && !extra.loadKg, ...extra }, s.main.range);
-  const acc = (variantId: string, extra: Partial<GenLine> = {}): GenLine => withRange({ variantId, kind: 'reps', role: 'work', sets: s.acc.sets, targetRir: rir, restSeconds: s.acc.rest, lastSetToFailure: failLast, ...extra }, s.acc.range);
+  // Échec : prescription DISTINCTE et facultative, seulement sur l'assistance au poids du corps (politique prudente de l'app).
+  const failLast = a.failureOk === true;
+  const main = (variantId: string, extra: Partial<GenLine> = {}): GenLine => withRange({ variantId, kind: 'reps', role: 'work', sets: s.main.sets, targetRir: rir, restSeconds: s.main.rest, lastSetToFailure: false, ...extra }, s.main.range);
+  const acc = (variantId: string, extra: Partial<GenLine> = {}): GenLine => withRange({ variantId, kind: 'reps', role: 'work', sets: s.acc.sets, targetRir: rir, restSeconds: s.acc.rest, lastSetToFailure: failLast && !extra.loadKg, ...extra }, s.acc.range);
 
   // Tirage : niveau d'après le max de tractions strictes.
   const pull = a.maxPullups;
@@ -351,8 +355,10 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
       : strict === 'strict'
         ? ['Jours fixes', 'Imprévu : version courte le jour même, pas de report']
         : ['Jours fixes, rien ne se déplace', 'Imprévu : version 20 min le jour même', 'Exception : maladie ou douleur → adaptation'];
-  rules.push(`Réserve : ${rir === 0 ? 'dernière série à l’échec' : `${rir} répétition${rir > 1 ? 's' : ''} en réserve`}`);
-  rules.push('Trop facile → la charge monte (matériel réel)');
+  rules.push(`Effort : ${rir} répétition${rir > 1 ? 's' : ''} en réserve`);
+  rules.push(a.failureOk ? 'Échec technique autorisé : dernière série de l’assistance au poids du corps seulement' : 'Pas d’échec prescrit');
+  rules.push('Politique de l’app : jamais d’échec avec du lest (choix prudent)');
+  rules.push('La difficulté monte quand tes résultats le justifient, pas parce que la séance est terminée');
 
   const label: Record<Priority, string> = { force: 'Force', muscle: 'Muscle', seche: 'Sèche', course: 'Course', hybride: 'Hybride' };
   return { title: `Winter Arc · ${label[a.priority ?? 'hybride']}`, weeks: weeksN, templates, week, weekly, rules, notes };
