@@ -55,6 +55,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   const lastM = useRef(0);
   const mapEl = useRef<HTMLDivElement>(null);
   const map = useRef<{ m: LMap; line: Polyline; dot: CircleMarker } | null>(null);
+  const centered = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -107,7 +108,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
     (async () => {
       const L = await import('leaflet');
       await import('leaflet/dist/leaflet.css');
-      const m = L.map(mapEl.current!, { zoomControl: false, attributionControl: true }).setView([50.94, 4.04], 16);
+      const m = L.map(mapEl.current!, { zoomControl: false, attributionControl: true }).setView([50.94, 4.04], 18);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
       const line = L.polyline([], { color: '#f3ecdc', weight: 4 }).addTo(m);
       const dot = L.circleMarker([50.94, 4.04], { radius: 7, color: '#050505', weight: 2, fillColor: '#f3ecdc', fillOpacity: 1 }).addTo(m);
@@ -121,7 +122,11 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
     if (!map.current || !last) return;
     map.current.line.setLatLngs(segments.map((s) => s.points.map((p) => [p.lat, p.lon] as [number, number])));
     map.current.dot.setLatLng([last.lat, last.lon]);
-    map.current.m.panTo([last.lat, last.lon], { animate: true });
+    // À pied : zoom rue (18). Premier point → on se centre directement dessus.
+    if (!centered.current) {
+      map.current.m.setView([last.lat, last.lon], 18);
+      centered.current = true;
+    } else map.current.m.panTo([last.lat, last.lon], { animate: true });
   }, [segments]);
 
   const startWatch = () => {
@@ -216,7 +221,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
       {phase !== 'setup' && (
         <button className="run-recenter" aria-label="Recentrer sur ma position" onClick={() => {
           const last = segments[segments.length - 1]?.points.slice(-1)[0];
-          if (map.current && last) map.current.m.setView([last.lat, last.lon], 17, { animate: true });
+          if (map.current && last) map.current.m.setView([last.lat, last.lon], 18, { animate: true });
         }}>
           <LocateFixed size={20} aria-hidden="true" />
         </button>
