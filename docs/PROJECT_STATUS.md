@@ -18,12 +18,17 @@
   aperçu de la version adaptée avant confirmation, raison conservée, « Rétablir » possible. Malade/douleur : seulement annuler
   ou reporter, statut « suspendu », aucune pénalité. Une séance adaptée est marquée « adaptée », jamais « réalisée ».
 - Séance lancée depuis le planning liée par identifiant.
+- Accueil = tableau de bord : séance du jour, sommeil, pas, eau (+/− 250 ml), calories actives, objectif (J−), défi.
+  Sommeil/pas/kcal déclarés (lus sur la montre) ; une seule saisie partagée avec le défi.
+- Fin de séance : durée, séries, kcal et bpm (déclarés), routine du jour, détail repliable.
+- Ambiance selon l'heure (matin, jour, soir, nuit) ; mode nuit 1 h avant le coucher déclaré ; rappel « Au lit » après l'heure de coucher.
+- Règle UI : textes réduits au minimum (badges, chiffres, icônes).
 - Illustrations : décors simples + icônes d'exercice (personnages retirés).
 - Captures des écrans dans docs/maquettes/.
 - Catalogue de 15 variantes, consignes **non relues**, **aucun média**.
 
 ## Testé
-- 58 tests automatisés (moteur, stockage, défi, planning, objectifs, imprévus).
+- 65 tests automatisés (moteur, stockage, défi, planning, objectifs, imprévus, données du jour, ambiance).
 - Parcours vérifiés dans le navigateur de bureau (vue mobile 375 px) : création de séance, série, saisie 11/8, double appui,
   rechargement en cours de repos, douleur → arrêt, bilan, écran du défi, onboarding quitté puis repris après rechargement,
   objectif modifié (raison obligatoire), ajout au planning avec conflit travail/trajet détecté, imprévus (retard → raccourcie,

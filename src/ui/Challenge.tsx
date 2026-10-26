@@ -11,6 +11,7 @@ import {
   type HabitStatus,
 } from '../engine/challenge';
 import { localDay } from '../engine/derive';
+import { challengeValues, dailyKey, type DailyMetrics } from '../engine/daily';
 import type { Repository } from '../storage/db';
 import { Notice } from './common';
 import { deviceTimeZone } from './support';
@@ -59,18 +60,43 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
     );
   }, [repo, tz]);
 
+  const [dailyMap, setDailyMap] = useState<Record<string, DailyMetrics>>({});
+  useEffect(() => {
+    (async () => {
+      const m: Record<string, DailyMetrics> = {};
+      for (const d of days) {
+        const v = await repo.getKv<DailyMetrics>(dailyKey(d));
+        if (v) m[d] = v;
+      }
+      setDailyMap(m);
+    })();
+  }, [repo, days]);
+
   const editable = day <= today;
-  const entry = entries[day];
+  const merged = (d: string): DayEntry | undefined => {
+    if (!entries[d] && !dailyMap[d]) return undefined;
+    return { ...(entries[d] ?? { updatedAt: 0 }), values: challengeValues(entries[d]?.values, dailyMap[d]) };
+  };
+  const entry = merged(day);
   const weeks = summarizeWeeks(DEF, entries, appDays);
   const week = weeks.find((w) => w.weekStart === weekStart(day));
 
-  const setValue = (id: string, v: boolean | number | undefined) =>
-    update(day, (e) => {
+  const setValue = async (id: string, v: boolean | number | undefined) => {
+    // Sommeil et pas : une seule saisie, partagée avec l'accueil.
+    if (id === 'sleep' || id === 'steps') {
+      const field = id === 'sleep' ? 'sleepH' : 'steps';
+      const next: DailyMetrics = { ...(dailyMap[day] ?? {}), [field]: typeof v === 'number' ? v : undefined, updatedAt: Date.now() };
+      await repo.setKv(dailyKey(day), next);
+      setDailyMap({ ...dailyMap, [day]: next });
+      return;
+    }
+    return update(day, (e) => {
       const values = { ...e.values };
       if (v === undefined) delete values[id];
       else values[id] = v;
       return { ...e, values };
     });
+  };
 
   return (
     <>
@@ -79,13 +105,14 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
       </button>
       <p className="greeting" style={{ marginTop: 8 }}>{DEF.title}</p>
       <p className="greeting-sub" style={{ fontSize: '1.1rem' }}>
-        {started ? 'Du 1er au 30 novembre.' : `Commence le 1er novembre. Aperçu en lecture seule d’ici là.`}
+        {started ? '1 → 30 nov.' : '🗓 Dès le 1er nov.'}
       </p>
 
-      <Notice tone="warn">
-        {DEF.source} 4 séances de salle + 3 courses par semaine dès la reprise, c’est un gros volume : adapte si besoin.
-        Un jour manqué ne se rattrape pas en double : on reprend le lendemain. Coche « jour excusé » si tu es malade ou blessé.
-      </Notice>
+      <div className="row" style={{ gap: 6, marginBottom: 12 }}>
+        <span className="badge warn">⚠️ Gros volume : adapte</span>
+        <span className="badge">🚫 Pas de rattrapage</span>
+        <span className="badge">🤒 Jour excusé = 0 pénalité</span>
+      </div>
 
       {week && (
         <div className="card">
@@ -103,7 +130,7 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
               </div>
             ))}
           </div>
-          {week.partial && <p className="muted" style={{ margin: '8px 0 0', fontSize: '0.88rem' }}>Objectif hebdo non jugé sur une semaine partielle.</p>}
+          {week.partial && <p className="muted" style={{ margin: '8px 0 0', fontSize: '0.88rem' }}>Semaine partielle : non jugée.</p>}
         </div>
       )}
 
@@ -112,8 +139,8 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
       </div>
       <div className="cats" role="group" aria-label="Choisir le jour">
         {days.map((d) => {
-          const done = DEF.daily.filter((h) => habitStatus(h, entries[d]) === 'done').length;
-          const filled = entries[d] !== undefined;
+          const done = DEF.daily.filter((h) => habitStatus(h, merged(d)) === 'done').length;
+          const filled = merged(d) !== undefined;
           return (
             <button
               key={d}
@@ -135,7 +162,7 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
         <div className="spread">
           <h2 style={{ margin: 0, textTransform: 'capitalize' }}>{fmtDay(day, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
         </div>
-        {!editable && <p className="muted" style={{ margin: 0 }}>Jour futur : saisie possible le jour même.</p>}
+        {!editable && <p className="muted" style={{ margin: 0 }}>🔒 Jour futur</p>}
         <label className="row" style={{ minHeight: 44 }}>
           <input
             type="checkbox"
@@ -205,9 +232,7 @@ export function Challenge({ repo, onBack }: { repo: Repository; onBack: () => vo
             </label>
           );
         })}
-        <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-          Pas, sommeil et course sont déclarés : l’app web n’a pas accès à Apple Santé.
-        </p>
+        <span className="badge" style={{ alignSelf: 'flex-start' }}>✍️ Déclaré (pas de lien montre)</span>
       </div>
     </>
   );

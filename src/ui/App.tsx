@@ -9,6 +9,7 @@ import { Challenge } from './Challenge';
 import { Onboarding } from './Onboarding';
 import { Planning } from './Planning';
 import { loadOnboarding } from './profileStore';
+import { useDayPhase } from './useDayPhase';
 import { Summary } from './Summary';
 import { Today } from './Today';
 import { deviceTimeZone, fmtDateTime } from './support';
@@ -36,6 +37,7 @@ const TABS = [
 export function App() {
   const repo = useMemo(() => new Repository(new CoachDb()), []);
   const [route, setRoute] = useState<Route>({ name: 'today' });
+  const day = useDayPhase(repo);
   const go = useCallback((r: Route) => {
     setRoute(r);
     window.scrollTo(0, 0);
@@ -77,13 +79,12 @@ export function App() {
         </button>
       </header>
       <main className="content">
-        {route.name === 'today' && <Today repo={repo} go={go} />}
+        {route.name === 'today' && <Today repo={repo} go={go} night={day} />}
         {route.name === 'program' && <Program repo={repo} go={go} />}
         {route.name === 'nutrition' && (
           <>
             <h1>Nutrition</h1>
             <NotBuilt title="Journal alimentaire" phase="phase 2">
-              Une journée non renseignée ne sera jamais comptée comme zéro calorie.
             </NotBuilt>
           </>
         )}
@@ -99,7 +100,7 @@ export function App() {
         {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}
         {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} />}
         {route.name === 'planning' && <Planning repo={repo} go={go} />}
-        {route.name === 'summary' && <Summary repo={repo} sessionId={route.id} onBack={() => go({ name: 'progress' })} />}
+        {route.name === 'summary' && <Summary repo={repo} sessionId={route.id} onBack={() => go({ name: 'progress' })} onHome={() => go({ name: 'today' })} />}
       </main>
       <nav className="navwrap" aria-label="Navigation principale">
         <div className="tabbar">
@@ -154,7 +155,6 @@ function Progress({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
         </div>
       </div>
       <NotBuilt title="Tendances et rapports hebdomadaires" phase="phase 1 (suite)">
-        Ils seront calculés seulement quand il y aura assez de séances comparables.
       </NotBuilt>
     </>
   );

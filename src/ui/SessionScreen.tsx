@@ -126,8 +126,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
         )}
         {state.safetyStop && (
           <Notice tone="danger">
-            Séance arrêtée suite à une douleur signalée. Ce n’est pas un diagnostic. Si la douleur est forte, inhabituelle,
-            persiste ou s’accompagne d’autres symptômes, consulte un professionnel de santé. Tu peux terminer la séance.
+            🛑 Arrêt pour douleur. Pas de diagnostic : si ça persiste, avis médical.
           </Notice>
         )}
 
@@ -206,8 +205,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
               </details>
 
               <p className="muted" style={{ margin: 0, textAlign: 'center' }}>
-                Dernière performance comparable :{' '}
-                {comparable ? comparable.results.map(describeResult).join(' / ') : 'aucune donnée pour cette variante'}
+                ↺ Dernière fois : {comparable ? comparable.results.map(describeResult).join(' / ') : '—'}
               </p>
             </>
           ) : (
@@ -299,7 +297,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
       </Modal>
 
       <Modal open={dialog === 'skip'} onClose={() => setDialog(null)} title="Passer cette série">
-        <p className="muted">Elle sera notée comme non réalisée. La séance sera marquée partielle.</p>
+        <p className="muted">→ non réalisée · séance partielle</p>
         <div className="stack">
           {SKIP_REASONS.map((r) => (
             <button
@@ -319,7 +317,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
       </Modal>
 
       <Modal open={dialog === 'interrupt'} onClose={() => setDialog(null)} title="Déclarer une interruption">
-        <p className="muted">Le temps d’interruption est mesuré à part et n’est pas compté comme repos.</p>
+        <p className="muted">⏸ Compté à part, pas comme repos.</p>
         <div className="stack">
           {INTERRUPT_REASONS.map((r) => (
             <button
@@ -446,7 +444,7 @@ function PainForm({ onSubmit, onCancel }: { onSubmit: (location: string, intensi
   const ready = location.trim() !== '' && intensity !== null;
   return (
     <div className="stack">
-      <p className="muted" style={{ margin: 0 }}>L’application n’établit aucun diagnostic. Elle note ce que tu signales.</p>
+      <p className="muted" style={{ margin: 0 }}>Pas de diagnostic, juste une note.</p>
       <label className="field">
         Où ?
         <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="ex. épaule droite" />

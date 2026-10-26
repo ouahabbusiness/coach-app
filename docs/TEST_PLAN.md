@@ -27,4 +27,4 @@ Fixtures fictives uniquement (jamais présentées comme performances réelles).
 | — | Écran verrouillé / arrière-plan sur iPhone | **Non testé** | nécessite l'iPhone |
 | — | Hors ligne réel (service worker) | **Non testé** | nécessite HTTPS + iPhone |
 
-Dernière exécution : 58 tests passés (`npm test`), 26/10/2026.
+Dernière exécution : 65 tests passés (`npm test`), 26/10/2026.

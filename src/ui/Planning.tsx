@@ -32,6 +32,15 @@ export async function loadPlanning(repo: Repository): Promise<PlannedItem[]> {
   return (await repo.getKv<PlannedItem[]>(KEY)) ?? [];
 }
 
+/** Lance la séance prévue (version adaptée si un imprévu l'a modifiée) et la lie à l'élément par identifiant. */
+export async function startPlanned(repo: Repository, item: PlannedItem, tpl: SessionTemplate): Promise<string> {
+  const source: SessionTemplate = item.adapted ? { ...tpl, title: `${tpl.title} (adaptée)`, lines: item.adapted.lines as SessionTemplate['lines'] } : tpl;
+  const sessionId = await startSessionFromTemplate(repo, source);
+  const all = await loadPlanning(repo);
+  await repo.setKv(KEY, all.map((x) => (x.id === item.id ? { ...x, sessionId } : x)));
+  return sessionId;
+}
+
 const KIND_LABEL: Record<ItemKind, string> = { seance: 'Séance', course: 'Course', marche: 'Marche' };
 const STATUS_TONE: Record<ItemStatus, string> = { prévu: '', réalisé: 'ok', adapté: 'ok', partiel: 'warn', annulé: '', suspendu: 'warn', 'non confirmé': '' };
 const FIXED_ICON = { travail: Briefcase, trajet: Car, sommeil: Moon, autre: Briefcase };
@@ -115,12 +124,8 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
     await persist(items.map((i) => (i.id === next.id ? next : i)));
   };
 
-  /** Lance la séance (version adaptée si un imprévu l'a modifiée) et la lie à l'élément par identifiant. */
   const startFromItem = async (i: PlannedItem, tpl: SessionTemplate) => {
-    const source: SessionTemplate = i.adapted ? { ...tpl, title: `${tpl.title} (adaptée)`, lines: i.adapted.lines as SessionTemplate['lines'] } : tpl;
-    const sessionId = await startSessionFromTemplate(repo, source);
-    await replaceItem({ ...i, sessionId });
-    go({ name: 'session', id: sessionId });
+    go({ name: 'session', id: await startPlanned(repo, i, tpl) });
   };
 
   const consequences = draft ? consequencesOf(weekItems, { id: draft.id, day: draft.day, start: draft.start, durationMin: draft.durationMin, kind: draft.kind }, fixed ?? []) : [];
@@ -156,14 +161,11 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
             <div style={{ fontSize: '1.6rem', fontWeight: 600 }}>{realized}</div>
           </div>
         </div>
-        <p className="muted" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>
-          L’app ne remplit pas tes journées : tu places toi-même tes séances. Une course ou une marche non enregistrée reste « non confirmée ».
-        </p>
       </div>
 
       {fixed && fixed.length === 0 && (
         <Notice tone="warn">
-          Tes horaires de travail et de sommeil ne sont pas renseignés : aucun conflit ne peut être détecté.{' '}
+          ⏰ Horaires inconnus{' '}
           <button className="btn ghost" style={{ minHeight: 32, padding: '0 4px' }} onClick={() => go({ name: 'onboarding' })}>
             Compléter
           </button>

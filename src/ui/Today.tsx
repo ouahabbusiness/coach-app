@@ -1,332 +1,309 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Dumbbell, Layers, Play, Repeat, Trophy } from 'lucide-react';
-import { EXERCISES, findVariant, type Exercise } from '../catalog/exercises';
-import { project } from '../engine/session';
-import type { Repository, SessionSummaryRow } from '../storage/db';
-import { OutcomeBadge } from './common';
-import { STEPS } from './Onboarding';
-import { loadOnboarding } from './profileStore';
-import { loadPlanning } from './Planning';
-import { conflicts, dateOf, fixedEventsFromAnswers, itemStatus, spansOf, toMin, type FixedEvent, type PlannedItem } from '../engine/planning';
-import { weekStart } from '../engine/challenge';
-import { ClipboardList } from 'lucide-react';
-import { CATEGORY_ICON, Scene } from './Scene';
-import { fmtDateTime, deviceTimeZone } from './support';
-import { loadTemplates, type SessionTemplate } from './templates';
-import { startSessionFromTemplate } from './actions';
-import { NOVEMBER_2026, habitStatus } from '../engine/challenge';
+// Accueil : tableau de bord du jour. Peu de texte, des chiffres et des icônes.
+// Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
+
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ClipboardList, Droplet, Flame, Footprints, Minus, Moon, Play, Plus, Target, Trophy } from 'lucide-react';
+import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
+import { addWater, challengeValues, dailyKey, daysUntil, type DailyMetrics } from '../engine/daily';
 import { localDay } from '../engine/derive';
+import { estimateMinutes } from '../engine/disruption';
+import { itemStatus, toMin, type PlannedItem } from '../engine/planning';
+import { GOAL_LABELS, type GoalVersion } from '../engine/profile';
+import { project } from '../engine/session';
+import type { Repository } from '../storage/db';
+import { Modal } from './common';
 import { useChallengeEntries } from './Challenge';
+import { STEPS } from './Onboarding';
+import { loadPlanning, startPlanned } from './Planning';
+import { loadGoals, loadOnboarding } from './profileStore';
+import { deviceTimeZone } from './support';
+import { loadTemplates, type SessionTemplate } from './templates';
 import type { Route } from './App';
 
-type Category = Exercise['category'];
-const CATEGORIES: { id: Category; label: string; scene: 'gym' | 'outdoor' }[] = [
-  { id: 'street_workout', label: 'Street workout', scene: 'outdoor' },
-  { id: 'kettlebell', label: 'Kettlebell', scene: 'gym' },
-  { id: 'jambes', label: 'Jambes', scene: 'gym' },
-  { id: 'gainage', label: 'Gainage', scene: 'gym' },
-];
+const WATER_GOAL_KEY = 'settings.waterGoalMl';
+const STEPS_GOAL = 10000; // objectif du défi de novembre (choisi par Hmidou)
 
-function categoriesOf(t: SessionTemplate): Set<Category> {
-  return new Set(t.lines.map((l) => EXERCISES.find((e) => e.variants.some((v) => v.id === l.variantId))?.category).filter((c): c is Category => !!c));
+type Field = 'sleepH' | 'steps' | 'activeKcal' | 'waterGoal';
+
+function Tile({ icon, label, onClick, children }: { icon: ReactNode; label: string; onClick?: () => void; children: ReactNode }) {
+  const content = (
+    <>
+      <span className="tile-label">
+        {icon}
+        {label}
+      </span>
+      {children}
+    </>
+  );
+  return onClick ? (
+    <button className="tile" onClick={onClick} aria-label={label}>
+      {content}
+    </button>
+  ) : (
+    <div className="tile">{content}</div>
+  );
 }
 
-/** Anneau de progression : valeur réelle uniquement. */
-function Ring({ value, label }: { value: number; label: string }) {
-  const r = 18;
+function Ring({ value }: { value: number }) {
+  const r = 26;
   const c = 2 * Math.PI * r;
   return (
-    <svg className="ring" width="48" height="48" viewBox="0 0 48 48" role="img" aria-label={label}>
-      <circle cx="24" cy="24" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="4" />
-      <circle cx="24" cy="24" r={r} fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${c * value} ${c}`} transform="rotate(-90 24 24)" />
-      <text x="24" y="28" textAnchor="middle" fontSize="11" fontWeight="600" fill="currentColor">
-        {Math.round(value * 100)}%
-      </text>
+    <svg width="68" height="68" viewBox="0 0 68 68" aria-hidden="true">
+      <circle cx="34" cy="34" r={r} fill="none" stroke="var(--surface-2)" strokeWidth="8" />
+      <circle cx="34" cy="34" r={r} fill="none" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${c * Math.min(1, value)} ${c}`} transform="rotate(-90 34 34)" />
     </svg>
   );
 }
 
-export function Today({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const [open, setOpen] = useState<{ row: SessionSummaryRow; done: number; total: number } | undefined>();
-  const [recent, setRecent] = useState<SessionSummaryRow[]>([]);
-  const [templates, setTemplates] = useState<SessionTemplate[] | null>(null);
-  const [lastByTemplate, setLastByTemplate] = useState<Map<string, number>>(new Map());
-  const [cat, setCat] = useState<Category | null>(null);
-  const [starting, setStarting] = useState(false);
+const fmtNum = (n: number) => n.toLocaleString('fr-BE');
+
+const EDIT_META: Record<Field, { title: string; unit: string; hint: string; step: string }> = {
+  sleepH: { title: 'Sommeil', unit: 'h', hint: 'Lu sur ta montre ou estimé par toi.', step: '0.25' },
+  steps: { title: 'Pas', unit: 'pas', hint: 'Lu sur ta montre.', step: '100' },
+  activeKcal: { title: 'Calories actives', unit: 'kcal', hint: 'Lues sur ta montre. Ce n’est pas un crédit alimentaire.', step: '10' },
+  waterGoal: { title: 'Objectif eau', unit: 'L', hint: 'Ton objectif personnel.', step: '0.25' },
+};
+
+type Hero =
+  | { kind: 'open'; id: string; title: string; done: number; total: number }
+  | { kind: 'planned'; item: PlannedItem; tpl?: SessionTemplate }
+  | { kind: 'none' };
+
+export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) => void; night: { phase: string; pastBed: boolean; bedtime?: string; now: Date } }) {
   const tz = deviceTimeZone();
+  const today = localDay(Date.now(), tz);
+  const [daily, setDaily] = useState<DailyMetrics | undefined>();
+  const [waterGoal, setWaterGoal] = useState<number | undefined>();
+  const [goal, setGoal] = useState<GoalVersion | undefined>();
+  const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
+  const [hero, setHero] = useState<Hero | null>(null);
+  const [editing, setEditing] = useState<Field | null>(null);
+  const [draft, setDraft] = useState('');
+  const { entries } = useChallengeEntries(repo);
 
   useEffect(() => {
     (async () => {
-      const row = await repo.openSession();
-      if (row) {
-        const st = project(await repo.sessionEvents(row.id));
-        if (st) setOpen({ row, done: st.sets.filter((s) => s.status !== 'pending').length, total: st.sets.length });
+      setDaily(await repo.getKv<DailyMetrics>(dailyKey(today)));
+      setWaterGoal(await repo.getKv<number>(WATER_GOAL_KEY));
+      const goals = await loadGoals(repo);
+      setGoal(goals[goals.length - 1]);
+      const ob = await loadOnboarding(repo);
+      setOnboardingStep(ob.completedAt ? null : ob.step);
+
+      const open = await repo.openSession();
+      if (open) {
+        const st = project(await repo.sessionEvents(open.id));
+        setHero({ kind: 'open', id: open.id, title: open.title, done: st?.sets.filter((s) => s.status !== 'pending').length ?? 0, total: st?.sets.length ?? 0 });
+        return;
       }
-      const list = await repo.listSessions();
-      setRecent(list.filter((s) => s.outcome !== 'in_progress').slice(0, 3));
-      const last = new Map<string, number>();
-      for (const s of list) if (!last.has(s.title)) last.set(s.title, s.startedAt);
-      setLastByTemplate(last);
-      setTemplates(await loadTemplates(repo));
+      const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
+      const sessions = (await repo.listSessions()).filter((r) => localDay(r.startedAt, tz) === today);
+      const templates = await loadTemplates(repo);
+      const next = (await loadPlanning(repo))
+        .filter((i) => i.weekStart === weekStart(today) && i.day === day && i.kind === 'seance')
+        .filter((i) => itemStatus(i, today, today, sessions) === 'prévu')
+        .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
+      setHero(next ? { kind: 'planned', item: next, tpl: templates.find((t) => t.id === next.templateId) } : { kind: 'none' });
     })();
-  }, [repo]);
+  }, [repo, today, tz]);
 
-  const shown = useMemo(() => (templates ?? []).filter((t) => !cat || categoriesOf(t).has(cat)), [templates, cat]);
+  const saveDaily = useCallback(
+    async (next: DailyMetrics) => {
+      await repo.setKv(dailyKey(today), next);
+      setDaily(next);
+    },
+    [repo, today],
+  );
 
-  const start = async (t: SessionTemplate) => {
-    if (starting) return;
-    setStarting(true);
-    try {
-      go({ name: 'session', id: await startSessionFromTemplate(repo, t) });
-    } finally {
-      setStarting(false);
-    }
+  const openEditor = (field: Field) => {
+    const current = field === 'waterGoal' ? (waterGoal === undefined ? undefined : waterGoal / 1000) : daily?.[field];
+    setDraft(current === undefined ? '' : String(current));
+    setEditing(field);
   };
 
+  const saveEditor = async (clear = false) => {
+    if (!editing) return;
+    const value = clear || draft.trim() === '' ? undefined : Number(draft.replace(',', '.'));
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) return;
+    if (editing === 'waterGoal') {
+      const ml = value === undefined ? undefined : Math.round(value * 1000);
+      await repo.setKv(WATER_GOAL_KEY, ml);
+      setWaterGoal(ml);
+    } else {
+      await saveDaily({ ...(daily ?? {}), [editing]: value, updatedAt: Date.now() });
+    }
+    setEditing(null);
+  };
+
+  const challengeOn = today >= NOVEMBER_2026.start && today <= NOVEMBER_2026.end;
+  const dayEntry = { values: challengeValues(entries[today]?.values, daily), excused: entries[today]?.excused, updatedAt: 0 };
+  const habitsDone = NOVEMBER_2026.daily.filter((h) => habitStatus(h, dayEntry) === 'done').length;
+  const sleepBars = Math.min(8, Math.round(daily?.sleepH ?? 0));
+
   return (
     <>
-      <p className="greeting">Salut Hmidou</p>
-      <p className="greeting-sub">{open ? 'Ta séance t’attend.' : 'Voici ta prochaine action.'}</p>
+      <p className="muted" style={{ margin: 0, textTransform: 'capitalize' }}>
+        {new Intl.DateTimeFormat('fr-BE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz }).format(Date.now())}
+      </p>
+      <h1 style={{ marginBottom: 16 }}>{night.phase === 'matin' ? 'Bonjour ☀️' : night.phase === 'soir' ? 'Bonsoir 🌇' : night.phase === 'nuit' ? 'Bonne nuit 🌙' : 'Aujourd’hui'}</h1>
 
-      {open && (
-        <button className="item" onClick={() => go({ name: 'session', id: open.row.id })}>
-          <div className="thumb">
-            <Scene kind="gym" />
-          </div>
-          <div className="grow">
-            <div className="tag">Séance en cours</div>
-            <div className="name">{open.row.title}</div>
-            <div className="meta">Commencée {fmtDateTime(open.row.startedAt, tz)}</div>
-          </div>
-          <Ring value={open.total ? open.done / open.total : 0} label={`${open.done} séries sur ${open.total} faites ou passées`} />
-        </button>
-      )}
-
-      <OnboardingCard repo={repo} onOpen={() => go({ name: 'onboarding' })} />
-      <ChallengeCard repo={repo} onOpen={() => go({ name: 'challenge' })} />
-
-      <div className="section-head">
-        <h2>Catégories</h2>
-        {cat && (
-          <button className="link" onClick={() => setCat(null)}>
-            Tout afficher
-          </button>
-        )}
-      </div>
-      <div className="cats" role="group" aria-label="Filtrer par catégorie">
-        {CATEGORIES.map((c) => (
-          <button key={c.id} className="cat" aria-pressed={cat === c.id} onClick={() => setCat(cat === c.id ? null : c.id)}>
-            <span className="bubble" style={{ position: 'relative' }}>
-              <Scene kind={c.scene} icon={CATEGORY_ICON[c.id]} iconSize={26} />
-            </span>
-            {c.label}
-          </button>
-        ))}
-        <button className="cat" aria-disabled="true" onClick={() => go({ name: 'progress' })} title="Module course non implémenté">
-          <span className="bubble" style={{ position: 'relative' }}>
-            <Scene kind="outdoor" />
-          </span>
-          Course (bientôt)
-        </button>
-      </div>
-
-      <div className="section-head">
-        <h2>Mes séances</h2>
-        <button className="link" onClick={() => go({ name: 'program' })}>
-          Gérer
-        </button>
-      </div>
-      {templates && templates.length === 0 && (
-        <div className="card">
-          <p>Aucune séance n’est encore préparée.</p>
-          <button className="btn primary block" onClick={() => go({ name: 'program' })}>
-            Préparer ma première séance
-          </button>
-        </div>
-      )}
-      {templates && templates.length > 0 && shown.length === 0 && <p className="muted">Aucune séance dans cette catégorie.</p>}
-      <div className="featured">
-        {shown.map((t, i) => {
-          const sets = t.lines.reduce((n, l) => n + l.sets, 0);
-          const last = lastByTemplate.get(t.title);
-          const first = findVariant(t.lines[0]?.variantId ?? '');
-          return (
-            <button key={t.id} className="feature" disabled={starting || !!open} onClick={() => start(t)} aria-label={`Commencer ${t.title}`}>
-              <Scene kind={i % 2 === 0 ? 'gym' : 'outdoor'} icon={first ? CATEGORY_ICON[first.exercise.category] : Dumbbell} iconSize={64} />
-              <div className="shade" />
-              <span className="pill">{first?.exercise.name ?? 'Séance'}</span>
-              <div className="info">
-                <div className="title">{t.title}</div>
-                <div className="stats">
-                  <div className="stat">
-                    <div className="v">{t.lines.length}</div>
-                    <div className="l">
-                      <Dumbbell size={11} aria-hidden="true" /> exercices
-                    </div>
-                  </div>
-                  <div className="stat">
-                    <div className="v">{sets}</div>
-                    <div className="l">
-                      <Layers size={11} aria-hidden="true" /> séries
-                    </div>
-                  </div>
-                  <div className="stat">
-                    <div className="v">{last ? new Intl.DateTimeFormat('fr-BE', { day: '2-digit', month: '2-digit', timeZone: tz }).format(last) : '—'}</div>
-                    <div className="l">
-                      <Repeat size={11} aria-hidden="true" /> dernière
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-      {open && templates && templates.length > 0 && <p className="muted">Termine la séance en cours avant d’en commencer une autre.</p>}
-
-      {recent.length > 0 && (
-        <>
-          <div className="section-head">
-            <h2>Dernières séances</h2>
-            <button className="link" onClick={() => go({ name: 'progress' })}>
-              Tout voir
-            </button>
-          </div>
-          {recent.map((r) => (
-            <button key={r.id} className="item" onClick={() => go({ name: 'summary', id: r.id })}>
-              <div className="thumb">
-                <Scene kind="gym" />
-              </div>
-              <div className="grow">
-                <div className="name">{r.title}</div>
-                <div className="meta">{fmtDateTime(r.startedAt, tz)}</div>
-              </div>
-              <OutcomeBadge outcome={r.outcome} />
-            </button>
-          ))}
-        </>
-      )}
-
-      <DayPlan repo={repo} go={go} />
-      {!open && templates && templates.length > 0 && (
-        <p className="muted" style={{ textAlign: 'center' }}>
-          <Play size={14} aria-hidden="true" /> Touche une carte pour commencer la séance.
-        </p>
-      )}
-    </>
-  );
-}
-
-function ChallengeCard({ repo, onOpen }: { repo: Repository; onOpen: () => void }) {
-  const { entries } = useChallengeEntries(repo);
-  const today = localDay(Date.now(), deviceTimeZone());
-  const before = today < NOVEMBER_2026.start;
-  const after = today > NOVEMBER_2026.end;
-  const daysLeft = Math.round((Date.parse(`${NOVEMBER_2026.start}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000);
-  const done = NOVEMBER_2026.daily.filter((h) => habitStatus(h, entries[today]) === 'done').length;
-  return (
-    <button className="item" onClick={onOpen}>
-      <div className="thumb">
-        <Scene kind="outdoor" icon={Trophy} />
-      </div>
-      <div className="grow">
-        <div className="tag">Défi</div>
-        <div className="name">{NOVEMBER_2026.title}</div>
-        <div className="meta">
-          {before ? `Commence dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}` : after ? 'Terminé : voir le bilan' : entries[today] ? `Aujourd’hui : ${done}/${NOVEMBER_2026.daily.length} habitudes tenues` : 'Aujourd’hui : non renseigné'}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function OnboardingCard({ repo, onOpen }: { repo: Repository; onOpen: () => void }) {
-  const [step, setStep] = useState<number | null>(null);
-  useEffect(() => {
-    loadOnboarding(repo).then((o) => setStep(o.completedAt ? null : o.step));
-  }, [repo]);
-  if (step === null) return null;
-  return (
-    <button className="item" onClick={onOpen}>
-      <div className="thumb">
-        <Scene kind="gym" icon={ClipboardList} />
-      </div>
-      <div className="grow">
-        <div className="tag">Configuration</div>
-        <div className="name">Reprendre la configuration</div>
-        <div className="meta">
-          Étape {Math.min(step + 1, STEPS.length + 1)} / {STEPS.length + 1} · tes réponses sont enregistrées
-        </div>
-      </div>
-    </button>
-  );
-}
-
-/** Planning du jour : événements fixes et éléments prévus, avec leur statut réel. */
-function DayPlan({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const tz = deviceTimeZone();
-  const today = localDay(Date.now(), tz);
-  const week = weekStart(today);
-  const day = DAY_INDEX(today);
-  const [items, setItems] = useState<PlannedItem[]>([]);
-  const [fixed, setFixed] = useState<FixedEvent[]>([]);
-  const [sessions, setSessions] = useState<{ id: string; title: string; outcome: string }[]>([]);
-  useEffect(() => {
-    loadPlanning(repo).then((all) => setItems(all.filter((i) => i.weekStart === week && i.day === day)));
-    loadOnboarding(repo).then((o) => setFixed(fixedEventsFromAnswers(o.answers)));
-    repo.listSessions().then((rows) => setSessions(rows.filter((r) => localDay(r.startedAt, tz) === today)));
-  }, [repo, week, day, today, tz]);
-
-  const dayFixed = fixed.filter((ev) => spansOf(ev).some((s) => s.day === day && s.start > 0)).sort((a, b) => toMin(a.start) - toMin(b.start));
-  const sorted = [...items].sort((a, b) => toMin(a.start) - toMin(b.start));
-  return (
-    <>
-      <div className="section-head">
-        <h2>Planning du jour</h2>
-        <button className="link" onClick={() => go({ name: 'planning' })}>
-          Voir la semaine
-        </button>
-      </div>
-      <div className="card stack">
-        {[
-          ...dayFixed.map((ev) => ({ min: toMin(ev.start), key: ev.id, node: (
-            <div key={ev.id} className="spread muted">
-              <span>{ev.label}</span>
-              <span className="num">
-                {ev.start}–{ev.end}
-              </span>
+      {night.pastBed && night.bedtime && (
+        <div className="bed-banner" role="status">
+          <span className="bed-moon" aria-hidden="true">🌙</span>
+          <div>
+            <div style={{ fontWeight: 700 }}>Au lit, Hmidou.</div>
+            <div className="num" style={{ fontSize: '0.85rem', opacity: 0.85 }}>
+              {night.now.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })} · coucher prévu {night.bedtime}
             </div>
-          ) })),
-          ...sorted.map((i) => {
-            const st = itemStatus(i, dateOf(week, day), today, sessions);
-            const clash = conflicts(i.day, i.start, i.durationMin, fixed);
-            return { min: toMin(i.start), key: i.id, node: (
-              <div key={i.id} className="spread">
-                <div>
-                  <div style={{ fontWeight: 600 }}>
-                    <span className="num">{i.start}</span> · {i.title}
-                  </div>
-                  {clash.length > 0 && <div style={{ color: 'var(--warn)', fontSize: '0.85rem' }}>Chevauche : {clash.map((c) => c.label).join(', ')}</div>}
-                </div>
-                <span className={`badge ${st === 'réalisé' ? 'ok' : st === 'partiel' ? 'warn' : ''}`}>{st}</span>
-              </div>
-            ) };
-          }),
-        ]
-          .sort((a, b) => a.min - b.min)
-          .map((e) => e.node)}
-        {dayFixed.length === 0 && sorted.length === 0 && <p className="muted" style={{ margin: 0 }}>Rien de prévu aujourd’hui.</p>}
-        {sorted.length === 0 && (
-          <button className="btn block" onClick={() => go({ name: 'planning' })}>
-            Planifier ma semaine
-          </button>
+          </div>
+        </div>
+      )}
+
+      {onboardingStep !== null && (
+        <button className="item" onClick={() => go({ name: 'onboarding' })}>
+          <ClipboardList size={22} aria-hidden="true" />
+          <div className="grow">
+            <div className="name">Terminer la configuration</div>
+            <div className="meta">
+              {Math.min(onboardingStep + 1, STEPS.length + 1)} / {STEPS.length + 1}
+            </div>
+          </div>
+        </button>
+      )}
+
+      <section className="hero-card" aria-label="Séance du jour">
+        {hero?.kind === 'open' && (
+          <>
+            <span className="tile-label">En cours</span>
+            <div className="hero-title">{hero.title}</div>
+            <div className="hero-meta num">
+              {hero.done}/{hero.total} séries
+            </div>
+            <button className="btn primary big" onClick={() => go({ name: 'session', id: hero.id })}>
+              <Play size={20} aria-hidden="true" /> Reprendre
+            </button>
+          </>
         )}
+        {hero?.kind === 'planned' && (
+          <>
+            <span className="tile-label num">
+              {hero.item.start}
+              {hero.item.adapted ? ' · adaptée' : ''}
+            </span>
+            <div className="hero-title">{hero.item.title}</div>
+            {hero.tpl ? (
+              <>
+                <div className="hero-meta num">
+                  {(hero.item.adapted?.lines ?? hero.tpl.lines).length} exercices · {(hero.item.adapted?.lines ?? hero.tpl.lines).reduce((n, l) => n + l.sets, 0)} séries · ≈{' '}
+                  {hero.item.adapted?.estimatedMin ?? estimateMinutes(hero.tpl.lines)} min
+                </div>
+                <button className="btn primary big" onClick={async () => go({ name: 'session', id: await startPlanned(repo, hero.item, hero.tpl!) })}>
+                  <Play size={20} aria-hidden="true" /> Commencer
+                </button>
+              </>
+            ) : (
+              <p className="muted">Modèle de séance introuvable.</p>
+            )}
+          </>
+        )}
+        {hero?.kind === 'none' && (
+          <>
+            <span className="tile-label">Séance du jour</span>
+            <div className="hero-title">Rien de prévu</div>
+            <button className="btn big" onClick={() => go({ name: 'planning' })}>
+              Planifier
+            </button>
+          </>
+        )}
+      </section>
+
+      <div className="tiles">
+        <Tile icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')}>
+          <div className="tile-value num">
+            {daily?.sleepH !== undefined ? `${Math.floor(daily.sleepH)}h${String(Math.round((daily.sleepH % 1) * 60)).padStart(2, '0')}` : '—'}
+          </div>
+          <div className="bars" aria-hidden="true">
+            {Array.from({ length: 8 }, (_, i) => (
+              <span key={i} className={i < sleepBars ? 'on' : ''} />
+            ))}
+          </div>
+        </Tile>
+
+        <Tile icon={<Footprints size={16} aria-hidden="true" />} label="Pas" onClick={() => openEditor('steps')}>
+          <div className="row" style={{ flexWrap: 'nowrap', gap: 8 }}>
+            <Ring value={(daily?.steps ?? 0) / STEPS_GOAL} />
+            <div>
+              <div className="tile-value num" style={{ fontSize: '1.25rem' }}>
+                {daily?.steps !== undefined ? fmtNum(daily.steps) : '—'}
+              </div>
+              <div className="muted num" style={{ fontSize: '0.75rem' }}>/ {fmtNum(STEPS_GOAL)}</div>
+            </div>
+          </div>
+        </Tile>
+
+        <Tile icon={<Droplet size={16} aria-hidden="true" />} label="Eau">
+          <button className="tile-hit" onClick={() => openEditor('waterGoal')} aria-label="Modifier l’objectif d’eau">
+            <span className="tile-value num">{((daily?.waterMl ?? 0) / 1000).toLocaleString('fr-BE', { maximumFractionDigits: 2 })} L</span>
+            <span className="muted num" style={{ fontSize: '0.75rem' }}>
+              {' '}
+              / {waterGoal ? `${(waterGoal / 1000).toLocaleString('fr-BE')} L` : 'objectif ?'}
+            </span>
+          </button>
+          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+            <button className="btn icon" aria-label="Retirer 250 ml" onClick={() => saveDaily(addWater(daily, -250, Date.now()))}>
+              <Minus size={18} aria-hidden="true" />
+            </button>
+            <button className="btn primary icon" aria-label="Ajouter 250 ml" onClick={() => saveDaily(addWater(daily, 250, Date.now()))}>
+              <Plus size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </Tile>
+
+        <Tile icon={<Flame size={16} aria-hidden="true" />} label="Calories actives" onClick={() => openEditor('activeKcal')}>
+          <div className="tile-value num">{daily?.activeKcal !== undefined ? fmtNum(daily.activeKcal) : '—'}</div>
+          <div className="muted" style={{ fontSize: '0.75rem' }}>kcal · montre</div>
+        </Tile>
+
+        <Tile icon={<Target size={16} aria-hidden="true" />} label="Objectif" onClick={() => go({ name: 'settings' })}>
+          <div style={{ fontWeight: 600, lineHeight: 1.2 }}>{goal?.main ? GOAL_LABELS[goal.main] : '—'}</div>
+          {goal?.targetDate && <div className="muted num" style={{ fontSize: '0.8rem' }}>J−{Math.max(0, daysUntil(today, goal.targetDate))}</div>}
+        </Tile>
+
+        <Tile icon={<Trophy size={16} aria-hidden="true" />} label="Défi" onClick={() => go({ name: 'challenge' })}>
+          <div className="tile-value num">
+            {challengeOn ? `${habitsDone}/${NOVEMBER_2026.daily.length}` : `J−${Math.max(0, daysUntil(today, NOVEMBER_2026.start))}`}
+          </div>
+          <div className="muted" style={{ fontSize: '0.75rem' }}>{challengeOn ? 'habitudes' : 'novembre'}</div>
+        </Tile>
       </div>
+
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing ? EDIT_META[editing].title : ''}>
+        {editing && (
+          <div className="stack">
+            <p className="muted" style={{ margin: 0 }}>{EDIT_META[editing].hint}</p>
+            <div className="row" style={{ flexWrap: 'nowrap' }}>
+              <input
+                aria-label={EDIT_META[editing].title}
+                type="text"
+                inputMode="decimal"
+                min={0}
+                step={EDIT_META[editing].step}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+              />
+              <span className="muted">{EDIT_META[editing].unit}</span>
+            </div>
+            <div className="row">
+              <button className="btn primary" onClick={() => saveEditor()}>
+                Enregistrer
+              </button>
+              <button className="btn ghost" onClick={() => saveEditor(true)}>
+                Effacer
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
-}
-
-/** Index du jour (0 = lundi) d'une date AAAA-MM-JJ. */
-function DAY_INDEX(day: string): number {
-  return (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7;
 }

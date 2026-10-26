@@ -99,7 +99,6 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
         </div>
       </div>
       <NotBuilt title="Programme sur plusieurs semaines" phase="phase 1 (suite)">
-        Pour l’instant, tu crées des séances à la main. La progression automatique demandera des règles documentées et relues.
       </NotBuilt>
     </>
   );

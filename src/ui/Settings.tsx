@@ -70,12 +70,10 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
-        <p className="muted" style={{ margin: 0 }}>
-          Tout est stocké uniquement sur cet appareil, dans le navigateur. Rien n’est envoyé à un serveur.
-        </p>
+        <span className="badge ok" style={{ alignSelf: 'flex-start' }}>🔒 100 % sur cet appareil</span>
         {persisted === false && (
           <Notice tone="warn">
-            Le navigateur peut effacer ces données s’il manque de place ou si le site n’est pas utilisé. Exporte régulièrement.
+            ⚠️ Le navigateur peut effacer ces données : exporte souvent.
           </Notice>
         )}
         {persisted === true && <Notice>Stockage persistant accordé par le navigateur.</Notice>}

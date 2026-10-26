@@ -30,5 +30,11 @@ Inter (texte) et Doto (chrono à points), auto-hébergées via @fontsource (lice
 - Icônes Lucide (ISC), pas d'emoji. Animations coupées si `prefers-reduced-motion`.
 - Les chiffres des cartes sont réels (exercices, séries, dernière fois). Pas de kcal ni de « score » inventés.
 
+## Règle de contenu (26/10/2026)
+Zéro paragraphe inutile : chiffres, badges, compteurs, icônes/emojis, cartes épurées. Explications derrière « ? » ou un détail repliable.
+
+## Ambiance
+Fond selon l'heure (matin, jour, soir) en thème clair ; nuit = thème sombre bleu nuit, 1 h avant le coucher déclaré.
+
 ## Ton du coach
 Ferme, factuel, jamais humiliant. Dit ce qu'il sait et ce qu'il ne sait pas.
