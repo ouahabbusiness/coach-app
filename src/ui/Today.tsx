@@ -12,6 +12,7 @@ import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
 import { RunModal, WhyModal, useTargets } from './Targets';
 import { NextStepCard } from './Nutrition';
+import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { nextPrayer, PRAYER_LABELS } from '../engine/prayer';
 import { useReading } from './Reading';
@@ -258,6 +259,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
 
   const challengeOn = today >= NOVEMBER_2026.start && today <= NOVEMBER_2026.end;
   const habitsDone = habits.done;
+  const tracking = useTracking(repo);
   const { settings: prayer } = usePrayer(repo);
   const nextP = prayer?.enabled ? nextPrayer(timesFor(today, prayer), new Date().toTimeString().slice(0, 5)) : undefined;
   const trainingMin = hero?.kind === 'planned' && hero.tpl ? hero.item.adapted?.estimatedMin ?? estimateMinutes(hero.tpl.lines) : hero?.kind === 'open' ? 60 : 0;
@@ -431,8 +433,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           icon={<Flame size={16} aria-hidden="true" />}
           label="Calories"
           onClick={() => setWhy('kcal')}
-          value={kcal ? fmtNum(kcal.kcal) : '—'}
-          sub={kcal ? 'kcal cible' : undefined}
+          value={!tracking.prefs.showCalories ? 'off' : kcal ? fmtNum(kcal.kcal) : '—'}
+          sub={!tracking.prefs.showCalories ? 'suivi sans calories' : kcal ? 'kcal cible' : undefined}
         >
           <div className="row" style={{ gap: 6 }}>
             {kcal ? <span className="pill num">P {kcal.proteinG} g</span> : <span className="pill">calculer ?</span>}

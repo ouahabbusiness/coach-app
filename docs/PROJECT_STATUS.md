@@ -15,6 +15,15 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Validation → modèles + planning du bloc, **placés dans les trous** de l'agenda, séjours adaptés au matériel.
 - Rigueur appliquée aux imprévus : strict = pas de report ; militaire = ni report ni annulation, version courte ≥ 20 min (maladie/douleur toujours libres).
 
+**Système de coaching (cahier des charges du 26/10)** — seuils = choix de conception ajustables, pas des lois
+- Prescriptions en plages (force 3–6, muscle 6–12, assistance 10–15/20), réserve visée 3/2/1, échec seulement en dernière série si choisi.
+- Double progression par exercice (`decide`) : augmenter / maintenir / réduire / observer ; effort non noté → confirmation sur 2 séances ; effort excessif → pas de hausse ; une séance isolée sous la plage ne change rien ; douleur → sécurité ; incrément réel du matériel.
+- Journal des décisions (`decisions.log`) : avant/après, observations, règle, manques, réévaluation ; sauvegardé avant affichage.
+- Séance libre / EMOM : travail effectué (jamais un maximum), incertitudes affichées, prochaine fois prudente.
+- Contrôle avant séance (5 questions + alerte) ; retour après séance (prévu/fait, cible atteinte ≠ progression validée) ; répétitions jamais préremplies.
+- Nutrition adaptative : développement +5 %, réduction −12 %, maintien = observation ; protéines 1,8–2,0 g/kg ; lipides ≥ 0,8 g/kg ; bilan sur 2 semaines (± 125 kcal).
+- Statut des données (observée, déclarée, estimée, à confirmer), « bilan incertain », alerte sécurité en séance (112), suivi poids/calories facultatif.
+
 **Cibles calculées**
 - Eau 35 ml/kg + 0,5 L/h de séance ; calories Mifflin-St Jeor × activité, ajustées à l'objectif du programme et à la tendance du poids ; protéines 1,8 g/kg.
 - Course : +10 % sur la plus longue récente, maintien si effort ≥ 9/10, baisse après pause.
@@ -55,7 +64,7 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Onboarding 13 étapes (zone sombre) ; formule de calcul dans le profil ; objectifs versionnés ; export/import complet.
 
 ## Testé
-- 150 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
+- 173 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.
 - Navigateur de bureau (vue mobile) : accueil bleu, entretien programme complet → planning rempli, entretien nutrition jusqu'aux compléments,
   configuration sombre, fenêtre Calories.
 

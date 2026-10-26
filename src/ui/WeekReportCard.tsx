@@ -89,6 +89,7 @@ export function WeekReportCard({ repo }: { repo: Repository }) {
       </div>
       <p className="wr-verdict">{r.verdict}</p>
       {r.free && <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{r.free}</p>}
+      {r.uncertain.length > 0 && <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Incertain : {r.uncertain.join(' · ')}</p>}
     </section>
   );
 }

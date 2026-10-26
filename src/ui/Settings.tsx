@@ -3,6 +3,7 @@ import { ChevronLeft, Download, Upload, X } from 'lucide-react';
 import { availableLoads } from '../engine/progression';
 import { loadKettlebells, loadPieces, saveKettlebells, savePieces } from './equipment';
 import { timesFor, usePrayer } from './prayerStore';
+import { useTracking } from './trackingPrefs';
 import { deviceTimeZone } from './support';
 import { localDay } from '../engine/derive';
 import { DEFAULT_PRAYER, PRAYER_LABELS } from '../engine/prayer';
@@ -83,6 +84,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
       <LoadCard repo={repo} />
 
       <PrayerCard repo={repo} />
+
+      <TrackingCard repo={repo} />
 
       <div className="card stack">
         <h2 style={{ margin: 0 }}>Mes données</h2>
@@ -377,6 +380,23 @@ function PrayerCard({ repo }: { repo: Repository }) {
         Lever 10 min avant Fajr
       </button>
       <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Calcul sur le téléphone (aucune donnée envoyée). Chaque prière bloque {s.blockMin} min dans le planning.</p>
+    </div>
+  );
+}
+
+/** Suivi facultatif : pesée plein écran et calories peuvent être coupées à tout moment. */
+function TrackingCard({ repo }: { repo: Repository }) {
+  const { prefs, save } = useTracking(repo);
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>Suivi</h2>
+      <button className="chip" style={{ alignSelf: 'flex-start' }} aria-pressed={prefs.weighGate} onClick={() => save({ ...prefs, weighGate: !prefs.weighGate })}>
+        Pesée du matin plein écran
+      </button>
+      <button className="chip" style={{ alignSelf: 'flex-start' }} aria-pressed={prefs.showCalories} onClick={() => save({ ...prefs, showCalories: !prefs.showCalories })}>
+        Afficher les calories
+      </button>
+      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>Si le suivi du poids ou des calories devient pesant, coupe-le : les portions et le coach continuent sans les chiffres.</p>
     </div>
   );
 }

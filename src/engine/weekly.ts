@@ -24,6 +24,8 @@ export interface WeekReport {
   pages: number;
   verdict: string;
   free?: string;
+  /** Ce qui manque pour juger la semaine. */
+  uncertain: string[];
 }
 
 export function weekReport(w: WeekInput): WeekReport {
@@ -32,11 +34,16 @@ export function weekReport(w: WeekInput): WeekReport {
   const weightDelta = w.weightAvg !== undefined && w.weightAvgPrev !== undefined ? Math.round((w.weightAvg - w.weightAvgPrev) * 10) / 10 : undefined;
   const missed = Math.max(0, w.plannedSessions - w.doneSessions) + Math.max(0, w.plannedRuns - w.runsKm.length);
   const verdict =
-    w.plannedSessions + w.plannedRuns === 0
+    w.plannedSessions + w.plannedRuns === 0 && !w.habitsByDay.length && w.weightAvg === undefined
+      ? 'Bilan incertain : pas assez de données cette semaine.'
+      : w.plannedSessions + w.plannedRuns === 0
       ? 'Aucune séance prévue cette semaine : passe par le coach pour construire ton programme.'
       : missed === 0
         ? 'Semaine tenue. Rien n’a sauté.'
         : `${missed} séance${missed > 1 ? 's' : ''} manquée${missed > 1 ? 's' : ''}. On ne rattrape pas en double : on tient la suivante.`;
+  const uncertain: string[] = [];
+  if (!w.habitsByDay.length) uncertain.push('habitudes non renseignées');
+  if (w.weightAvg === undefined || w.weightAvgPrev === undefined) uncertain.push('pas assez de pesées pour une tendance');
   const free = w.freeReps ? `Hors programme : ${w.freeReps} rép. déclarées, intégrées à la charge de la semaine.` : undefined;
-  return { free, sessions: `${w.doneSessions}/${w.plannedSessions}`, runs: `${w.runsKm.length}/${w.plannedRuns}`, km, habits, weightDelta, pages: w.pagesRead, verdict };
+  return { uncertain, free, sessions: `${w.doneSessions}/${w.plannedSessions}`, runs: `${w.runsKm.length}/${w.plannedRuns}`, km, habits, weightDelta, pages: w.pagesRead, verdict };
 }

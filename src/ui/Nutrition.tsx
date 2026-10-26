@@ -6,6 +6,7 @@ import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, D
 import { Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
+import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
@@ -314,6 +315,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
   const [text, setText] = useState('');
   const [shot, setShot] = useState<File | undefined>();
   const [shopping, setShopping] = useState(false);
+  const showKcal = useTracking(repo).prefs.showCalories;
   const [got, setGot] = useState<string[]>([]);
   const [unplanned, setUnplanned] = useState<PlanEntry | null>(null);
   const [uk, setUk] = useState<UnplannedKind>('maison');
@@ -327,7 +329,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
       <div className="kpi-grid">
         <div className="ui-card kpi">
           <span className="kpi-label">Calories cible</span>
-          <span className="kpi-value num">{kcal ? kcal.kcal.toLocaleString('fr-BE') : '—'}</span>
+          <span className="kpi-value num">{!showKcal ? 'off' : kcal ? kcal.kcal.toLocaleString('fr-BE') : '—'}</span>
           <span className="kpi-sub num">{totals ? `plan ≈ ${totals.kcal.toLocaleString('fr-BE')} kcal` : 'estimation'}</span>
         </div>
         <div className="ui-card kpi">
@@ -394,7 +396,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                   <div className="tl-body">
                     <p className="tl-title">
                       {e.title}
-                      {e.kcal ? <span className="num tl-kcal">{e.kcal} kcal · {e.protein} g P</span> : null}
+                      {e.kcal && showKcal ? <span className="num tl-kcal">{e.kcal} kcal · {e.protein} g P</span> : null}
                     </p>
                     <p className="tl-items">{e.items.join(' · ')}</p>
                     {e.unplanned && <span className="pill">imprévu · estimation</span>}

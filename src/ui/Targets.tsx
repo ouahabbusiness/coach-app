@@ -73,7 +73,10 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   );
 
   // Poids : dernière pesée, sinon celui déclaré à l'onboarding.
-  const weightKg = weights[weights.length - 1]?.kg ?? profile.weightKg;
+  const lastW = weights[weights.length - 1];
+  const weightKg = lastW?.kg ?? profile.weightKg;
+  // Statut de la donnée : observée (pesée), déclarée (configuration), à confirmer (pesée de plus de 30 jours).
+  const weightStatus = lastW ? (Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${lastW.day}T12:00:00Z`)) / 864e5) > 30 ? 'à confirmer' : lastW.status === 'estimé' ? 'estimée' : 'observée') : profile.weightKg ? 'déclarée' : undefined;
   const water = waterTarget(weightKg, trainingMin);
   const calories = calorieTarget({ sex, age: profile.age, heightCm: profile.heightCm, weightKg, sessionsPerWeek: profile.spw, goal: profile.goal, strategy: profile.strategy, adjustments });
 
@@ -99,7 +102,9 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   }, [calories.value?.strategy, weights.length, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const run = runTarget(runs, today);
   const ranToday = runs.some((r) => r.day === today);
-  return { today, water, calories, run, runs, ranToday, sex, setSex, addRun, review };
+  if (weightStatus && calories.value) calories.why.unshift(`poids ${weightKg} kg · donnée ${weightStatus}`);
+  if (weightStatus && water.value) water.why.push(`poids : donnée ${weightStatus}`);
+  return { today, water, calories, run, runs, ranToday, sex, setSex, addRun, review, weightStatus };
 }
 
 export type Targets = ReturnType<typeof useTargets>;

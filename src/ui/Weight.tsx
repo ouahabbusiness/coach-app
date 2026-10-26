@@ -6,6 +6,7 @@ import { localDay } from '../engine/derive';
 import { average7, dailyWeights, isValidKg, trend, type WeighIn, type WeightStatus } from '../engine/weight';
 import type { Repository } from '../storage/db';
 import { Modal } from './common';
+import { useTracking } from './trackingPrefs';
 import { deviceTimeZone, newId } from './support';
 
 const KEY = 'weight.log';
@@ -166,6 +167,7 @@ const SKIP = (day: string) => `weighin.skip.${day}`;
  */
 export function WeighInGate({ repo }: { repo: Repository }) {
   const { days, add } = useWeightLog(repo);
+  const { prefs } = useTracking(repo);
   const today = localDay(Date.now(), deviceTimeZone());
   const [ready, setReady] = useState(false);
   const [skipped, setSkipped] = useState(false);
@@ -182,7 +184,7 @@ export function WeighInGate({ repo }: { repo: Repository }) {
   useEffect(() => {
     if (last && !draft) setDraft(String(last.kg).replace('.', ','));
   }, [last]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!ready || skipped || days.some((d) => d.day === today)) return null;
+  if (!ready || skipped || !prefs.weighGate || days.some((d) => d.day === today)) return null;
   const kg = Number(draft.replace(',', '.'));
   const valid = draft.trim() !== '' && isValidKg(kg);
   return (

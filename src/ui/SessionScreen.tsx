@@ -362,6 +362,19 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
       </Modal>
 
       <Modal open={dialog === 'pain'} onClose={() => setDialog(null)} title="Douleur ou problème">
+        <button
+          className="rc-red"
+          style={{ width: '100%', marginBottom: 12 }}
+          onClick={async () => {
+            const res = await act({ type: 'report_pain', plannedSetId: focus?.planned.id, location: 'alerte : douleur thoracique / malaise / essoufflement', intensity: 10, stop: true }, 'Séance arrêtée : signal d’alerte');
+            if (res.ok) {
+              setDialog(null);
+              setLive('Arrête l’effort. Douleur thoracique, malaise ou essoufflement anormal : appelle le 112.');
+            }
+          }}
+        >
+          Douleur thoracique, malaise, essoufflement anormal → arrêt + 112
+        </button>
         <PainForm
           onCancel={() => setDialog(null)}
           onSubmit={async (location, intensity, stop) => {

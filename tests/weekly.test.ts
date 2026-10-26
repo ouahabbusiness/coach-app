@@ -12,4 +12,9 @@ describe('bilan de la semaine', () => {
     expect(r.habits).toBeUndefined();
     expect(r.weightDelta).toBeUndefined();
   });
+  it('rien de renseigné → « bilan incertain », jamais un progrès ou un retard inventé', () => {
+    const r = weekReport({ plannedSessions: 0, doneSessions: 0, plannedRuns: 0, runsKm: [], habitsByDay: [], pagesRead: 0 });
+    expect(r.verdict).toContain('Bilan incertain');
+    expect(r.uncertain).toContain('habitudes non renseignées');
+  });
 });
