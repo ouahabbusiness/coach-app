@@ -1277,3 +1277,7 @@ body:has(.run-live.full) { background-image: none; }
 .vol-bar i.done { background: var(--accent); }
 .vol-bar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: 0.5; }
 .vol-num small { color: var(--text-2); font-size: 0.7rem; }
+
+/* Fiche d'exercice */
+.sheet .sheet-row { display: grid; gap: 2px; }
+.sheet .sheet-row p:not(.eyebrow) { font-size: 0.88rem; line-height: 1.35; }

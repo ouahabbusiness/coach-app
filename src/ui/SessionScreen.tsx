@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronLeft, History, Minus, MoreHorizontal, Pause, Play, Plus, SkipForward, Square, TriangleAlert, Undo2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
+import { exerciseSheet } from '../engine/exerciseSheet';
+import { ExerciseSheetView } from './ExerciseSheetView';
 import { currentResult, lastComparable, timings } from '../engine/derive';
 import { liveLoad } from '../engine/progression';
 import { deviceTimeZone } from './support';
@@ -52,7 +54,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const equipment = useEquipment(repo);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [entryId, setEntryId] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | 'menu' | null>(null);
+  const [dialog, setDialog] = useState<'pain' | 'skip' | 'interrupt' | 'end' | 'menu' | 'sheet' | null>(null);
   const [live, setLive] = useState('');
   const [flash, setFlash] = useState(0);
   const [check, setCheck] = useState<{ d: ReadinessDecision } | null | undefined>(undefined);
@@ -133,6 +135,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
   const lastRest = state.rests[state.rests.length - 1];
   const openInterruption = state.interruptions.find((i) => i.end === undefined);
   const focusInfo = focus ? findVariant(focus.planned.variantId) : undefined;
+  const sheet = focus ? exerciseSheet(focus.planned.variantId, focus.planned) : undefined;
   const comparable = focus ? lastComparable(history, focus.planned.variantId, state.startedAt) : undefined;
   // Consigne en direct : si la série d'avant était trop facile, la suivante monte.
   const order = focus && focus.status === 'pending' ? liveLoad(state, focus.planned, loadsFor(focus.planned.variantId, equipment)) : undefined;
@@ -351,19 +354,18 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
             </button>
           )}
           {focusInfo && (
-            <details>
-              <summary className="hud-summary">Consignes</summary>
-              <ul className="mini-list">
-                {focusInfo.variant.cues.map((c) => (
-                  <li key={c}>• {c}</li>
-                ))}
-              </ul>
-            </details>
+            <button className="btn block" onClick={() => setDialog('sheet')}>
+              Fiche de l’exercice
+            </button>
           )}
           <button className="btn primary block" onClick={() => setDialog('end')}>
             Terminer la séance
           </button>
         </div>
+      </Modal>
+
+      <Modal open={dialog === 'sheet'} onClose={() => setDialog(null)} title={focusInfo?.variant.name ?? 'Fiche'}>
+        {focus && sheet && <ExerciseSheetView s={sheet} />}
       </Modal>
 
       <Modal open={dialog === 'pain'} onClose={() => setDialog(null)} title="Douleur ou problème">
