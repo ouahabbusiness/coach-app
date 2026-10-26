@@ -36,6 +36,8 @@ export interface PlannedItem {
   adjustment?: Adjustment;
   /** Version adaptée à utiliser à la place du modèle (raccourcie, allégée, sans matériel). */
   adapted?: { lines: PlanLine[]; estimatedMin: number; removed: string[] };
+  /** Élément créé par un programme du coach (remplacé si le programme est refait). */
+  programId?: string;
 }
 
 export interface Adjustment {

@@ -1017,3 +1017,41 @@ div.why-list { flex-direction: row; flex-wrap: wrap; }
 :root[data-theme='zone'] .ob .controls .btn.side { color: var(--text); background: transparent; border-color: transparent; }
 :root[data-theme='zone'] .ob .controls .btn.dark { background: #f3ecdc; border-color: #f3ecdc; color: #0a0a0a; font-family: var(--font-mono, monospace); letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.82rem; }
 :root[data-theme='zone'] .ob .controls .btn.dark:disabled { background: #1a1a18; border-color: #262624; color: #5c5a54; }
+
+/* Entretien coach (zone Winter Arc) */
+.cq-say { display: flex; flex-direction: column; gap: 14px; animation: rise 320ms cubic-bezier(.2,.8,.2,1) both; }
+.cq-who { margin: 0; font-family: var(--font-mono, monospace); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-2); }
+.cq-q { margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1.25; letter-spacing: -0.02em; }
+.cq-line { margin: 0; color: var(--text-2); line-height: 1.5; }
+.cq-choices { display: flex; flex-direction: column; gap: 8px; }
+.cq-rec { margin: 0 0 4px; padding: 10px 12px; border-left: 2px solid var(--text); background: #121211; border-radius: 8px; font-size: 0.86rem; line-height: 1.45; color: var(--text); }
+.cq-rec-tag { font-family: var(--font-mono, monospace); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: var(--text); color: #0a0a0a; margin-right: 6px; }
+.cq-opt { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 56px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #2c2b28; background: #050505; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, transform 120ms ease; }
+.cq-opt:active { transform: scale(0.99); }
+.cq-opt.rec { border-style: dashed; border-color: #6d6a62; }
+.cq-opt[aria-pressed='true'] { background: #f3ecdc; border-color: #f3ecdc; border-style: solid; color: #0a0a0a; }
+.cq-opt-l { font-weight: 700; font-size: 0.98rem; }
+.cq-opt-sub { font-size: 0.8rem; opacity: 0.7; }
+.cq-badge { position: absolute; top: 10px; right: 12px; font-family: var(--font-mono, monospace); font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; }
+.cq-num { display: flex; flex-direction: column; gap: 10px; }
+.cq-num-row { display: flex; align-items: baseline; gap: 10px; }
+.cq-num-row input { font-size: 2.4rem !important; font-weight: 800; text-align: center; min-height: 72px !important; max-width: 160px; }
+.cq-num-row span { font-family: var(--font-mono, monospace); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-2); }
+.cq-warn { margin: 6px 0 0; display: flex; gap: 6px; align-items: center; font-size: 0.78rem; color: var(--text-2); }
+.cq-week { gap: 0 !important; padding: 6px 14px !important; }
+.cq-day { display: flex; align-items: center; gap: 10px; min-height: 46px; border-top: 1px dashed #2c2b28; font-size: 0.9rem; }
+.cq-day:first-child { border-top: 0; }
+.cq-day-name { width: 34px; font-family: var(--font-mono, monospace); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-2); }
+.cq-day-ico { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #121211; }
+.cq-day-meta { font-size: 0.75rem; color: var(--text-2); }
+.cq-tpl summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 700; min-height: 32px; list-style: none; }
+.cq-tpl summary::-webkit-details-marker { display: none; }
+.cq-key { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: #f3ecdc; color: #0a0a0a; font-family: var(--font-mono, monospace); font-size: 0.8rem; }
+.cq-tpl ul { list-style: none; margin: 0; padding: 0; }
+.cq-tpl li { display: flex; gap: 10px; align-items: center; min-height: 40px; border-top: 1px dashed #2c2b28; font-size: 0.88rem; }
+.cq-rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
+.cq-rules li::before { content: '▸ '; color: var(--text-2); }
+.cq-rules li.note { color: var(--text-2); }
+.cq .seg2 { background: #050505; border-color: #2c2b28; }
+.cq .seg2 button[aria-pressed='true'] { background: #f3ecdc; color: #0a0a0a; }

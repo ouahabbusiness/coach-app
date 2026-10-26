@@ -17,6 +17,7 @@ import { AppBackground } from './AppBackground';
 import { BootOverlay } from './BootOverlay';
 import { ArcPage } from './ArcPage';
 import { Reading } from './Reading';
+import { CoachHome, CoachProgram } from './CoachProgram';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Today } from './Today';
@@ -34,6 +35,7 @@ export type Route =
   | { name: 'planning' }
   | { name: 'arc' }
   | { name: 'reading' }
+  | { name: 'coachProgram' }
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
@@ -53,7 +55,7 @@ export function App() {
   const { mode: winterMode } = useWinterMode(repo);
   const winterOn = winterInfo(winterMode, localDay(Date.now(), deviceTimeZone()), winterForced()).active;
   // Zone sombre uniquement pendant l'entraînement (et sur la page Winter Arc) ; ailleurs, thème clair (bleu en novembre).
-  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding';
+  const zone = route.name === 'session' || route.name === 'arc' || route.name === 'onboarding' || route.name === 'coachProgram';
   useEffect(() => {
     if (zone) document.documentElement.dataset.theme = 'zone';
     else if (winterOn) document.documentElement.dataset.theme = 'winter';
@@ -91,6 +93,7 @@ export function App() {
 
   if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;
   if (route.name === 'reading') return <Reading repo={repo} go={go} />;
+  if (route.name === 'coachProgram') return <CoachProgram repo={repo} go={go} />;
 
   if (route.name === 'session') {
     const id = route.id;
@@ -127,14 +130,7 @@ export function App() {
           </>
         )}
         {route.name === 'progress' && <Progress repo={repo} go={go} />}
-        {route.name === 'coach' && (
-          <>
-            <h1>Coach</h1>
-            <NotBuilt title="Coach et ajustements expliqués" phase="phase 4">
-              Les séances et les chronos fonctionnent sans lui.
-            </NotBuilt>
-          </>
-        )}
+        {route.name === 'coach' && <CoachHome repo={repo} go={go} />}
         {route.name === 'settings' && <Settings repo={repo} onBack={() => go({ name: 'today' })} onEditProfile={() => go({ name: 'onboarding' })} />}
         {route.name === 'challenge' && <Challenge repo={repo} onBack={() => go({ name: 'today' })} onStatus={() => go({ name: 'arc' })} onReading={() => go({ name: 'reading' })} />}
         {route.name === 'planning' && <Planning repo={repo} go={go} />}
