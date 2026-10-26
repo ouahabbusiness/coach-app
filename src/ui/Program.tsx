@@ -190,6 +190,11 @@ function TemplateEditor({ initial, onSave, onCancel }: { initial: SessionTemplat
                 <input value={l.assistance ?? ''} onChange={(e) => update(l.id, { assistance: e.target.value || undefined })} />
               </label>
             </div>
+            <label className="field">
+              Consigne
+              <span className="hint">ex. prise neutre, tempo 3-1-1</span>
+              <input value={l.cue ?? ''} onChange={(e) => update(l.id, { cue: e.target.value || undefined })} />
+            </label>
           </div>
         );
       })}

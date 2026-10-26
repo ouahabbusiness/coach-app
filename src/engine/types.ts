@@ -24,6 +24,8 @@ export interface PlannedSet {
   side?: Side;
   targetRir?: number;
   restSeconds: number;
+  /** Consigne d'exécution saisie par l'utilisateur (ex. « prise neutre »). */
+  cue?: string;
 }
 
 export interface SessionPlan {

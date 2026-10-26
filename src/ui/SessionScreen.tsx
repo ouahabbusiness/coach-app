@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronLeft, ImageOff, Minus, Pause, Play, Plus, SkipForward, Square, TriangleAlert, Undo2 } from 'lucide-react';
+import { Check, ChevronLeft, History, ImageOff, Minus, Pause, Play, Plus, SkipForward, Square, Timer, TriangleAlert, Undo2, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { currentResult, lastComparable, timings } from '../engine/derive';
@@ -7,7 +7,7 @@ import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { Modal, Notice } from './common';
-import { CATEGORY_ICON, Scene } from './Scene';
+import { CATEGORY_ICON } from './Scene';
 import { fmtDuration, useNow, useWakeLock } from './support';
 import { useSession, type SendResult } from './useSession';
 
@@ -31,6 +31,16 @@ function describeResult(r: SetResult | undefined): string {
   if (r.loadKg !== undefined) parts.push(`${r.loadKg} kg`);
   if (r.rir !== undefined) parts.push(`RIR ${r.rir}`);
   return parts.join(' · ') || 'saisi sans valeur';
+}
+
+/** Paramètre compact de la série (libellé + valeur). */
+function Param({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={`hud-param ${wide ? 'wide' : ''}`}>
+      <span className="hud-label">{label}</span>
+      <span className="hud-param-v num">{value}</span>
+    </div>
+  );
 }
 
 function setPosition(st: SessionState, set: SetState): string {
@@ -89,6 +99,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   const openInterruption = state.interruptions.find((i) => i.end === undefined);
   const focusInfo = focus ? findVariant(focus.planned.variantId) : undefined;
   const comparable = focus ? lastComparable(history, focus.planned.variantId, state.startedAt) : undefined;
+  const setsDone = state.sets.filter((s) => s.status === 'done' || s.status === 'skipped').length;
   const blocks: { blockId: string; name: string; icon?: LucideIcon; done: number; total: number }[] = [];
   for (const s of state.sets) {
     let b = blocks.find((x) => x.blockId === s.planned.blockId);
@@ -102,176 +113,170 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
   }
 
   return (
-    <div className="session">
-      <div className="session-hero">
-        <Scene kind="gym" icon={focusInfo ? CATEGORY_ICON[focusInfo.exercise.category] : undefined} iconSize={88} />
-        <div className="fade" />
-        <div className="top">
-          <button className="round" onClick={onExit} aria-label="Quitter l’écran de séance (la séance reste en cours)">
-            <ChevronLeft size={20} aria-hidden="true" />
-          </button>
-          <span className="badge num" style={{ background: 'var(--surface-glass)' }}>Total {fmtDuration(t.totalMs)}</span>
-          <button className="btn" style={{ minHeight: 44 }} onClick={() => setDialog('end')}>
-            Terminer
-          </button>
+    <div className="session hud">
+      <header className="hud-top">
+        <button className="icon-btn" onClick={onExit} aria-label="Quitter l’écran de séance (la séance reste en cours)">
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+        <div className="grow">
+          <p className="hud-label">Mission</p>
+          <p className="row-title">{state.plan.title}</p>
         </div>
-      </div>
+        <span className="pill num" aria-label={`Durée totale ${fmtDuration(t.totalMs)}`}>
+          <Timer size={12} aria-hidden="true" /> {fmtDuration(t.totalMs)}
+        </span>
+        <button className="btn sm" onClick={() => setDialog('end')}>
+          Terminer
+        </button>
+      </header>
 
-      <div className="session-body">
+      <div className="session-body hud-body">
         <div aria-live="polite" className="sr-only">{live}</div>
-        {storageError && (
-          <Notice tone="danger">
-            Échec d’enregistrement sur l’appareil : la dernière action n’a pas été sauvegardée. ({storageError})
-          </Notice>
-        )}
-        {state.safetyStop && (
-          <Notice tone="danger">
-            🛑 Arrêt pour douleur. Pas de diagnostic : si ça persiste, avis médical.
-          </Notice>
-        )}
+        {storageError && <Notice tone="danger">Échec d’enregistrement : dernière action non sauvegardée. ({storageError})</Notice>}
+        {state.safetyStop && <Notice tone="danger">Arrêt pour douleur. Pas de diagnostic : si ça persiste, avis médical.</Notice>}
 
-        <div className="steps" role="list" aria-label="Exercices de la séance">
-          {blocks.map((b) => (
-            <div key={b.blockId} role="listitem" className="cat" aria-current={focus?.planned.blockId === b.blockId ? 'step' : undefined}>
-              <span className="bubble" style={{ position: 'relative', borderColor: focus?.planned.blockId === b.blockId ? 'var(--accent)' : undefined }}>
-                <Scene kind="gym" icon={b.icon} iconSize={26} />
-              </span>
-              <span style={{ maxWidth: 76, textAlign: 'center', lineHeight: 1.2 }}>
-                {b.name} · {b.done}/{b.total}
-              </span>
+        <section className="ui-card hud-stats" aria-label="Avancement de la mission">
+          <div className="hud-stat">
+            <span className="hud-label">Exos</span>
+            <span className="hud-num num">
+              {blocks.filter((b) => b.done === b.total).length}/{blocks.length}
+            </span>
+          </div>
+          <div className="hud-stat">
+            <span className="hud-label">Séries</span>
+            <span className="hud-num num">
+              {setsDone}/{state.sets.length}
+            </span>
+          </div>
+          <div className="hud-stat">
+            <span className="hud-label">Actif</span>
+            <span className="hud-num num">{fmtDuration(t.activeMs)}</span>
+          </div>
+          <div className="hud-stat">
+            <span className="hud-label">Repos</span>
+            <span className="hud-num num">{fmtDuration(t.restMs)}</span>
+          </div>
+          <span className="meter hud-meter" aria-hidden="true">
+            <span style={{ width: `${(setsDone / Math.max(1, state.sets.length)) * 100}%` }} />
+          </span>
+        </section>
+
+        {state.phase === 'interrupted' && openInterruption ? (
+          <section className="ui-card hud-main" aria-label="Interruption">
+            <div className="spread">
+              <span className="hud-tag">Interruption · {openInterruption.reason}</span>
+              <span className="hud-status">Pause</span>
             </div>
-          ))}
-        </div>
+            <div className="hud-clock num">{fmtDuration(now - openInterruption.start)}</div>
+            <p className="hud-clock-label">Compté à part, pas comme repos.</p>
+            <button className="btn primary big" onClick={() => act({ type: 'end_interruption' }, 'Interruption terminée')}>
+              <Play size={18} aria-hidden="true" /> Reprendre
+            </button>
+          </section>
+        ) : focus ? (
+          <section className={`ui-card hud-main ${inSet ? 'is-live' : ''}`} aria-label="Série en cours">
+            <div className="spread">
+              <span className="hud-tag num">
+                Exo {blocks.findIndex((b) => b.blockId === focus.planned.blockId) + 1}/{blocks.length} · {setPosition(state, focus)}
+              </span>
+              <span className={`hud-status ${inSet ? 'live' : ''}`}>{inSet ? 'En série' : state.phase === 'resting' ? 'Repos' : 'Prêt'}</span>
+            </div>
+            <h1 className="hud-title">{focusInfo?.variant.name ?? focus.planned.variantId}</h1>
+            <div className="hud-params">
+              <Param label="Cible" value={focus.planned.kind === 'reps' ? `${focus.planned.targetReps ?? '?'} rép.` : `${focus.planned.targetSeconds ?? '?'} s`} />
+              <Param label="Repos" value={fmtDuration(focus.planned.restSeconds * 1000)} />
+              {focus.planned.loadKg ? <Param label="Lest" value={`${focus.planned.loadKg} kg`} /> : null}
+              {focus.planned.assistance ? <Param label="Assist." value={focus.planned.assistance} /> : null}
+              {focus.planned.targetRir !== undefined ? <Param label="RIR" value={String(focus.planned.targetRir)} /> : null}
+              {focus.planned.cue ? <Param label="Consigne" value={focus.planned.cue} wide /> : null}
+            </div>
 
-        <section aria-label="Série en cours" style={{ margin: '8px 0 20px' }}>
-          {state.phase === 'interrupted' && openInterruption ? (
-            <>
-              <div className="counter">Interruption · {openInterruption.reason}</div>
-              <div className="clock" style={{ marginTop: 12 }}>{fmtDuration(now - openInterruption.start)}</div>
-              <div className="clock-label">Ce temps n’est pas compté comme repos.</div>
-            </>
-          ) : focus ? (
-            <>
-              <div className="counter">
-                {inSet ? 'Série en cours' : state.phase === 'resting' ? 'Repos' : 'Prêt'} · {setPosition(state, focus)}
-              </div>
-              <div className="ex-name">{focusInfo?.variant.name ?? focus.planned.variantId}</div>
-              <p className="ex-target">
-                Cible : <strong>{describeTarget(focus)}</strong>
-              </p>
+            <div className="hud-clock-wrap">
               {state.phase === 'resting' && lastRest && t.currentRestMs !== undefined ? (
                 <>
-                  <div className={`clock ${t.currentRestMs > lastRest.targetSeconds * 1000 ? 'over' : ''}`}>{fmtDuration(t.currentRestMs)}</div>
-                  <div className="clock-label">
+                  <div className={`hud-clock num ${t.currentRestMs > lastRest.targetSeconds * 1000 ? 'over' : ''}`}>{fmtDuration(t.currentRestMs)}</div>
+                  <span className="meter" aria-hidden="true">
+                    <span style={{ width: `${Math.min(100, (t.currentRestMs / Math.max(1, lastRest.targetSeconds * 1000)) * 100)}%` }} />
+                  </span>
+                  <p className="hud-clock-label num">
                     {t.currentRestMs > lastRest.targetSeconds * 1000
-                      ? `+${fmtDuration(t.currentRestMs - lastRest.targetSeconds * 1000)} au-delà de la cible (${fmtDuration(lastRest.targetSeconds * 1000)})`
-                      : `Repos cible ${fmtDuration(lastRest.targetSeconds * 1000)}`}
-                  </div>
+                      ? `+${fmtDuration(t.currentRestMs - lastRest.targetSeconds * 1000)} au-delà de ${fmtDuration(lastRest.targetSeconds * 1000)}`
+                      : `Repos ${fmtDuration(lastRest.targetSeconds * 1000)}`}
+                  </p>
                 </>
               ) : inSet && t.currentSetMs !== undefined ? (
                 <>
-                  <div className="clock">{fmtDuration(t.currentSetMs)}</div>
-                  <div className="clock-label">{focus.planned.kind === 'hold' ? `Cible ${focus.planned.targetSeconds ?? '?'} s` : 'Durée de la série'}</div>
+                  <div className="hud-clock num">{fmtDuration(t.currentSetMs)}</div>
+                  <p className="hud-clock-label">{focus.planned.kind === 'hold' ? `Cible ${focus.planned.targetSeconds ?? '?'} s` : 'Série en cours'}</p>
                 </>
               ) : (
                 <>
-                  <div className="clock" aria-hidden="true">0:00</div>
-                  <div className="clock-label">Le chrono démarre quand tu touches « Commencer ».</div>
+                  <div className="hud-clock num idle" aria-hidden="true">0:00</div>
+                  <p className="hud-clock-label">Prêt</p>
                 </>
               )}
+            </div>
 
-              {!inSet && (
-                <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
-                  <button className="btn" onClick={() => setDialog('skip')}>
-                    <SkipForward size={18} aria-hidden="true" /> Passer cette série
-                  </button>
-                </div>
-              )}
-
-              <details className="card" style={{ marginTop: 16 }}>
-                <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', fontWeight: 600 }}>Consignes et démonstration</summary>
-                <div className="stack" style={{ marginTop: 8 }}>
-                  {focusInfo && focusInfo.variant.media.length === 0 && (
-                    <div className="media-missing">
-                      <ImageOff size={18} aria-hidden="true" /> Démonstration non disponible : aucun média vérifié pour cette variante.
-                    </div>
-                  )}
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>{focusInfo?.variant.cues.map((c) => <li key={c}>{c}</li>)}</ul>
-                  {focusInfo && focusInfo.variant.commonErrors.length > 0 && (
-                    <p className="muted" style={{ margin: 0 }}>Erreurs fréquentes : {focusInfo.variant.commonErrors.join(' ; ')}</p>
-                  )}
-                  <span className="badge warn" style={{ alignSelf: 'flex-start' }}>Consignes non relues par un professionnel</span>
-                </div>
-              </details>
-
-              <p className="muted" style={{ margin: 0, textAlign: 'center' }}>
-                ↺ Dernière fois : {comparable ? comparable.results.map(describeResult).join(' / ') : '—'}
-              </p>
-            </>
-          ) : (
-            <p style={{ textAlign: 'center' }}>Toutes les séries prévues sont faites ou passées.</p>
-          )}
-        </section>
-
-        <div className="controls">
-          <button className="btn side" aria-label="Signaler une douleur ou un problème" onClick={() => setDialog('pain')} style={{ color: 'var(--danger)' }}>
-            <TriangleAlert size={22} aria-hidden="true" />
-          </button>
-          {state.phase === 'interrupted' ? (
-            <button className="btn dark main" onClick={() => act({ type: 'end_interruption' }, 'Interruption terminée')}>
-              <Play size={20} aria-hidden="true" /> Reprendre
-            </button>
-          ) : focus ? (
-            inSet ? (
+            {inSet ? (
               <button
-                className="btn dark main"
+                className="btn primary big"
                 onClick={() => act({ type: 'end_set', plannedSetId: focus.planned.id }, 'Série terminée, repos lancé').then(() => setEntryId(focus.planned.id))}
               >
-                <Square size={18} aria-hidden="true" /> Terminer la série
+                <Square size={16} aria-hidden="true" /> Terminer la série
               </button>
             ) : (
-              <button className="btn dark main" disabled={state.safetyStop} onClick={() => act({ type: 'start_set', plannedSetId: focus.planned.id }, 'Série commencée')}>
-                <Play size={20} aria-hidden="true" /> Commencer la série
+              <button className="btn primary big" disabled={state.safetyStop} onClick={() => act({ type: 'start_set', plannedSetId: focus.planned.id }, 'Série commencée')}>
+                <Play size={18} aria-hidden="true" /> Commencer la série
               </button>
-            )
-          ) : (
-            <button className="btn dark main" onClick={() => setDialog('end')}>
-              <Check size={20} aria-hidden="true" /> Terminer la séance
+            )}
+            <div className="hud-actions">
+              <button className="btn sm" disabled={!!inSet || state.safetyStop} onClick={() => setDialog('interrupt')}>
+                <Pause size={14} aria-hidden="true" /> Pause
+              </button>
+              <button className="btn sm" disabled={!!inSet} onClick={() => setDialog('skip')}>
+                <SkipForward size={14} aria-hidden="true" /> Passer
+              </button>
+              <button className="btn sm hud-danger" onClick={() => setDialog('pain')}>
+                <TriangleAlert size={14} aria-hidden="true" /> Douleur
+              </button>
+            </div>
+            <p className="row-meta">
+              <History size={12} aria-hidden="true" /> Dernière fois : {comparable ? comparable.results.map(describeResult).join(' / ') : '—'}
+            </p>
+          </section>
+        ) : (
+          <section className="ui-card hud-main" aria-label="Mission terminée">
+            <span className="hud-status">Mission accomplie</span>
+            <button className="btn primary big" onClick={() => setDialog('end')}>
+              <Check size={18} aria-hidden="true" /> Terminer la séance
             </button>
-          )}
-          <button
-            className="btn side"
-            aria-label="Déclarer une interruption"
-            disabled={!!inSet || state.safetyStop || state.phase === 'interrupted'}
-            onClick={() => setDialog('interrupt')}
-          >
-            <Pause size={22} aria-hidden="true" />
-          </button>
-        </div>
+          </section>
+        )}
 
         {entry && <ResultEntry key={entry.planned.id + entry.entries.length} state={state} set={entry} act={act} />}
 
-        <section className="card" aria-label="Séries de la séance">
-          <h3>Séries</h3>
-          <ul className="setlist">
+        <section className="ui-card" aria-label="Plan de mission">
+          <p className="hud-label">Plan de mission</p>
+          <ul className="hud-sets">
             {state.sets.map((s) => {
               const name = findVariant(s.planned.variantId)?.variant.name ?? s.planned.variantId;
-              const status =
-                s.status === 'done' ? describeResult(currentResult(s)) : s.status === 'skipped' ? `passée (${s.skipReason})` : s.status === 'in_progress' ? 'en cours' : `prévu ${describeTarget(s)}`;
-              const clickable = s.status === 'pending' || s.status === 'done';
+              const res = currentResult(s);
+              const clickable = (s.status === 'pending' || s.status === 'done') && !inSet;
               return (
-                <li key={s.planned.id} className={s === focus ? 'current' : ''}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{name}</div>
-                    <div className="muted" style={{ fontSize: '0.9rem' }}>
-                      {setPosition(state, s)} · {status}
-                    </div>
-                  </div>
-                  {clickable && !inSet && (
-                    <button
-                      className="btn ghost"
-                      onClick={() => (s.status === 'pending' ? setFocusId(s.planned.id) : setEntryId(s.planned.id))}
-                    >
+                <li key={s.planned.id} className={`hud-set st-${s.status} ${s === focus ? 'current' : ''}`}>
+                  <span className="hud-set-ico" aria-hidden="true">
+                    {s.status === 'done' ? <Check size={12} /> : s.status === 'skipped' ? <X size={12} /> : s.status === 'in_progress' ? <Play size={10} /> : null}
+                  </span>
+                  <span className="hud-set-name">
+                    {name}
+                    <span className="hud-set-sub num">
+                      {setPosition(state, s).replace('Série ', 'S')} · {s.planned.kind === 'reps' ? `${s.planned.targetReps ?? '?'}` : `${s.planned.targetSeconds ?? '?'}s`}
+                      {s.planned.cue ? ` · ${s.planned.cue}` : ''}
+                    </span>
+                  </span>
+                  <span className="hud-set-res num">{s.status === 'done' ? (res ? describeResult(res) : '—') : s.status === 'skipped' ? 'passée' : ''}</span>
+                  {clickable && (
+                    <button className="btn ghost sm" onClick={() => (s.status === 'pending' ? setFocusId(s.planned.id) : setEntryId(s.planned.id))}>
                       {s.status === 'pending' ? 'Choisir' : 'Corriger'}
                     </button>
                   )}
@@ -279,11 +284,30 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary }: { repo: Re
               );
             })}
           </ul>
-          <p className="muted" style={{ marginTop: 12, marginBottom: 0, fontSize: '0.9rem' }}>
-            Actif {fmtDuration(t.activeMs)} · Repos {fmtDuration(t.restMs)} · Interruptions {fmtDuration(t.interruptedMs)}
-            {wake === 'unsupported' ? ' · Écran : maintien allumé non pris en charge' : wake === 'active' ? ' · Écran maintenu allumé' : ''}
+          <p className="row-meta">
+            {wake === 'active' ? 'Écran maintenu allumé' : wake === 'unsupported' ? 'Écran : maintien allumé non pris en charge' : ''}
           </p>
         </section>
+
+        {focusInfo && (
+          <details className="ui-card">
+            <summary className="hud-summary">Consignes</summary>
+            {focusInfo.variant.media.length === 0 && (
+              <div className="media-missing">
+                <ImageOff size={16} aria-hidden="true" /> Pas de démonstration vérifiée
+              </div>
+            )}
+            <ul className="mini-list">
+              {focusInfo.variant.cues.map((c) => (
+                <li key={c}>• {c}</li>
+              ))}
+              {focusInfo.variant.commonErrors.map((c) => (
+                <li key={c}>✕ {c}</li>
+              ))}
+            </ul>
+            <span className="pill" style={{ alignSelf: 'flex-start' }}>Non relu par un pro</span>
+          </details>
+        )}
       </div>
 
       <Modal open={dialog === 'pain'} onClose={() => setDialog(null)} title="Douleur ou problème">

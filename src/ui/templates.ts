@@ -16,6 +16,8 @@ export interface TemplateLine {
   assistance?: string;
   targetRir?: number;
   restSeconds: number;
+  /** Consigne d'exécution (ex. « prise neutre »). */
+  cue?: string;
 }
 
 export interface SessionTemplate {
@@ -57,6 +59,7 @@ export function planFromTemplate(t: SessionTemplate, exerciseOf: (variantId: str
         assistance: line.assistance,
         targetRir: line.targetRir,
         restSeconds: line.restSeconds,
+        cue: line.cue,
       })),
     ),
   };

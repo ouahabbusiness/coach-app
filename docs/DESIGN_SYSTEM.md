@@ -35,7 +35,7 @@ Plus Jakarta Sans uniquement (400 → 800), auto-hébergée (@fontsource, OFL). 
 - Planning : carte jour minimaliste (date empilée, 2 icônes travail/coucher, une ligne par séance, statut en petit badge) ; détails et actions derrière « ⋯ ».
 - Navigation : pilule compacte (42 px), translucide.
 - Animations : apparition décalée des blocs sur toutes les pages, jauges qui se remplissent, coches qui rebondissent ; coupées si mouvement réduit.
-- Barre de séance : même pilule noire, action principale orange.
+- Écran de séance « HUD » : barre Mission collante en haut, stats (exos, séries, actif, repos), carte de la série (étiquette EXO/SÉRIE, statut, paramètres en grille, chrono, bouton principal dans le flux), plan de mission en liste. Aucun élément flottant.
 - Icônes Lucide, trait fin (1,6).
 - Habitudes : barre en segments + ronds à cocher orange.
 
