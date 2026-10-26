@@ -1,6 +1,7 @@
 // Planning de la semaine. Heures locales « HH:MM », jours 0 = lundi … 6 = dimanche.
 // Fonctions pures : conflits avec les événements fixes et conséquences d'un déplacement.
 
+import type { DisruptionReason, PlanLine } from './disruption';
 import type { OnboardingAnswers } from './profile';
 
 export type FixedKind = 'travail' | 'trajet' | 'sommeil' | 'autre';
@@ -28,7 +29,20 @@ export interface PlannedItem {
   title: string;
   templateId?: string;
   /** Historique des déplacements (traçabilité). */
-  moves: { at: number; fromDay: number; fromStart: string }[];
+  moves: { at: number; fromDay: number; fromStart: string; reason?: DisruptionReason }[];
+  /** Séance démarrée depuis cet élément (lien par identifiant). */
+  sessionId?: string;
+  /** Imprévu déclaré : la décision et sa raison sont conservées. */
+  adjustment?: Adjustment;
+  /** Version adaptée à utiliser à la place du modèle (raccourcie, allégée, sans matériel). */
+  adapted?: { lines: PlanLine[]; estimatedMin: number; removed: string[] };
+}
+
+export interface Adjustment {
+  reason: DisruptionReason;
+  decision: 'adaptée' | 'annulée' | 'suspendue' | 'remplacée';
+  at: number;
+  note?: string;
 }
 
 export const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -127,20 +141,28 @@ export function consequencesOf(
   return out;
 }
 
-export type ItemStatus = 'prévu' | 'réalisé' | 'partiel' | 'non confirmé';
+export type ItemStatus = 'prévu' | 'réalisé' | 'adapté' | 'partiel' | 'annulé' | 'suspendu' | 'non confirmé';
 
 /**
- * Statut d'un élément prévu à partir des séances réellement enregistrées.
+ * Statut d'un élément prévu à partir des séances réellement enregistrées et des imprévus déclarés.
+ * Lien par identifiant si la séance a été lancée depuis le planning ; sinon par nom le même jour.
  * Jour passé sans séance : « non confirmé » (l'app ne sait pas), jamais « absent ».
  */
 export function itemStatus(
   item: PlannedItem,
   itemDate: string,
   today: string,
-  sessionsOnDay: { title: string; outcome: string }[],
+  sessionsOnDay: { id: string; title: string; outcome: string }[],
 ): ItemStatus {
-  const match = sessionsOnDay.find((s) => s.title === item.title && s.outcome !== 'in_progress');
-  if (match) return match.outcome === 'completed' ? 'réalisé' : 'partiel';
+  const match = item.sessionId
+    ? sessionsOnDay.find((s) => s.id === item.sessionId)
+    : sessionsOnDay.find((s) => s.title === item.title);
+  if (match && match.outcome !== 'in_progress') {
+    if (match.outcome === 'partial' || match.outcome === 'stopped_for_safety') return 'partiel';
+    return item.adapted ? 'adapté' : 'réalisé';
+  }
+  if (item.adjustment?.decision === 'annulée') return 'annulé';
+  if (item.adjustment?.decision === 'suspendue') return 'suspendu';
   return itemDate < today ? 'non confirmé' : 'prévu';
 }
 

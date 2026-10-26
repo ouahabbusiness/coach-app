@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, Car, ChevronLeft, ChevronRight, Moon, Play, Plus } from 'lucide-react';
+import { Briefcase, Car, ChevronLeft, ChevronRight, CloudLightning, Moon, Play, Plus } from 'lucide-react';
 import { weekStart as mondayOf } from '../engine/challenge';
 import { localDay } from '../engine/derive';
 import {
@@ -22,6 +22,8 @@ import { loadOnboarding } from './profileStore';
 import { deviceTimeZone, newId } from './support';
 import { loadTemplates, type SessionTemplate } from './templates';
 import { startSessionFromTemplate } from './actions';
+import { DisruptionPanel } from './Disruption';
+import { REASON_LABELS, type DisruptionReason } from '../engine/disruption';
 import type { Route } from './App';
 
 const KEY = 'planning.items';
@@ -31,7 +33,7 @@ export async function loadPlanning(repo: Repository): Promise<PlannedItem[]> {
 }
 
 const KIND_LABEL: Record<ItemKind, string> = { seance: 'Séance', course: 'Course', marche: 'Marche' };
-const STATUS_TONE: Record<ItemStatus, string> = { prévu: '', réalisé: 'ok', partiel: 'warn', 'non confirmé': '' };
+const STATUS_TONE: Record<ItemStatus, string> = { prévu: '', réalisé: 'ok', adapté: 'ok', partiel: 'warn', annulé: '', suspendu: 'warn', 'non confirmé': '' };
 const FIXED_ICON = { travail: Briefcase, trajet: Car, sommeil: Moon, autre: Briefcase };
 
 function fmtDate(day: string, opts: Intl.DateTimeFormatOptions) {
@@ -45,6 +47,8 @@ interface Draft {
   day: number;
   start: string;
   durationMin: number;
+  /** Raison du report quand il vient d'un imprévu. */
+  reason?: DisruptionReason;
 }
 
 export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
@@ -56,6 +60,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
   const [sessions, setSessions] = useState<SessionSummaryRow[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [disrupting, setDisrupting] = useState<PlannedItem | null>(null);
 
   useEffect(() => {
     loadPlanning(repo).then(setItems);
@@ -82,7 +87,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
   const planned = weekItems.filter((i) => i.kind !== 'marche').length;
   const realized = weekItems.filter((i) => {
     const st = itemStatus(i, dateOf(week, i.day), today, sessionsByDate.get(dateOf(week, i.day)) ?? []);
-    return st === 'réalisé' || st === 'partiel';
+    return st === 'réalisé' || st === 'adapté' || st === 'partiel';
   }).length;
 
   const titleOf = (d: Draft) => (d.kind === 'seance' ? templates.find((t) => t.id === d.templateId)?.title ?? 'Séance' : KIND_LABEL[d.kind]);
@@ -93,7 +98,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
       await persist(
         items.map((i) =>
           i.id === draft.id
-            ? { ...i, day: draft.day, start: draft.start, durationMin: draft.durationMin, moves: [...i.moves, { at: Date.now(), fromDay: i.day, fromStart: i.start }] }
+            ? { ...i, day: draft.day, start: draft.start, durationMin: draft.durationMin, moves: [...i.moves, { at: Date.now(), fromDay: i.day, fromStart: i.start, reason: draft.reason }] }
             : i,
         ),
       );
@@ -104,6 +109,18 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
       ]);
     }
     setDraft(null);
+  };
+
+  const replaceItem = async (next: PlannedItem) => {
+    await persist(items.map((i) => (i.id === next.id ? next : i)));
+  };
+
+  /** Lance la séance (version adaptée si un imprévu l'a modifiée) et la lie à l'élément par identifiant. */
+  const startFromItem = async (i: PlannedItem, tpl: SessionTemplate) => {
+    const source: SessionTemplate = i.adapted ? { ...tpl, title: `${tpl.title} (adaptée)`, lines: i.adapted.lines as SessionTemplate['lines'] } : tpl;
+    const sessionId = await startSessionFromTemplate(repo, source);
+    await replaceItem({ ...i, sessionId });
+    go({ name: 'session', id: sessionId });
   };
 
   const consequences = draft ? consequencesOf(weekItems, { id: draft.id, day: draft.day, start: draft.start, durationMin: draft.durationMin, kind: draft.kind }, fixed ?? []) : [];
@@ -160,7 +177,7 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
           .sort((a, b) => toMin(a.start) - toMin(b.start));
         const dayItems = weekItems.filter((i) => i.day === day).sort((a, b) => toMin(a.start) - toMin(b.start));
         const daySessions = sessionsByDate.get(date) ?? [];
-        const unplanned = daySessions.filter((s) => s.outcome !== 'in_progress' && !dayItems.some((i) => i.title === s.title));
+        const unplanned = daySessions.filter((s) => s.outcome !== 'in_progress' && !dayItems.some((i) => (i.sessionId ? i.sessionId === s.id : i.title === s.title)));
         return (
           <section key={day} className="card" aria-label={`${name} ${fmtDate(date, { day: 'numeric', month: 'long' })}`} style={date === today ? { borderColor: 'var(--accent)', borderWidth: 2 } : undefined}>
             <div className="spread">
@@ -198,15 +215,38 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
                           {i.start} · {i.title}
                         </div>
                         <div className="muted" style={{ fontSize: '0.85rem' }}>
-                          {KIND_LABEL[i.kind]} · {i.durationMin} min{i.moves.length > 0 ? ` · déplacé ${i.moves.length}×` : ''}
+                          {KIND_LABEL[i.kind]} · {i.durationMin} min{i.adapted ? ` · version adaptée ≈ ${i.adapted.estimatedMin} min (estimation)` : ''}
+                          {i.moves.length > 0 ? ` · déplacé ${i.moves.length}×` : ''}
                         </div>
                       </div>
                       <span className={`badge ${STATUS_TONE[st]}`}>{st}</span>
                     </div>
+                    {i.adjustment && (
+                      <div className="muted" style={{ fontSize: '0.85rem', marginTop: 6 }}>
+                        Imprévu : {REASON_LABELS[i.adjustment.reason]} → {i.adjustment.decision === 'adaptée' ? 'version adaptée' : i.adjustment.decision}
+                        {i.adjustment.note ? ` (${i.adjustment.note})` : ''}
+                        {i.adapted && i.adapted.removed.length > 0 ? ` · retiré : ${i.adapted.removed.join(' ; ')}` : ''}
+                      </div>
+                    )}
+                    {i.moves.some((m) => m.reason) && (
+                      <div className="muted" style={{ fontSize: '0.85rem', marginTop: 4 }}>
+                        Reporté pour : {[...new Set(i.moves.filter((m) => m.reason).map((m) => REASON_LABELS[m.reason!]))].join(', ')}
+                      </div>
+                    )}
                     <div className="row" style={{ marginTop: 8, gap: 6 }}>
                       {date === today && st === 'prévu' && tpl && (
-                        <button className="btn primary" onClick={async () => go({ name: 'session', id: await startSessionFromTemplate(repo, tpl) })}>
-                          <Play size={16} aria-hidden="true" /> Commencer
+                        <button className="btn primary" onClick={() => startFromItem(i, tpl)}>
+                          <Play size={16} aria-hidden="true" /> {i.adapted ? 'Commencer (adaptée)' : 'Commencer'}
+                        </button>
+                      )}
+                      {st === 'prévu' && date >= today && (
+                        <button className="btn" onClick={() => setDisrupting(i)}>
+                          <CloudLightning size={16} aria-hidden="true" /> Imprévu
+                        </button>
+                      )}
+                      {(st === 'annulé' || st === 'suspendu' || (st === 'prévu' && i.adapted)) && i.adjustment?.decision !== 'remplacée' && (
+                        <button className="btn ghost" onClick={() => replaceItem({ ...i, adjustment: undefined, adapted: undefined })}>
+                          Rétablir
                         </button>
                       )}
                       {st === 'prévu' && (
@@ -311,6 +351,25 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
               </button>
             </div>
           </div>
+        )}
+      </Modal>
+
+      <Modal open={!!disrupting} onClose={() => setDisrupting(null)} title="Déclarer un imprévu">
+        {disrupting && (
+          <DisruptionPanel
+            item={disrupting}
+            template={templates.find((t) => t.id === disrupting.templateId)}
+            onCancel={() => setDisrupting(null)}
+            onApply={async (next) => {
+              await replaceItem(next);
+              setDisrupting(null);
+            }}
+            onReschedule={(reason) => {
+              const i = disrupting;
+              setDisrupting(null);
+              setDraft({ id: i.id, kind: i.kind, templateId: i.templateId, day: i.day, start: i.start, durationMin: i.durationMin, reason });
+            }}
+          />
         )}
       </Modal>
     </>

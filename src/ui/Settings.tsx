@@ -20,6 +20,7 @@ const FEATURES: { name: string; status: Status; note?: string }[] = [
   { name: 'Défi de novembre (saisie déclarée)', status: 'testé', note: 'Calculs testés automatiquement ; pas, sommeil et course sont déclarés, pas importés.' },
   { name: 'Onboarding et profil', status: 'testé', note: 'Sauvegarde et reprise vérifiées dans le navigateur ; objectifs versionnés testés automatiquement.' },
   { name: 'Planning de la semaine', status: 'testé', note: 'Conflits et conséquences testés automatiquement ; placement manuel uniquement.' },
+  { name: 'Imprévus du planning', status: 'testé', note: 'Options et versions adaptées testées ; durées adaptées = estimations (règle produit).' },
   { name: 'Nutrition', status: 'non implémenté' },
   { name: 'Course à pied', status: 'non implémenté' },
   { name: 'Apple Santé / Apple Watch', status: 'non implémenté', note: 'Impossible dans une app web ; prévu dans l’app native.' },

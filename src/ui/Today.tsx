@@ -270,7 +270,7 @@ function DayPlan({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
   const day = DAY_INDEX(today);
   const [items, setItems] = useState<PlannedItem[]>([]);
   const [fixed, setFixed] = useState<FixedEvent[]>([]);
-  const [sessions, setSessions] = useState<{ title: string; outcome: string }[]>([]);
+  const [sessions, setSessions] = useState<{ id: string; title: string; outcome: string }[]>([]);
   useEffect(() => {
     loadPlanning(repo).then((all) => setItems(all.filter((i) => i.weekStart === week && i.day === day)));
     loadOnboarding(repo).then((o) => setFixed(fixedEventsFromAnswers(o.answers)));

@@ -79,8 +79,8 @@ describe('conséquences avant confirmation', () => {
 describe('statut des éléments prévus', () => {
   const it1 = item({});
   it('réalisé ou partiel uniquement d’après les séances enregistrées', () => {
-    expect(itemStatus(it1, '2026-11-02', '2026-11-03', [{ title: 'Haut du corps', outcome: 'completed' }])).toBe('réalisé');
-    expect(itemStatus(it1, '2026-11-02', '2026-11-03', [{ title: 'Haut du corps', outcome: 'partial' }])).toBe('partiel');
+    expect(itemStatus(it1, '2026-11-02', '2026-11-03', [{ id: 'x', title: 'Haut du corps', outcome: 'completed' }])).toBe('réalisé');
+    expect(itemStatus(it1, '2026-11-02', '2026-11-03', [{ id: 'x', title: 'Haut du corps', outcome: 'partial' }])).toBe('partiel');
   });
   it('jour passé sans séance : non confirmé, pas absent', () => {
     expect(itemStatus(it1, '2026-11-02', '2026-11-03', [])).toBe('non confirmé');

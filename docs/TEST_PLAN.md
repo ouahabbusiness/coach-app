@@ -15,7 +15,8 @@ Fixtures fictives uniquement (jamais présentées comme performances réelles).
 | 9 | Pas de doublon au rejeu (local) | Automatisé ✔ | sync distante : non applicable (pas de serveur) |
 | 12 | Journée vide ≠ échec | Automatisé ✔ | défi : « non renseigné » |
 | 14 | Douleur → comportement de sécurité | Automatisé ✔ + navigateur ✔ | |
-| 15 | Repos / maladie sans pénalité | Automatisé ✔ | défi : jour excusé |
+| 15 | Repos / maladie sans pénalité | Automatisé ✔ + navigateur ✔ | défi : jour excusé ; planning : malade → « suspendu », pas de rattrapage |
+| — | Séance raccourcie ≠ séance complète | Automatisé ✔ + navigateur ✔ | statut « adapté », titre « (adaptée) », retraits listés |
 | 19 | Export / import | Automatisé ✔ | |
 | 21 | Changement d'heure belge | Automatisé ✔ | 25/10/2026 |
 | 16 | Estimation ≠ mesure | Partiel | profil : statut par valeur ; résultat absent « — » ; pas/sommeil « déclarés » |
@@ -26,4 +27,4 @@ Fixtures fictives uniquement (jamais présentées comme performances réelles).
 | — | Écran verrouillé / arrière-plan sur iPhone | **Non testé** | nécessite l'iPhone |
 | — | Hors ligne réel (service worker) | **Non testé** | nécessite HTTPS + iPhone |
 
-Dernière exécution : 46 tests passés (`npm test`), 26/10/2026.
+Dernière exécution : 58 tests passés (`npm test`), 26/10/2026.

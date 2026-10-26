@@ -19,6 +19,8 @@ Chaque événement : `id` (UUID, clé d'idempotence), `sessionId`, `at` (UTC ms)
 - `goals` : versions successives `{ version, at, reason, main, secondary, description, why, measure, targetDate, limits }`. Jamais modifiées après coup.
 - `planning.items` : `{ id, weekStart (lundi), day 0–6, start HH:MM, durationMin, kind, title, templateId?, moves[] }`.
   Les horaires fixes ne sont pas stockés : ils sont recalculés depuis l'onboarding.
+  Champs ajoutés : `sessionId?` (lien), `adjustment? { reason, decision: adaptée | annulée | suspendue | remplacée, at, note? }`,
+  `adapted? { lines, estimatedMin, removed[] }`, `moves[].reason?`. Statuts calculés : prévu, réalisé, adapté, partiel, annulé, suspendu, non confirmé.
 
 ## À concevoir (phases suivantes)
-Consentements versionnés, historique des mesures corporelles, nutrition, course, règles de progression versionnées, lien séance prévue ↔ réalisée par identifiant.
+Consentements versionnés, historique des mesures corporelles, nutrition, course, règles de progression versionnées, séance plus longue que prévu, reprise après interruption.
