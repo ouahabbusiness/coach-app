@@ -18,8 +18,10 @@ import { loadPlanning } from './Planning';
 import { deviceTimeZone, fmtDuration, newId } from './support';
 import type { Route } from './App';
 import { useConsent } from './Privacy';
+import { INITIATION_STEPS } from '../engine/runInitiation';
+import { RunReport, type InitiationEntry } from './RunReport';
 
-type Mode = 'guidee' | 'distance' | 'libre';
+type Mode = 'initiation' | 'guidee' | 'distance' | 'libre';
 type Phase = 'setup' | 'running' | 'paused' | 'done';
 
 function speak(text: string, on: boolean) {
@@ -49,6 +51,15 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   const [guide, setGuide] = useState<GuideState>({ index: 0, startM: 0, startS: 0 });
   const [steps, setSteps] = useState<GuidedStep[]>([]);
   const [saved, setSaved] = useState(false);
+  // Initiation : tracé complet, points écartés, début de chaque étape, valeurs déclarées.
+  const rejected = useRef(0);
+  const marks = useRef<number[]>([]);
+  const [talk, setTalk] = useState<'phrases' | 'mots' | 'impossible' | undefined>();
+  const [hrAvg, setHrAvg] = useState('');
+  const [hrMax, setHrMax] = useState('');
+  const [pain, setPain] = useState('');
+  const [report, setReport] = useState<InitiationEntry | null>(null);
+  const guided = mode === 'guidee' || mode === 'initiation';
 
   const watch = useRef<number | null>(null);
   const wake = useRef<{ release: () => Promise<void> } | null>(null);
@@ -66,6 +77,8 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
       setRuns(r);
       const t = runTarget(r, today).value;
       if (t) setKm(String(t.km).replace('.', ','));
+      // Première course dans l'app : initiation proposée par défaut.
+      if (!r.some((x) => (x as RunEntry & { kind?: string }).kind === 'initiation')) return setMode('initiation');
       const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
       const it = (await loadPlanning(repo)).filter((i) => i.weekStart === weekStart(today) && i.day === day && i.kind === 'course' && !i.sessionId).sort((a, b) => toMin(a.start) - toMin(b.start))[0];
       if (it) {
@@ -95,10 +108,11 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
       navigator.vibrate?.(300);
     }
     lastM.current = st.meters;
-    if (mode === 'guidee' && steps.length) {
+    if (guided && steps.length) {
       const r = advance(steps, guide, st.meters, elapsedS);
       if (r.state !== guide) {
         setGuide(r.state);
+        if (r.started) marks.current.push(Date.now());
         speak(r.finished ? 'Séance terminée. Bravo.' : r.started ? announce(r.started) : '', voice);
         navigator.vibrate?.([200, 100, 200]);
       }
@@ -142,7 +156,11 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
         const p: GpsPoint = { lat: pos.coords.latitude, lon: pos.coords.longitude, t: pos.timestamp, acc: pos.coords.accuracy };
         setSegments((s) => {
           const copy = [...s];
-          copy[copy.length - 1] = addPoint(copy[copy.length - 1] ?? { points: [] }, p);
+          const before = copy[copy.length - 1] ?? { points: [] };
+          const after = addPoint(before, p);
+          // Point écarté (imprécis ou impossible) : compté pour juger la qualité du GPS.
+          if (after === before) rejected.current++;
+          copy[copy.length - 1] = after;
           return copy;
         });
         setErr(null);
@@ -160,10 +178,12 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
     // Accords avant activation : GPS (reste sur l'appareil), puis fond de carte (zone envoyée à OpenStreetMap).
     if (!(await gps.ensure())) return setErr('GPS non autorisé dans l’app : Réglages → Mes données.');
     await tiles.ensure();
-    const s = mode === 'guidee' && planned ? stepsFor(planned, pacesFrom(runs)) : [];
+    const s = mode === 'initiation' ? INITIATION_STEPS : mode === 'guidee' && planned ? stepsFor(planned, pacesFrom(runs)) : [];
     setSteps(s);
     setGuide({ index: 0, startM: 0, startS: 0 });
     t0.current = Date.now();
+    marks.current = [t0.current];
+    rejected.current = 0;
     pausedMs.current = 0;
     lastM.current = 0;
     setNow(Date.now());
@@ -200,6 +220,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
   useEffect(() => () => stopWatch(), []);
 
   const save = async () => {
+    if (mode === 'initiation') return saveInitiation();
     const entry: RunEntry & { gps: true; track: [number, number][] } = {
       id: newId(),
       day: today,
@@ -219,6 +240,39 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
       const items = await loadPlanning(repo);
       await repo.setKv('planning.items', items.map((i) => (i.id === planned.id ? { ...i, sessionId: `run-${entry.id}` } : i)));
     }
+    setSaved(true);
+  };
+
+  /** Initiation : tout le tracé horodaté (pour l'analyse), stocké sur l'appareil uniquement. */
+  const saveInitiation = async () => {
+    const num = (v: string) => {
+      const n = Number(v.replace(',', '.'));
+      return v.trim() && Number.isFinite(n) && n > 30 && n < 230 ? Math.round(n) : undefined;
+    };
+    const entry: RunEntry & InitiationEntry & { gps: true } = {
+      id: newId(),
+      day: today,
+      kind: 'initiation',
+      km: Math.round(st.meters / 10) / 100,
+      minutes: Math.round(elapsedS / 6) / 10,
+      effort,
+      at: Date.now(),
+      gps: true,
+      segments: segments.map((s) => s.points.map((p) => [Math.round(p.lat * 1e6) / 1e6, Math.round(p.lon * 1e6) / 1e6, p.t, Math.round(p.acc)] as [number, number, number, number])),
+      marks: marks.current,
+      rejected: rejected.current,
+      elapsedS,
+      declared: { hrAvg: num(hrAvg), hrMax: num(hrMax), rpe: effort, talk, pain: pain.trim() || undefined },
+    };
+    await repo.setKv('run.log', [...runs, entry]);
+    const proofs = (await repo.getKv<ProofDay>(proofKey(today))) ?? {};
+    await repo.setKv(proofKey(today), { ...proofs, run: { habitId: 'run', photo: '', takenAt: t0.current, savedAt: Date.now(), source: 'gps' } });
+    await update(today, (e) => ({ ...e, values: { ...e.values, run: true } }));
+    if (planned) {
+      const items = await loadPlanning(repo);
+      await repo.setKv('planning.items', items.map((i) => (i.id === planned.id ? { ...i, sessionId: `run-${entry.id}` } : i)));
+    }
+    setReport(entry);
     setSaved(true);
   };
 
@@ -251,6 +305,10 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
             <p className="cq-who">Coach</p>
             <h1 className="ob-title">On court.</h1>
             <div className="cq-choices">
+              <button className="cq-opt" aria-pressed={mode === 'initiation'} onClick={() => setMode('initiation')}>
+                <span className="cq-opt-l">Course d’initiation · 30 min</span>
+                <span className="cq-opt-sub">Pour connaître ton niveau : pas un test maximal</span>
+              </button>
               {planned && (
                 <button className="cq-opt" aria-pressed={mode === 'guidee'} onClick={() => setMode('guidee')}>
                   <span className="cq-opt-l">Séance du jour, guidée</span>
@@ -280,6 +338,24 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
                     Boucle libre
                   </button>
                 </div>
+              </div>
+            )}
+            {mode === 'initiation' && (
+              <div className="card ob-card">
+                <ol className="run-steps">
+                  {INITIATION_STEPS.map((s, i) => (
+                    <li key={i}>
+                      {s.label}
+                      <small> · {s.effort}</small>
+                    </li>
+                  ))}
+                </ol>
+                <p className="cq-line" style={{ margin: 0 }}>
+                  Mesuré par le GPS : tracé, distance, allure toutes les 30 s, passages en marche, temps par km.
+                </p>
+                <p className="cq-line" style={{ margin: 0 }}>
+                  Fréquence cardiaque : l’app web ne peut pas lire ta montre. Lance aussi « Course extérieure » sur l’Apple Watch au même moment, puis recopie la FC moyenne et max à la fin.
+                </p>
               </div>
             )}
             {mode === 'guidee' && planned && (
@@ -313,7 +389,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
 
         {phase !== 'setup' && (
           <section className="run-board">
-            {mode === 'guidee' && step && (
+            {guided && step && (
               <div className={`run-step k-${step.kind}`}>
                 <span className="cq-who">Étape {guide.index + 1}/{steps.length}</span>
                 <strong>{step.label}</strong>
@@ -361,12 +437,39 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
                     </button>
                   ))}
                 </div>
-                <button className="btn primary block" disabled={st.meters < 200 || effort === undefined} onClick={save}>
+                {mode === 'initiation' && (
+                  <>
+                    <p className="cq-who">Pendant la course, tu pouvais…</p>
+                    <div className="effort">
+                      {(
+                        [
+                          ['phrases', 'parler en phrases'],
+                          ['mots', 'dire quelques mots'],
+                          ['impossible', 'pas parler'],
+                        ] as const
+                      ).map(([v, l]) => (
+                        <button key={v} className="chip" aria-pressed={talk === v} onClick={() => setTalk(v)}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="cq-who">Fréquence cardiaque (Apple Watch → Forme → cette course)</p>
+                    <div className="cq-num-row">
+                      <input aria-label="FC moyenne" type="text" inputMode="numeric" placeholder="moyenne" value={hrAvg} onChange={(e) => setHrAvg(e.target.value)} />
+                      <input aria-label="FC max" type="text" inputMode="numeric" placeholder="max" value={hrMax} onChange={(e) => setHrMax(e.target.value)} />
+                      <span>bpm</span>
+                    </div>
+                    <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Laisse vide si tu ne l’as pas : la valeur restera « inconnue ».</p>
+                    <input aria-label="Douleur ou gêne" placeholder="Douleur ou gêne (laisser vide si aucune)" value={pain} onChange={(e) => setPain(e.target.value)} />
+                  </>
+                )}
+                <button className="btn primary block" disabled={st.meters < 200 || effort === undefined || (mode === 'initiation' && !talk)} onClick={save}>
                   Enregistrer la course
                 </button>
                 {st.meters < 200 && <p className="cq-warn">Moins de 200 m mesurés : rien à enregistrer.</p>}
               </div>
             )}
+            {saved && report && <RunReport entry={report} />}
             {saved && (
               <div className="card ob-card">
                 <p className="cq-q">Course enregistrée.</p>
