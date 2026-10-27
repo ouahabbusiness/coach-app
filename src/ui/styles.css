@@ -1297,3 +1297,33 @@ body:has(.run-live.full) { background-image: none; }
 .run-metrics { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .run-metrics li { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; font-size: 0.85rem; }
 .run-metrics small { grid-column: 1 / -1; opacity: .6; font-size: 0.7rem; }
+
+/* Entraînement : cartes de séance */
+.tpl { gap: 12px; padding: 14px; }
+.tpl-head { display: flex; align-items: center; gap: 12px; }
+.tpl-title { margin: 0 0 8px; font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.tpl-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill.num { font-variant-numeric: tabular-nums; }
+.tpl-play {
+  width: 56px; height: 56px; border-radius: 999px; flex: none; border: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; box-shadow: 0 8px 18px -8px var(--accent);
+  transition: transform 150ms ease;
+}
+.tpl-play:active { transform: scale(0.93); }
+.tpl-play:disabled { opacity: 0.4; cursor: not-allowed; }
+.tpl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tpl-ex { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+.tpl-ex:first-child { border-top: 0; }
+.tpl-n {
+  width: 24px; height: 24px; border-radius: 999px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; background: var(--accent-soft); color: var(--accent); font-variant-numeric: tabular-nums;
+}
+.tpl-name { flex: 1; min-width: 0; font-size: 0.92rem; font-weight: 500; line-height: 1.25; }
+.tpl-stat { flex: none; display: inline-flex; flex-direction: column; align-items: flex-end; font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tpl-stat b { font-size: 0.7rem; font-weight: 600; color: var(--accent); }
+.tpl-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* Fenêtres : titre + croix de fermeture */
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.modal-head h2 { margin: 0; }

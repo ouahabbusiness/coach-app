@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { CircleAlert, Info, TriangleAlert } from 'lucide-react';
+import { CircleAlert, Info, TriangleAlert, X } from 'lucide-react';
 import type { SessionOutcome } from '../engine/types';
 import type { Route } from './App';
 import { OUTCOME_LABEL } from './support';
@@ -29,8 +29,18 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
         onClose();
       }}
       aria-labelledby="modal-title"
+      // Toucher en dehors de la fenêtre (sur le fond sombre) la ferme.
+      onClick={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose();
+      }}
     >
-      <h2 id="modal-title">{title}</h2>
+      <div className="modal-head">
+        <h2 id="modal-title">{title}</h2>
+        <button className="icon-btn" aria-label="Fermer" onClick={onClose}>
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
       {open && children}
     </dialog>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { Dumbbell, Layers, Pencil, Play, Plus, Timer, Trash2 } from 'lucide-react';
 import { EXERCISES, findVariant } from '../catalog/exercises';
 import type { SetRole } from '../engine/types';
 import type { Repository } from '../storage/db';
@@ -7,6 +7,7 @@ import { ProgramTabs } from './common';
 import { newId } from './support';
 import { loadTemplates, saveTemplates, type SessionTemplate, type TemplateLine } from './templates';
 import { startSessionFromTemplate } from './actions';
+import { estimateMinutes } from '../engine/disruption';
 import type { Route } from './App';
 
 const ROLE_LABEL: Record<SetRole, string> = {
@@ -45,58 +46,66 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
 
   return (
     <>
-      <h1>Programme</h1>
+      <h1>Entraînement</h1>
       <ProgramTabs current="program" go={go} />
-      <div className="card">
-        <div className="spread">
-          <h2 style={{ margin: 0 }}>Mes séances</h2>
-          <button
-            className="btn primary"
-            onClick={() => setEditing({ id: newId(), title: '', lines: [], updatedAt: Date.now() })}
-          >
-            <Plus size={18} aria-hidden="true" /> Nouvelle
-          </button>
-        </div>
-        {templates.length === 0 && <p className="muted" style={{ marginTop: 12 }}>Aucune séance enregistrée.</p>}
-        <div className="stack" style={{ marginTop: 12 }}>
-          {templates.map((t) => (
-            <div key={t.id} className="card soft" style={{ margin: 0 }}>
-              <strong>{t.title}</strong>
-              <ul className="muted" style={{ margin: '4px 0 12px', paddingLeft: 18 }}>
-                {t.lines.map((l) => (
-                  <li key={l.id}>
-                    {findVariant(l.variantId)?.variant.name ?? l.variantId} — {l.sets} × {l.kind === 'reps' ? `${l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps ?? '?'} rép.` : `${l.targetSeconds ?? '?'} s`}
-                    {l.loadKg ? ` · +${l.loadKg} kg` : ''}
-                    {l.assistance ? ` · ${l.assistance}` : ''}
-                  </li>
-                ))}
-              </ul>
-              <div className="row">
-                <button
-                  className="btn primary"
-                  disabled={t.lines.length === 0}
-                  onClick={async () => go({ name: 'session', id: await startSessionFromTemplate(repo, t) })}
-                >
-                  <Play size={18} aria-hidden="true" /> Commencer
-                </button>
-                <button className="btn" onClick={() => setEditing(t)}>
-                  <Pencil size={18} aria-hidden="true" /> Modifier
-                </button>
-                <button
-                  className="btn ghost"
-                  aria-label={`Supprimer le modèle ${t.title}`}
-                  onClick={async () => {
-                    if (confirm(`Supprimer le modèle « ${t.title} » ? Les séances déjà réalisées restent dans l’historique.`)) {
-                      await persist(templates.filter((x) => x.id !== t.id));
-                    }
-                  }}
-                >
-                  <Trash2 size={18} aria-hidden="true" />
-                </button>
+      {templates.map((t) => {
+        const sets = t.lines.reduce((n, l) => n + l.sets, 0);
+        return (
+          <section key={t.id} className="ui-card tpl" aria-label={t.title}>
+            <div className="tpl-head">
+              <div className="grow">
+                <h2 className="tpl-title">{t.title}</h2>
+                <div className="tpl-meta">
+                  <span className="pill num"><Dumbbell size={12} aria-hidden="true" /> {t.lines.length}</span>
+                  <span className="pill num"><Layers size={12} aria-hidden="true" /> {sets}</span>
+                  <span className="pill num"><Timer size={12} aria-hidden="true" /> ≈ {estimateMinutes(t.lines)} min</span>
+                </div>
               </div>
+              <button
+                className="tpl-play"
+                aria-label={`Commencer ${t.title}`}
+                disabled={t.lines.length === 0}
+                onClick={async () => go({ name: 'session', id: await startSessionFromTemplate(repo, t) })}
+              >
+                <Play size={22} aria-hidden="true" />
+              </button>
             </div>
-          ))}
-        </div>
+            <ol className="tpl-list">
+              {t.lines.map((l, i) => (
+                <li key={l.id} className="tpl-ex">
+                  <span className="tpl-n">{i + 1}</span>
+                  <span className="tpl-name">{findVariant(l.variantId)?.variant.name ?? l.variantId}</span>
+                  <span className="tpl-stat">
+                    {l.sets}×{l.kind === 'reps' ? (l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps ?? '?') : `${l.targetSeconds ?? '?'} s`}
+                    {l.loadKg ? <b>+{l.loadKg} kg</b> : null}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <div className="tpl-actions">
+              <button className="btn sm" onClick={() => setEditing(t)}>
+                <Pencil size={16} aria-hidden="true" /> Modifier
+              </button>
+              <button
+                className="icon-btn"
+                aria-label={`Supprimer le modèle ${t.title}`}
+                onClick={async () => {
+                  if (confirm(`Supprimer le modèle « ${t.title} » ? Les séances déjà réalisées restent dans l’historique.`)) {
+                    await persist(templates.filter((x) => x.id !== t.id));
+                  }
+                }}
+              >
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </section>
+        );
+      })}
+      {templates.length === 0 && <p className="muted">Aucune séance.</p>}
+      <div className="row" style={{ marginTop: 4 }}>
+        <button className="btn primary" onClick={() => setEditing({ id: newId(), title: '', lines: [], updatedAt: Date.now() })}>
+          <Plus size={18} aria-hidden="true" /> Nouvelle
+        </button>
       </div>
       <button className="ui-card list-row" onClick={() => go({ name: 'coachProgram' })} style={{ marginTop: 10 }}>
         <div className="grow">
@@ -107,6 +116,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
     </>
   );
 }
+
 
 function TemplateEditor({ initial, onSave, onCancel }: { initial: SessionTemplate; onSave: (t: SessionTemplate) => void; onCancel: () => void }) {
   const [title, setTitle] = useState(initial.title);
