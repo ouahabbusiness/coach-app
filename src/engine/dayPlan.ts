@@ -21,7 +21,7 @@ export interface Food {
 }
 
 export const FOODS: Food[] = [
-  { id: 'oeuf', name: 'Œufs', group: 'proteine', kcal: 140, protein: 12.5, unitG: 60, unitName: 'œuf', breakfast: true },
+  { id: 'oeuf', name: 'Œufs', group: 'proteine', kcal: 140, protein: 12.5, unitG: 51, unitName: 'œuf', breakfast: true },
   { id: 'poulet', name: 'Blanc de poulet', group: 'proteine', kcal: 120, protein: 23 },
   { id: 'dinde', name: 'Escalope de dinde', group: 'proteine', kcal: 110, protein: 24 },
   { id: 'boeuf5', name: 'Steak haché 5 %', group: 'proteine', kcal: 125, protein: 21 },
@@ -64,11 +64,15 @@ export interface DeclaredSupplement {
   waterMl?: number;
 }
 
+export type EggCalibre = 'S' | 'M' | 'L' | 'XL';
+
 export type MilkKind = 'entier' | 'demi' | 'ecreme' | 'vegetal';
 
 export interface BreakfastDetails {
-  /** Poids sans coquille d'un œuf (g). Absent = moyenne de 60 g, affichée comme estimation. */
+  /** Poids du contenu d'un œuf PESÉ sans coquille (g) : prioritaire. */
   eggG?: number;
+  /** Calibre commercial connu (poids AVEC coquille) : poids comestible estimé. Ni l'un ni l'autre = œuf M supposé. */
+  eggCalibre?: EggCalibre;
   /** Matière grasse de cuisson. Quantité absente = pas encore précisée ; `fatUnknown` = elle existe mais on ne la connaît pas (non comptée, jamais 0). */
   fatKind?: 'huile' | 'beurre' | 'autre';
   fatG?: number;
@@ -242,9 +246,24 @@ function portion(f: Food, grams: number): { label: string; g: number } {
   return { label: `${g} g ${f.name.toLowerCase()}`, g };
 }
 
-/** Poids sans coquille d'un œuf : celui déclaré, sinon la moyenne (estimation). */
-export const EGG_DEFAULT_G = 60;
-export const eggUnit = (d?: BreakfastDetails) => d?.eggG ?? EGG_DEFAULT_G;
+/**
+ * Œufs. Les calibres commerciaux (règlement UE 589/2008) sont des intervalles de poids AVEC coquille :
+ * S < 53 g, M 53 à < 63 g, L 63 à < 73 g, XL ≥ 73 g. La part comestible est estimée à 88 % du poids moyen du calibre
+ * (USDA FoodData Central, œuf entier cru : 1 gros œuf ≈ 50 g sans coquille pour ≈ 57 g avec). Estimation, pas une mesure.
+ */
+export const EGG_CALIBRES: Record<EggCalibre, { label: string; shell: string; edibleG: number }> = {
+  S: { label: 'S', shell: '< 53 g', edibleG: 42 },
+  M: { label: 'M', shell: '53 à < 63 g', edibleG: 51 },
+  L: { label: 'L', shell: '63 à < 73 g', edibleG: 60 },
+  XL: { label: 'XL', shell: '≥ 73 g', edibleG: 69 },
+};
+export const EGG_SOURCE =
+  'Calibres UE = poids avec coquille (S < 53 g, M 53–63, L 63–73, XL ≥ 73). Part comestible estimée à 88 % du poids moyen du calibre (USDA FoodData Central : œuf entier cru, 1 gros ≈ 50 g sans coquille pour ≈ 57 g avec).';
+/** Un œuf est compté « 60 » dans les quantités enregistrées (nombre × 60) : le poids réel vient de `eggUnit`. */
+export const EGG_COUNT_G = 60;
+/** Poids comestible d'un œuf : pesé > calibre connu > œuf M supposé (estimation). */
+export const eggUnit = (d?: BreakfastDetails) => d?.eggG ?? (d?.eggCalibre ? EGG_CALIBRES[d.eggCalibre].edibleG : EGG_CALIBRES.M.edibleG);
+export const eggBasis = (d?: BreakfastDetails): 'pesé' | 'calibre' | 'supposé' => (d?.eggG ? 'pesé' : d?.eggCalibre ? 'calibre' : 'supposé');
 
 /** Lait : valeurs moyennes pour 100 ml (estimation). */
 const MILK: Record<MilkKind, { kcal: number; protein: number; label: string }> = {
@@ -297,8 +316,9 @@ export function usualBreakfast(list: UsualItem[], coffee: boolean, details?: Bre
   for (const u of list) {
     const f: { id: string; name: string; kcal: number; protein: number; unitG?: number; unitName?: string } | undefined = food(u.foodId) ?? custom.find((c) => c.id === u.foodId);
     if (!f) continue;
-    const unit = u.foodId === 'oeuf' ? eggUnit(details) : f.unitG;
-    const n = unit ? Math.max(1, Math.round(u.grams / unit)) : 0;
+    const isEgg = u.foodId === 'oeuf';
+    const unit = isEgg ? eggUnit(details) : f.unitG;
+    const n = unit ? Math.max(1, Math.round(u.grams / (isEgg ? EGG_COUNT_G : unit))) : 0;
     const g = unit ? n * unit : r5(u.grams);
     items.push(unit ? `${n} ${f.unitName ?? 'portion'}${n > 1 ? 's' : ''}${custom.some((c) => c.id === f.id) ? ' · ' + f.name : ''}` : `${g} g ${f.name.toLowerCase()}`);
     parts.push({ foodId: f.id, grams: g });
@@ -368,7 +388,11 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const supp = (t: DeclaredSupplement['timing']) => a.supplements.filter((s) => s.timing === t);
 
   // Répartition : petit-déj 25 %, déjeuner 30 %, dîner 30 %, collation(s) le reste.
-  const shares = meals === 3 ? [0.3, 0.35, 0.35] : meals === 4 ? [0.25, 0.3, 0.15, 0.3] : [0.2, 0.1, 0.25, 0.15, 0.3];
+  const defaultShares = meals === 3 ? [0.3, 0.35, 0.35] : meals === 4 ? [0.25, 0.3, 0.15, 0.3] : [0.2, 0.1, 0.25, 0.15, 0.3];
+  // « Appétit le matin » : le petit-déjeuner prend sa part, les autres repas se partagent le reste : le total du jour est conservé.
+  const s0 = a.breakfastShare ? Math.min(0.5, Math.max(0.1, a.breakfastShare / 100)) : defaultShares[0]!;
+  const restScale = (1 - s0) / (1 - defaultShares[0]!);
+  const shares = defaultShares.map((x, idx) => (idx === 0 ? s0 : x * restScale));
   const proteinPer = i.proteinG / meals;
 
   out.push({ id: 'reveil', time: fromMin(wake), kind: 'eau', title: 'Réveil', items: ['Grand verre d’eau'], waterMl: 400 });
@@ -608,4 +632,12 @@ export function shoppingList(plans: PlanEntry[][], pantry?: string[]): ShoppingL
   }
   const order: Aisle[] = ['Frais : viandes, poissons, œufs, laitiers', 'Fruits et légumes', 'Épicerie'];
   return lines.sort((a, b) => order.indexOf(a.aisle) - order.indexOf(b.aisle) || a.name.localeCompare(b.name));
+}
+
+/**
+ * Repas déjà confirmés (« exactement le plan ») : leurs valeurs du moment sont conservées. Un changement de réglage
+ * ou d'habitude plus tard dans la journée ne réécrit pas ce qui a déjà été enregistré.
+ */
+export function freezeConfirmed(plan: PlanEntry[], snapshot: Record<string, PlanEntry>, confirmed: string[]): PlanEntry[] {
+  return plan.map((e) => (confirmed.includes(e.id) && snapshot[e.id] ? snapshot[e.id]! : e));
 }

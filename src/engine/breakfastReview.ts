@@ -2,7 +2,7 @@
 // Aucun avis médical : l'app compare des quantités à des repères ajustables ; valeurs nutritionnelles = moyennes (estimation)
 // sauf pour un produit personnel (étiquette). Une quantité inconnue n'est jamais comptée comme zéro.
 
-import { coffeeExtras, eggUnit, fatExtras, food, usualBreakfast, type BreakfastDetails, type CustomFood, type NutritionAnswers, type UsualItem } from './dayPlan';
+import { coffeeExtras, EGG_COUNT_G, EGG_SOURCE, eggBasis, eggUnit, fatExtras, food, usualBreakfast, type BreakfastDetails, type CustomFood, type NutritionAnswers, type UsualItem } from './dayPlan';
 
 type Part = UsualItem;
 
@@ -33,8 +33,11 @@ export interface BreakfastReview {
   unknownNotCounted: string[];
   /** Aliments calculés avec une moyenne générique (pas un produit scanné). */
   generic: string[];
-  /** Hypothèse sur le poids d'un œuf. */
+  /** Hypothèse sur le poids d'un œuf, et d'où elle vient. */
   eggAssumption?: string;
+  eggSource?: string;
+  /** Critères exacts de la recommandation. */
+  criteria: string;
   notes: string[];
 }
 
@@ -79,7 +82,7 @@ export function reviewBreakfast(a: NutritionAnswers, kcal: number, proteinG: num
   const gramsOf = (parts: Part[], id: string) => parts.find((p) => p.foodId === id)?.grams ?? 0;
   const describe = (id: string, fromG: number, toG: number) => {
     const f = food(id);
-    const unit = id === 'oeuf' ? eggUnit(details) : f?.unitG ?? custom.find((c) => c.id === id)?.unitG;
+    const unit = id === 'oeuf' ? EGG_COUNT_G : f?.unitG ?? custom.find((c) => c.id === id)?.unitG;
     const fmt = (g: number) => (unit ? `${Math.round(g / unit)}` : `${g} g`);
     return `${nameOf(id, custom)} : ${fmt(fromG)} → ${fmt(toG)}`;
   };
@@ -94,15 +97,15 @@ export function reviewBreakfast(a: NutritionAnswers, kcal: number, proteinG: num
 
   const egg = food('oeuf')!;
   const white = food('blanc_oeuf')!;
-  const unit = eggUnit(details);
+  const unit = eggUnit(details); // poids comestible d'un œuf (g)
   const eggs = usual.find((u) => u.foodId === 'oeuf');
-  const nEggs = eggs ? Math.round(eggs.grams / unit) : 0;
+  const nEggs = eggs ? Math.round(eggs.grams / EGG_COUNT_G) : 0; // les œufs sont enregistrés « nombre × 60 »
 
   if (nEggs >= 3) {
     // Garde 2 œufs entiers ; les protéines des œufs retirés sont reprises par des blancs (même convention de poids).
     const removedProtein = (nEggs - 2) * unit * (egg.protein / 100);
     const whites = r5((removedProtein / white.protein) * 100);
-    const parts = merge(usual.map((u) => (u.foodId === 'oeuf' ? { ...u, grams: 2 * unit } : u)), { foodId: 'blanc_oeuf', grams: whites });
+    const parts = merge(usual.map((u) => (u.foodId === 'oeuf' ? { ...u, grams: 2 * EGG_COUNT_G } : u)), { foodId: 'blanc_oeuf', grams: whites });
     options.push(build('moins-jaunes', 'Moins d’œufs entiers', parts, `2 œufs entiers + ${whites} g de blancs : protéines proches, moins de jaunes.`));
   }
   if (nEggs >= 2) {
@@ -111,7 +114,7 @@ export function reviewBreakfast(a: NutritionAnswers, kcal: number, proteinG: num
     const other = usual.some((u) => u.foodId === 'cottage') || !usual.some((u) => u.foodId === 'skyr') ? 'cottage' : 'skyr';
     const f = food(other)!;
     const grams = r5((removedProtein / f.protein) * 100);
-    const parts = merge(usual.map((u) => (u.foodId === 'oeuf' ? { ...u, grams: u.grams - 2 * unit } : u)), { foodId: other, grams });
+    const parts = merge(usual.map((u) => (u.foodId === 'oeuf' ? { ...u, grams: u.grams - 2 * EGG_COUNT_G } : u)), { foodId: other, grams });
     options.push(build('alterner', 'Alterner la source', parts.filter((p) => p.grams > 0), `2 œufs de moins, +${grams} g de ${f.name.toLowerCase()} : protéines proches, aliments séparés.`));
   }
   if (!usual.some((u) => food(u.foodId)?.group === 'fruit')) {
@@ -146,6 +149,14 @@ export function reviewBreakfast(a: NutritionAnswers, kcal: number, proteinG: num
   if (nEggs >= 3) {
     notes.push(`Rappel choisi par l’app, pas un seuil scientifique : ${nEggs} œufs entiers par jour. Les repères de santé varient selon les personnes ; si tu as un cholestérol élevé, un diabète ou des antécédents cardiovasculaires, fais valider la quantité par un professionnel.`);
   }
-  const eggAssumption = eggs ? (details?.eggG ? `Œuf : ${details.eggG} g sans coquille (réglé par toi).` : `Œuf : ${unit} g sans coquille, moyenne estimée. Précise le calibre pour affiner.`) : undefined;
-  return { target, options, recommendedId: recommended.id, recommendedWhy, missing, unknownNotCounted, generic, eggAssumption, notes };
+  const basis = eggBasis(details);
+  const eggAssumption = eggs
+    ? basis === 'pesé'
+      ? `Œuf : ${unit} g de contenu sans coquille, pesé par toi.`
+      : basis === 'calibre'
+        ? `Œuf calibre ${details!.eggCalibre} : ≈ ${unit} g comestibles par œuf (estimation, le calibre est un poids avec coquille).`
+        : `Calibre inconnu : œuf M supposé, ≈ ${unit} g comestibles (estimation). Précise le calibre, ou pèse le contenu, pour affiner.`
+    : undefined;
+  const criteria = `Critères : les calories ET les protéines, chacune à ± 15 % du repère, pour garder ta version. Sinon, la version dont l’écart cumulé (calories + protéines) est le plus faible. Cela ne juge pas la qualité du repas (fibres, graisses, satiété).`;
+  return { target, options, recommendedId: recommended.id, recommendedWhy, missing, unknownNotCounted, generic, eggAssumption, eggSource: eggs ? EGG_SOURCE : undefined, criteria, notes };
 }

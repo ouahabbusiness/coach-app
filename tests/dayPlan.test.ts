@@ -138,8 +138,8 @@ describe('petit-déjeuner habituel', () => {
   it('est repris tel quel : quantités, café, valeurs', () => {
     const bf = day(usual).find((e) => e.id === 'petit_dej')!;
     expect(bf.items).toEqual(['150 g cottage cheese', '4 œufs', '4 cracottes', 'Café']);
-    expect(bf.parts).toEqual([{ foodId: 'cottage', grams: 150 }, { foodId: 'oeuf', grams: 240 }, { foodId: 'cracotte', grams: 36 }]);
-    expect(bf.kcal).toBe(Math.round(0.98 * 150 + 1.4 * 240 + 3.8 * 36));
+    expect(bf.parts).toEqual([{ foodId: 'cottage', grams: 150 }, { foodId: 'oeuf', grams: 204 }, { foodId: 'cracotte', grams: 36 }]);
+    expect(bf.kcal).toBe(Math.round(0.98 * 150 + 1.4 * 204 + 3.8 * 36));
   });
 
   it('les autres repas absorbent l’écart : la journée reste proche de la cible', () => {

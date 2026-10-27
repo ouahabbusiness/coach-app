@@ -11,7 +11,8 @@ import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
 import { BREAKFAST_SHARES, reviewBreakfast } from '../engine/breakfastReview';
-import { buildDayPlan, EGG_DEFAULT_G, eggUnit, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type CustomFood, type UsualItem, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { loadBreakfastToday, saveBreakfastToday } from './breakfastToday';
+import { buildDayPlan, EGG_CALIBRES, EGG_COUNT_G, EGG_SOURCE, freezeConfirmed, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type CustomFood, type UsualItem, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -26,7 +27,7 @@ const KEY = 'nutrition.answers';
 const doneKey = (day: string) => `dayplan.done.${day}`;
 const eatenKey = (day: string) => `dayplan.eaten.${day}`;
 const confirmedKey = (day: string) => `dayplan.confirmed.${day}`;
-const breakfastKey = (day: string) => `dayplan.breakfast.${day}`;
+const snapshotKey = (day: string) => `dayplan.snapshot.${day}`;
 
 /** Compléments déclarés par Hmidou le 26/10/2026 : pré-remplis, dose et valeurs à recopier de l'emballage. */
 const DECLARED: DeclaredSupplement[] = [
@@ -51,12 +52,6 @@ function Multi({ group, value, onChange }: { group: FoodGroup; value: string[]; 
 }
 
 
-const EGG_SIZES = [
-  { g: 45, label: 'Petit · 45 g' },
-  { g: 53, label: 'Moyen · 53 g' },
-  { g: 63, label: 'Gros · 63 g' },
-  { g: 73, label: 'Très gros · 73 g' },
-] as const;
 const MILKS = [
   { k: 'entier', label: 'Entier' },
   { k: 'demi', label: 'Demi-écrémé' },
@@ -90,9 +85,10 @@ function UsualBreakfast({ a, set, products }: { a: NutritionAnswers; set: (p: Pa
   const value = a.usualBreakfast ?? [];
   const coffee = !!a.breakfastCoffee;
   const d: BreakfastDetails = a.breakfastDetails ?? {};
-  const unitOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? eggUnit(d) : f?.unitG);
+  // Les œufs sont comptés par nombre (enregistré × 60) : changer de calibre ou de poids ne change pas le nombre d'œufs.
+  const unitOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? EGG_COUNT_G : f?.unitG);
   const stepOf = (id: string, f?: { unitG?: number }) => unitOf(id, f) ?? 25;
-  const startOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? 4 * eggUnit(d) : unitOf(id, f) ? 2 * unitOf(id, f)! : 100);
+  const startOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? 4 * EGG_COUNT_G : unitOf(id, f) ? 2 * unitOf(id, f)! : 100);
   const qty = (id: string, f: { unitG?: number } | undefined, g: number) => (unitOf(id, f) ? `${Math.round(g / unitOf(id, f)!)}` : `${g} g`);
   const setValue = (v: UsualItem[]) => set({ usualBreakfast: v });
   const setDetails = (p: Partial<BreakfastDetails>) => set({ breakfastDetails: { ...d, ...p } });
@@ -102,16 +98,6 @@ function UsualBreakfast({ a, set, products }: { a: NutritionAnswers; set: (p: Pa
     const grams = cur.grams + delta * stepOf(id, f);
     setValue(grams <= 0 ? value.filter((x) => x.foodId !== id) : value.map((x) => (x.foodId === id ? { ...x, grams } : x)));
   };
-  /** Changer le calibre garde le même nombre d'œufs. */
-  const setEgg = (eggG?: number) => {
-    const cur = value.find((x) => x.foodId === 'oeuf');
-    const n = cur ? Math.max(1, Math.round(cur.grams / eggUnit(d))) : 0;
-    set({
-      breakfastDetails: { ...d, eggG },
-      ...(cur ? { usualBreakfast: value.map((x) => (x.foodId === 'oeuf' ? { ...x, grams: n * (eggG ?? EGG_DEFAULT_G) } : x)) } : {}),
-    });
-  };
-
   const row = (id: string, f: { name: string; unitG?: number }) => {
     const cur = value.find((x) => x.foodId === id);
     return (
@@ -153,12 +139,16 @@ function UsualBreakfast({ a, set, products }: { a: NutritionAnswers; set: (p: Pa
 
       {value.some((x) => x.foodId === 'oeuf') && (
         <>
-          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Œuf · poids sans coquille</p>
+          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Œuf · calibre (poids avec coquille)</p>
           <div className="chips" role="group" aria-label="Calibre de l’œuf">
-            {EGG_SIZES.map((s) => chip(d.eggG === s.g, s.label, () => setEgg(s.g)))}
-            {chip(d.eggG === undefined, 'Je ne sais pas · 60 g estimé', () => setEgg(undefined))}
+            {(Object.keys(EGG_CALIBRES) as (keyof typeof EGG_CALIBRES)[]).map((c) =>
+              chip(!d.eggG && d.eggCalibre === c, `${c} · ${EGG_CALIBRES[c].shell} → ≈ ${EGG_CALIBRES[c].edibleG} g`, () => setDetails({ eggCalibre: c, eggG: undefined })),
+            )}
+            {chip(!d.eggG && !d.eggCalibre, 'Je ne sais pas · M supposé', () => setDetails({ eggCalibre: undefined, eggG: undefined }))}
           </div>
-          <QtyInput label="Autre poids" unit="g" value={d.eggG && !EGG_SIZES.some((s) => s.g === d.eggG) ? d.eggG : undefined} onChange={(v) => setEgg(v && v > 0 ? v : undefined)} />
+          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Ou : contenu pesé sans coquille</p>
+          <QtyInput label="Poids d’un œuf pesé" unit="g" value={d.eggG} onChange={(v) => setDetails({ eggG: v && v > 0 ? v : undefined })} />
+          <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>{EGG_SOURCE}</p>
         </>
       )}
 
@@ -435,6 +425,7 @@ export function useDayPlan(repo: Repository) {
   const [eaten, setEatenState] = useState<Record<string, EatenMeal>>({});
   const [confirmed, setConfirmed] = useState<string[]>([]);
   const [bfToday, setBfToday] = useState<UsualItem[] | undefined>();
+  const [snapshot, setSnapshot] = useState<Record<string, PlanEntry>>({});
   const kitchen = useKitchen(repo);
   const customFoods = useMemo<CustomFood[]>(() => kitchen.mine.map((m) => ({ id: m.id, name: m.name, kcal: m.kcal, protein: m.protein, unitG: m.unitG, unitName: m.unitName })), [kitchen.mine]);
   const targets = useTargets(repo, weight.days, workout?.durationMin ?? 0);
@@ -447,7 +438,8 @@ export function useDayPlan(repo: Repository) {
       setDone((await repo.getKv<string[]>(doneKey(today))) ?? []);
       setEatenState((await repo.getKv<Record<string, EatenMeal>>(eatenKey(today))) ?? {});
       setConfirmed((await repo.getKv<string[]>(confirmedKey(today))) ?? []);
-      setBfToday((await repo.getKv<UsualItem[]>(breakfastKey(today)))?.filter(Boolean).length ? await repo.getKv<UsualItem[]>(breakfastKey(today)) : undefined);
+      setBfToday(await loadBreakfastToday(repo, today));
+      setSnapshot((await repo.getKv<Record<string, PlanEntry>>(snapshotKey(today))) ?? {});
       const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
       const monday = new Date(Date.parse(`${today}T12:00:00Z`) - day * 86_400_000).toISOString().slice(0, 10);
       const item = (await loadPlanning(repo)).filter((i) => i.weekStart === monday && i.day === day && (i.kind === 'seance' || i.kind === 'course') && (!i.adjustment || i.adjustment.decision === 'adaptée')).sort((x, y) => toMin(x.start) - toMin(y.start))[0];
@@ -458,8 +450,8 @@ export function useDayPlan(repo: Repository) {
   const plan = useMemo(() => {
     if (!answers || !targets.calories.value || !targets.water.value) return undefined;
     const dayIndex = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
-    return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers, customFoods, breakfastOverride: bfToday });
-  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer, customFoods, bfToday]); // eslint-disable-line react-hooks/exhaustive-deps
+    return freezeConfirmed(buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers, customFoods, breakfastOverride: bfToday }), snapshot, confirmed);
+  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer, customFoods, bfToday, snapshot, confirmed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apport CONNU (détaillé ou « exactement le plan ») : seule base du bilan calorique. Coché ou estimé ≠ connu.
   const intake = useMemo(() => (plan ? knownIntake(plan, done, confirmed) : undefined), [plan, done, confirmed]);
@@ -471,10 +463,18 @@ export function useDayPlan(repo: Repository) {
   const confirmPlan = useCallback(
     async (id: string, on: boolean) => {
       const next = on ? [...new Set([...confirmed, id])] : confirmed.filter((x) => x !== id);
+      // Photo du repas au moment de la confirmation : un réglage ou une habitude changés plus tard ne la réécrivent pas.
+      const snap = { ...snapshot };
+      if (on) {
+        const entry = plan?.find((e) => e.id === id);
+        if (entry) snap[id] = entry;
+      } else delete snap[id];
+      await repo.setKv(snapshotKey(today), snap);
+      setSnapshot(snap);
       await repo.setKv(confirmedKey(today), next);
       setConfirmed(next);
     },
-    [confirmed, repo, today],
+    [confirmed, repo, today, snapshot, plan],
   );
 
   /** Imprévu : un repas remplacé par autre chose (estimation), les suivants sont recalculés. */
@@ -517,7 +517,7 @@ export function useDayPlan(repo: Repository) {
 
   /** « Utiliser aujourd'hui » : change seulement le petit-déjeuner du jour ; l'habitude reste intacte. */
   const setBreakfastToday = async (items: UsualItem[] | undefined) => {
-    await repo.setKv(breakfastKey(today), items ?? []);
+    await saveBreakfastToday(repo, today, items);
     setBfToday(items?.length ? items : undefined);
   };
   const saveAnswers = async (next: NutritionAnswers) => {
@@ -776,6 +776,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                     <p className="eyebrow" style={{ margin: 0 }}>Recommandé</p>
                     <p className="row-title" style={{ margin: 0, whiteSpace: 'normal' }}>{r.options.find((o) => o.id === r.recommendedId)?.label}</p>
                     <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>{r.recommendedWhy}</p>
+                    <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>{r.criteria}</p>
                   </div>
                   {r.options.map((o) => (
                     <section key={o.id} className="ui-card" style={{ margin: 0 }} aria-label={o.label}>
@@ -833,7 +834,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       </div>
                     </section>
                   ))}
-                  {r.eggAssumption && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{r.eggAssumption}</p>}
+                  {r.eggAssumption && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{r.eggAssumption} {r.eggSource}</p>}
                   {r.generic.length > 0 && (
                     <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
                       Calcul avec des valeurs génériques (moyennes) : {r.generic.join(', ')}. Scanne ton produit dans Ma cuisine, puis ajoute-le dans « Mes produits » de l’entretien, pour utiliser ses valeurs.

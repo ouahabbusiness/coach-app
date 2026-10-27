@@ -20,7 +20,7 @@ describe('ma cuisine', () => {
       ['banane', 1, 'unité'],
     ]);
     const t = totalOf(r.items, foods, []);
-    expect(t.kcal).toBe(Math.round(140 * 1.8) + Math.round(370 * 0.8) + Math.round(90 * 1.2));
+    expect(t.kcal).toBe(Math.round(140 * 1.53) + Math.round(370 * 0.8) + Math.round(90 * 1.2));
   });
 
   it('mes plats et mes alias : « 1 portion riz poulet + 1 shaker »', () => {

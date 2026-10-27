@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { reviewBreakfast, breakfastTarget } from '../src/engine/breakfastReview';
-import { buildDayPlan, coffeeExtras, fatExtras, usualBreakfast, type CustomFood, type NutritionAnswers } from '../src/engine/dayPlan';
+import { buildDayPlan, coffeeExtras, eggBasis, eggUnit, fatExtras, usualBreakfast, type CustomFood, type NutritionAnswers } from '../src/engine/dayPlan';
 
 const base: NutritionAnswers = {
   wake: '07:00', bedtime: '23:00', meals: 4, proteins: ['oeuf', 'poulet', 'skyr'], carbs: ['avoine', 'riz'], fats: ['amandes', 'huile_olive'], fruits: ['banane'], exclude: [], supplements: [],
@@ -21,17 +21,32 @@ describe('repère du petit-déjeuner', () => {
   });
 });
 
-describe('œufs : poids sans coquille', () => {
-  it('moyenne 60 g affichée comme estimation, calibre choisi sinon', () => {
-    expect(reviewBreakfast(base, 2600, 140)!.eggAssumption).toMatch(/moyenne estimée/);
-    const r = reviewBreakfast({ ...base, usualBreakfast: [{ foodId: 'oeuf', grams: 4 * 53 }], breakfastDetails: { eggG: 53 } }, 2600, 140)!;
-    expect(r.eggAssumption).toMatch(/53 g.*réglé par toi/);
+describe('œufs : calibre estimé ≠ poids pesé', () => {
+  it('calibre inconnu : œuf M supposé, annoncé comme estimation avec sa source', () => {
+    const r = reviewBreakfast(base, 2600, 140)!;
+    expect(r.eggAssumption).toMatch(/Calibre inconnu : œuf M supposé.*51 g.*estimation/);
+    expect(r.eggSource).toMatch(/poids avec coquille/);
+    expect(r.eggSource).toMatch(/USDA/);
   });
-  it('4 œufs de 53 g donnent moins de calories que 4 œufs de 60 g', () => {
-    const a = usualBreakfast([{ foodId: 'oeuf', grams: 4 * 53 }], false, { eggG: 53 });
-    const b = usualBreakfast([{ foodId: 'oeuf', grams: 4 * 60 }], false);
-    expect(a.items).toEqual(['4 œufs']);
-    expect(a.kcal).toBeLessThan(b.kcal);
+  it('calibre connu : intervalle avec coquille → poids comestible estimé, pas un poids exact', () => {
+    const r = reviewBreakfast({ ...base, breakfastDetails: { eggCalibre: 'L' } }, 2600, 140)!;
+    expect(r.eggAssumption).toMatch(/calibre L.*60 g comestibles.*estimation.*poids avec coquille/);
+    expect(eggUnit({ eggCalibre: 'S' })).toBeLessThan(eggUnit({ eggCalibre: 'M' }));
+    expect(eggUnit({ eggCalibre: 'XL' })).toBeGreaterThan(eggUnit({ eggCalibre: 'L' }));
+  });
+  it('contenu pesé : le poids saisi est utilisé tel quel et prime sur le calibre', () => {
+    expect(eggUnit({ eggG: 48, eggCalibre: 'XL' })).toBe(48);
+    expect(eggBasis({ eggG: 48 })).toBe('pesé');
+    expect(reviewBreakfast({ ...base, breakfastDetails: { eggG: 48 } }, 2600, 140)!.eggAssumption).toMatch(/48 g de contenu sans coquille, pesé par toi/);
+  });
+  it('changer de calibre ne change pas le nombre d’œufs, seulement les calories', () => {
+    const list = [{ foodId: 'oeuf', grams: 4 * 60 }];
+    const s = usualBreakfast(list, false, { eggCalibre: 'S' });
+    const xl = usualBreakfast(list, false, { eggCalibre: 'XL' });
+    expect(s.items).toEqual(['4 œufs']);
+    expect(xl.items).toEqual(['4 œufs']);
+    expect(s.kcal).toBeLessThan(xl.kcal);
+    expect(xl.kcal).toBe(Math.round(1.4 * 4 * 69));
   });
 });
 
