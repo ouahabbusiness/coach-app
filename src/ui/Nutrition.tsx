@@ -773,10 +773,6 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
               return (
                 <div className="stack">
                   <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Coche ce que tu as à la maison. Décoche ce que tu n’as plus : tes plats et ton petit-déjeuner le savent.</p>
-                  <p style={{ margin: 0, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span className="chip" aria-pressed="true" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check size={14} aria-hidden="true" /> bleu + coche = au frigo</span>
-                    <span className="chip" aria-pressed="false">gris = plus à la maison</span>
-                  </p>
                   {!answers.pantry?.length && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>Pré-coché avec ce que tu manges d’habitude. Ton premier geste l’enregistre.</p>}
                   {groups.map(({ g, label }) => (
                     <div key={g} className="stack">
