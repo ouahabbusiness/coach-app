@@ -115,7 +115,7 @@ function NumberQ({ value, onChange, unit, unknown = true }: { value: number | nu
           }}
         >
           <span className="cq-opt-l">Je ne sais pas</span>
-          <span className="cq-opt-sub">On teste en semaine 1</span>
+          <span className="cq-opt-sub">Calibration sous-maximale en semaine 1</span>
         </button>
       )}
     </div>
@@ -183,7 +183,7 @@ const STEPS: Step[] = [
   {
     id: 'pull',
     calm: 'Combien de tractions strictes peux-tu faire d’affilée ?',
-    say: 'Tractions strictes. Bras tendus en bas, menton au-dessus de la barre. Pas d’élan. Ton vrai max, pas celui de tes rêves.',
+    say: 'Tractions strictes. Bras tendus en bas, menton au-dessus de la barre. Pas d’élan. Ce que tu fais d’affilée aujourd’hui, si tu le sais. Ne fais pas de test pour répondre.',
     done: (a) => a.maxPullups !== undefined,
     render: (a, set) => <NumberQ value={a.maxPullups} onChange={(v) => set({ maxPullups: v })} unit="tractions" />,
   },
@@ -197,7 +197,7 @@ const STEPS: Step[] = [
   {
     id: 'push',
     calm: 'Combien de pompes au sol d’affilée ?',
-    say: 'Pompes au sol, corps gainé, poitrine au sol. Ton max.',
+    say: 'Pompes au sol, corps gainé, poitrine au sol. Combien d’affilée, si tu le sais ? Pas de test pour répondre.',
     done: (a) => a.maxPushups !== undefined,
     render: (a, set) => <NumberQ value={a.maxPushups} onChange={(v) => set({ maxPushups: v })} unit="pompes" />,
   },
@@ -362,9 +362,9 @@ const STEPS: Step[] = [
         onPick={(v) => set({ intensity: v })}
         rec={recIntensity(a)}
         options={[
-          { v: 'controlee', l: 'Contrôlée', sub: '2 répétitions en réserve' },
-          { v: 'dure', l: 'Dure', sub: '1 répétition en réserve' },
-          { v: 'tres_exigeant', l: 'Très exigeant', sub: '≈ 1 répétition en réserve' },
+          { v: 'controlee', l: 'Contrôlée', sub: '3 répétitions en réserve' },
+          { v: 'dure', l: 'Dure', sub: '2 répétitions en réserve' },
+          { v: 'tres_exigeant', l: 'Très exigeant', sub: '1 répétition en réserve' },
         ]}
       />
     ),
@@ -573,12 +573,17 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
                 </summary>
                 <ul>
                   {t.lines.map((l, i) => (
-                    <li key={i}>
+                    <li key={i} style={{ flexWrap: 'wrap' }}>
                       <span className="grow">{findVariant(l.variantId)?.variant.name ?? l.variantId}</span>
                       <span className="num">
-                        {l.sets} × {l.kind === 'hold' ? `${l.targetSeconds} s` : l.targetReps}
+                        {l.sets} × {l.kind === 'hold' ? `${l.targetSeconds} s` : l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps}
                         {l.loadKg ? ` · ${l.loadKg} kg` : ''}
                       </span>
+                      <small className="muted num" style={{ width: '100%' }}>
+                        {l.targetRir !== undefined ? `réserve ${l.targetRir}` : ''}
+                        {` · repos ${l.restSeconds >= 60 ? `${Math.floor(l.restSeconds / 60)} min${l.restSeconds % 60 ? ` ${l.restSeconds % 60} s` : ''}` : `${l.restSeconds} s`}`}
+                        {l.cue ? ` · ${l.cue}` : ''}
+                      </small>
                     </li>
                   ))}
                 </ul>
@@ -620,7 +625,7 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
           <section className="cq-say" key="saved">
             <p className="cq-who">Coach</p>
             <h1 className="ob-title">{tone === 'dur' ? 'C’est signé.' : 'Programme enregistré.'}</h1>
-            <p className="cq-line">Ton planning est rempli. Les charges montent toutes seules quand c’est trop facile.{tone === 'dur' ? ' Maintenant, tu exécutes.' : ''}</p>
+            <p className="cq-line">Ton planning est rempli. Les charges évoluent seulement quand tes résultats notés le justifient, avec l’explication et la règle.{tone === 'dur' ? ' Maintenant, tu exécutes.' : ''}</p>
             {placed.length > 0 && (
               <ul className="cq-rules">
                 {placed.slice(0, 8).map((r) => (

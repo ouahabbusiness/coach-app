@@ -25,7 +25,8 @@ describe('programme', () => {
     const p = buildProgram({ ...base, maxPullups: null, priority: 'muscle' }, loads, [6, 12], known);
     const l = p.templates.flatMap((t) => t.lines).find((x) => x.variantId === 'pullup-weighted')!;
     expect(l.loadKg).toBe(12);
-    expect(l.cue).toContain('calibration');
+    expect(l.cue).toMatch(/calibr/);
+    expect(l.targetRir).toBeGreaterThanOrEqual(2);
     expect(l.lastSetToFailure).toBe(false);
     expect(p.notes.join(' ')).toContain('pas un max');
     expect(p.notes.join(' ')).toContain('propre à ce format');

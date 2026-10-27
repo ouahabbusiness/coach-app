@@ -78,7 +78,7 @@ export function recIntensity(a: ProgramAnswers): Rec<Intensity> {
   }
   if (a.pains.length > 0) return { value: 'dure', why: 'Tu as signalé une douleur : dur, mais jamais à l’échec sur les mouvements chargés.' };
   if (a.priority === 'muscle') return { value: 'tres_exigeant', why: 'Très exigeant : environ 1 répétition en réserve. Aller à l’échec n’est pas indispensable aux résultats et ajoute de la fatigue.' };
-  return { value: 'dure', why: 'Dur : 1 répétition en réserve. Assez lourd pour progresser, assez propre pour durer 4 semaines.' };
+  return { value: 'dure', why: 'Dur : 2 répétitions en réserve. Assez lourd pour progresser, assez propre pour durer 4 semaines.' };
 }
 
 export function recStrictness(a: ProgramAnswers): Rec<Strictness> {
@@ -223,18 +223,21 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   let pullLine: GenLine;
   // Charge lestée DÉCLARÉE dans un autre format (EMOM : 6 rép. par minute, récupération entre chaque minute).
   // Référence propre à ce format, pas une validation pour des séries continues : point de départ à calibrer, pas un max.
+  // Calibration : réserve au moins 2 (sous-maximale), même si l'intensité choisie en prévoit 1.
+  const calRir = Math.max(rir, 2);
   const kp = known.filter((k) => k.variantId === 'pullup-weighted' && k.loadKg > 0).sort((x, y) => y.loadKg - x.loadKg)[0];
   if (kp && !pain.has('coudes') && !pain.has('epaules')) {
     pullLine = main('pullup-weighted', {
       loadKg: Math.max(0, ...loads.filter((l) => l > 0 && l <= kp.loadKg)) || kp.loadKg,
-      cue: `Référence déclarée en EMOM (${kp.loadKg} kg) : calibration, garde 3 rép. en réserve ; la charge peut baisser`,
+      targetRir: calRir,
+      cue: `Référence déclarée en EMOM (${kp.loadKg} kg), à calibrer : la charge peut baisser`,
     });
     notes.push(
-      `Tractions lestées : ${kp.loadKg} kg vient de ton EMOM déclaré (${kp.source}). Référence propre à ce format (séries de ${kp.reps} rép. avec récupération chaque minute), pas un max ni une validation en séries continues : la 1re séance calibre, arrêt à 3 rép. de réserve.`,
+      `Tractions lestées : ${kp.loadKg} kg vient de ton EMOM déclaré (${kp.source}). Référence propre à ce format (séries de ${kp.reps} rép. avec récupération chaque minute), pas un max ni une validation en séries continues : la 1re séance calibre, arrêt à ${calRir} rép. de réserve.`,
     );
   } else if (pull === null || pull === undefined) {
-    pullLine = main('pullup-strict', { cue: 'Calibration sous-maximale : arrête chaque série avec 3 rép. en réserve (pas de max)' });
-    notes.push('Tractions : max inconnu → test à la 1re séance, l’app ajuste ensuite.');
+    pullLine = main('pullup-strict', { targetRir: calRir, cue: 'Calibration sous-maximale (pas de max)' });
+    notes.push(`Tractions : niveau inconnu → calibration sous-maximale (${calRir} rép. en réserve), pas de test maximal.`);
   } else if (pull < 3) pullLine = main('pullup-negative', { targetReps: 4, cue: 'Descente 4–5 s' });
   else if (pull < 8) pullLine = main('pullup-strict', { targetReps: Math.max(2, Math.min(s.main.range[0], Math.floor(pull * 0.6))) });
   else if (pull < 12 || pain.has('coudes')) pullLine = main('pullup-strict', { targetReps: Math.min(s.main.range[0] + 2, Math.floor(pull * 0.6)) });
@@ -252,8 +255,8 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     notes.push('Épaules : pas de dips ni de pompes piquées. Pompes à la place.');
   } else if (dips === null || dips === undefined) {
     // Pas de test maximal : calibration sous-maximale (épaules exposées en bas du mouvement).
-    pushLine = main('dips-bars', { cue: 'Calibration sous-maximale : arrête chaque série avec 3 rép. en réserve, amplitude confortable (pas de max)' });
-    notes.push('Dips : niveau inconnu → calibration sous-maximale (3 rép. en réserve), jamais de test maximal.');
+    pushLine = main('dips-bars', { targetRir: calRir, cue: 'Calibration sous-maximale, amplitude confortable (pas de max)' });
+    notes.push(`Dips : niveau inconnu → calibration sous-maximale (${calRir} rép. en réserve), jamais de test maximal.`);
   }
   else if (dips < 4) pushLine = main('dips-bars', { targetReps: 3, cue: 'Descente contrôlée' });
   else if (dips < 12) pushLine = main('dips-bars', { targetReps: Math.max(3, Math.min(s.main.range[0] + 2, Math.floor(dips * 0.6))) });

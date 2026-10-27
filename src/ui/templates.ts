@@ -45,7 +45,7 @@ export async function saveTemplates(repo: Repository, list: SessionTemplate[]): 
  * calibration sous-maximale. Le programme stocké n'est pas modifié (aucune réécriture de tes données).
  */
 export function currentCue(cue: string | undefined): string | undefined {
-  if (cue && /test max/i.test(cue)) return 'Calibration sous-maximale : arrête chaque série avec 3 rép. en réserve (pas de max)';
+  if (cue && /test max/i.test(cue)) return 'Calibration sous-maximale : pas de max, garde au moins 2 rép. en réserve';
   return cue;
 }
 
