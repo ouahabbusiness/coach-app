@@ -2,7 +2,7 @@
 // Seul le numéro du code-barres part sur Internet (Open Food Facts, base publique et gratuite).
 
 import { useCallback, useEffect, useState } from 'react';
-import { Barcode, ChevronLeft, Plus, Trash2 } from 'lucide-react';
+import { Barcode, ChevronLeft, Hash, Plus, Trash2 } from 'lucide-react';
 import { BASE_FOODS, dishNutrients, fromOpenFoodFacts, type Dish, type KitchenFood } from '../engine/kitchen';
 import type { Repository } from '../storage/db';
 import { Modal } from './common';
@@ -37,6 +37,15 @@ export function useKitchen(repo: Repository) {
   // Tes produits passent avant les moyennes (même nom → le tien).
   const foods = [...mine, ...BASE_FOODS];
   return { mine, foods, dishes, saveFoods, saveDishes };
+}
+
+/** Numéro de code-barres valide (EAN-8, UPC-A 12, EAN-13, GTIN-14) : chiffre de contrôle vérifié pour détecter une faute de frappe. */
+export function validGtin(code: string): boolean {
+  if (!/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(code)) return false;
+  const d = code.split('').map(Number);
+  const check = d.pop()!;
+  const sum = d.reverse().reduce((s, n, i) => s + n * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === check;
 }
 
 /** Lit le code-barres sur une photo (dans le téléphone, rien n'est envoyé). */
@@ -174,10 +183,28 @@ export function KitchenPage({ repo, go }: { repo: Repository; go: (r: Route) => 
   const [scan, setScan] = useState<string | null>(null);
   const food = useConsent(repo, 'food');
 
+  const [typing, setTyping] = useState(false);
+  const [ean, setEan] = useState('');
+
   const onPhoto = async (file: File) => {
     setScan('Lecture du code-barres…');
     const code = await readBarcode(file);
-    if (!code) return setScan('Code-barres illisible : reprends la photo bien à plat, ou saisis l’étiquette.');
+    if (!code) {
+      setScan('Code-barres illisible : reprends la photo bien à plat, saisis le numéro (EAN) ou recopie l’étiquette.');
+      return setTyping(true);
+    }
+    return lookup(code);
+  };
+
+  const onEan = () => {
+    const code = ean.replace(/\s+/g, '');
+    if (!validGtin(code)) return setScan('Numéro invalide : 8, 12, 13 ou 14 chiffres, vérifie chaque chiffre.');
+    setTyping(false);
+    setEan('');
+    return lookup(code);
+  };
+
+  const lookup = async (code: string) => {
     // Accord avant le premier envoi du code-barres à Open Food Facts ; sinon saisie manuelle.
     if (!(await food.ensure())) {
       setScan(`Code ${code} lu sur l’appareil, non envoyé : recopie l’étiquette.`);
@@ -211,11 +238,32 @@ export function KitchenPage({ repo, go }: { repo: Repository; go: (r: Route) => 
               <Barcode size={14} aria-hidden="true" /> Scanner
               <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && onPhoto(e.target.files[0])} />
             </label>
+            <button className="btn sm" onClick={() => setTyping(!typing)} aria-pressed={typing}>
+              <Hash size={14} aria-hidden="true" /> EAN
+            </button>
             <button className="btn sm" onClick={() => setEditFood({})}>
               <Plus size={14} aria-hidden="true" /> Étiquette
             </button>
           </div>
         </div>
+        {typing && (
+          <div className="row" style={{ gap: 6 }}>
+            <input
+              className="grow"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="Numéro du code-barres (EAN)"
+              placeholder="Numéro sous le code-barres"
+              value={ean}
+              onChange={(e) => setEan(e.target.value.replace(/[^\d\s]/g, ''))}
+              onKeyDown={(e) => e.key === 'Enter' && onEan()}
+            />
+            <button className="btn sm primary" disabled={ean.replace(/\s+/g, '').length < 8} onClick={onEan}>
+              Chercher
+            </button>
+          </div>
+        )}
         {scan && <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{scan}</p>}
         {mine.length === 0 && <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Photographie le code-barres de ce que tu achètes souvent.</p>}
         <ul className="kit-list">
