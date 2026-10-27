@@ -126,3 +126,28 @@ describe('ce que j’ai à la maison', () => {
     expect(b).toEqual(a);
   });
 });
+
+describe('petit-déjeuner habituel', () => {
+  const usual: NutritionAnswers = {
+    ...answers,
+    usualBreakfast: [{ foodId: 'cottage', grams: 150 }, { foodId: 'oeuf', grams: 240 }, { foodId: 'cracotte', grams: 36 }],
+    breakfastCoffee: true,
+  };
+  const day = (a: NutritionAnswers) => buildDayPlan({ answers: a, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 1 });
+
+  it('est repris tel quel : quantités, café, valeurs', () => {
+    const bf = day(usual).find((e) => e.id === 'petit_dej')!;
+    expect(bf.items).toEqual(['150 g cottage cheese', '4 œufs', '4 cracottes', 'Café']);
+    expect(bf.parts).toEqual([{ foodId: 'cottage', grams: 150 }, { foodId: 'oeuf', grams: 240 }, { foodId: 'cracotte', grams: 36 }]);
+    expect(bf.kcal).toBe(Math.round(0.98 * 150 + 1.4 * 240 + 3.8 * 36));
+  });
+
+  it('les autres repas absorbent l’écart : la journée reste proche de la cible', () => {
+    const t = planTotals(day(usual));
+    expect(Math.abs(t.kcal - 2600)).toBeLessThanOrEqual(260);
+  });
+
+  it('sans petit-déjeuner habituel : inchangé', () => {
+    expect(day({ ...answers, usualBreakfast: [] })).toEqual(day(answers));
+  });
+});

@@ -2,7 +2,7 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Pill, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
 import { Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
@@ -10,7 +10,7 @@ import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
-import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -44,6 +44,49 @@ function Multi({ group, value, onChange }: { group: FoodGroup; value: string[]; 
           <span className="cq-opt-l">{f.name}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+type UsualItem = { foodId: string; grams: number };
+
+/** Petit-déjeuner habituel : on coche ce qu'on mange d'ordinaire et on règle les quantités. */
+function UsualBreakfast({ value, coffee, onChange }: { value: UsualItem[]; coffee: boolean; onChange: (v: UsualItem[], coffee: boolean) => void }) {
+  const step = (f: Food) => f.unitG ?? 25;
+  const start = (f: Food) => (f.id === 'oeuf' ? 4 * (f.unitG ?? 60) : f.unitG ? 2 * f.unitG : 100);
+  const qty = (f: Food, g: number) => (f.unitG ? `${Math.round(g / f.unitG)}` : `${g} g`);
+  const change = (f: Food, delta: number) => {
+    const cur = value.find((x) => x.foodId === f.id);
+    if (!cur) return;
+    const grams = cur.grams + delta * step(f);
+    onChange(grams <= 0 ? value.filter((x) => x.foodId !== f.id) : value.map((x) => (x.foodId === f.id ? { ...x, grams } : x)), coffee);
+  };
+  return (
+    <div className="stack">
+      {FOODS.filter((f) => f.breakfast).map((f) => {
+        const cur = value.find((x) => x.foodId === f.id);
+        return (
+          <div key={f.id} className="spread">
+            <button className="cq-opt" style={{ flex: 1 }} aria-pressed={!!cur} onClick={() => onChange(cur ? value.filter((x) => x.foodId !== f.id) : [...value, { foodId: f.id, grams: start(f) }], coffee)}>
+              <span className="cq-opt-l">{f.name}</span>
+            </button>
+            {cur && (
+              <span className="row" style={{ gap: 6, marginLeft: 8 }}>
+                <button className="icon-btn" aria-label={`Moins de ${f.name}`} onClick={() => change(f, -1)}>
+                  <Minus size={16} aria-hidden="true" />
+                </button>
+                <strong className="num" style={{ minWidth: 44, textAlign: 'center' }}>{qty(f, cur.grams)}</strong>
+                <button className="icon-btn" aria-label={`Plus de ${f.name}`} onClick={() => change(f, 1)}>
+                  <Plus size={16} aria-hidden="true" />
+                </button>
+              </span>
+            )}
+          </div>
+        );
+      })}
+      <button className="cq-opt" aria-pressed={coffee} onClick={() => onChange(value, !coffee)}>
+        <span className="cq-opt-l">Café</span>
+      </button>
     </div>
   );
 }
@@ -114,6 +157,12 @@ const NSTEPS: NStep[] = [
   { id: 'glucides', say: 'Tes glucides : c’est ton carburant pour la séance et la course.', done: (a) => a.carbs.length > 0, render: (a, set) => <Multi group="glucide" value={a.carbs} onChange={(v) => set({ carbs: v })} /> },
   { id: 'lipides', say: 'Tes bonnes graisses.', done: (a) => a.fats.length > 0, render: (a, set) => <Multi group="lipide" value={a.fats} onChange={(v) => set({ fats: v })} /> },
   { id: 'fruits', say: 'Tes fruits.', done: (a) => a.fruits.length > 0, render: (a, set) => <Multi group="fruit" value={a.fruits} onChange={(v) => set({ fruits: v })} /> },
+  {
+    id: 'petitdej',
+    say: 'Ton petit-déjeuner habituel, si tu en as un. Je le garde tel quel et j’ajuste les autres repas. Passe si tu n’en as pas.',
+    done: () => true,
+    render: (a, set) => <UsualBreakfast value={a.usualBreakfast ?? []} coffee={!!a.breakfastCoffee} onChange={(v, c) => set({ usualBreakfast: v, breakfastCoffee: c })} />,
+  },
   {
     id: 'maison',
     say: 'Ce que tu as déjà à la maison. Je te prépare tes plats avec ça d’abord ; le reste ira dans tes courses.',

@@ -29,8 +29,10 @@ export const FOODS: Food[] = [
   { id: 'saumon', name: 'Saumon', group: 'proteine', kcal: 200, protein: 20 },
   { id: 'skyr', name: 'Skyr', group: 'proteine', kcal: 63, protein: 11, breakfast: true },
   { id: 'fromage_blanc', name: 'Fromage blanc 0 %', group: 'proteine', kcal: 47, protein: 7.5, breakfast: true },
+  { id: 'cottage', name: 'Cottage cheese', group: 'proteine', kcal: 98, protein: 11, breakfast: true },
   { id: 'lentilles', name: 'Lentilles cuites', group: 'proteine', kcal: 115, protein: 9 },
   { id: 'avoine', name: 'Flocons d’avoine', group: 'glucide', kcal: 370, protein: 13, breakfast: true },
+  { id: 'cracotte', name: 'Cracottes', group: 'glucide', kcal: 380, protein: 10, unitG: 9, unitName: 'cracotte', breakfast: true },
   { id: 'pain', name: 'Pain complet', group: 'glucide', kcal: 245, protein: 9, unitG: 35, unitName: 'tranche', breakfast: true },
   { id: 'riz', name: 'Riz (cuit)', group: 'glucide', kcal: 130, protein: 2.7 },
   { id: 'pates', name: 'Pâtes (cuites)', group: 'glucide', kcal: 150, protein: 5.5 },
@@ -72,6 +74,9 @@ export interface NutritionAnswers {
   exclude: string[];
   /** Aliments réellement à la maison : le plan les préfère ; le reste passe aux courses. Absent = pas déclaré. */
   pantry?: string[];
+  /** Petit-déjeuner habituel déclaré (quantités exactes) : il remplace le petit-déjeuner généré. */
+  usualBreakfast?: { foodId: string; grams: number }[];
+  breakfastCoffee?: boolean;
   supplements: DeclaredSupplement[];
   cooking?: 'rapide' | 'normal';
 }
@@ -195,6 +200,25 @@ function portion(f: Food, grams: number): { label: string; g: number } {
   return { label: `${g} g ${f.name.toLowerCase()}`, g };
 }
 
+/** Petit-déjeuner déclaré par l'utilisateur : quantités exactes, valeurs moyennes (estimation). */
+function usualBreakfast(list: { foodId: string; grams: number }[], coffee: boolean) {
+  const items: string[] = [];
+  const parts: { foodId: string; grams: number }[] = [];
+  let k = 0;
+  let pr = 0;
+  for (const u of list) {
+    const f = food(u.foodId)!;
+    const n = f.unitG ? Math.max(1, Math.round(u.grams / f.unitG)) : 0;
+    const g = f.unitG ? n * f.unitG : r5(u.grams);
+    items.push(f.unitG ? `${n} ${f.unitName}${n > 1 ? 's' : ''}` : `${g} g ${f.name.toLowerCase()}`);
+    parts.push({ foodId: f.id, grams: g });
+    k += (f.kcal * g) / 100;
+    pr += (f.protein * g) / 100;
+  }
+  if (coffee) items.push('Café');
+  return { items, parts, kcal: Math.round(k), protein: Math.round(pr) };
+}
+
 /** Construit un repas : protéine pour la part de protéines, puis glucides et lipides pour compléter les calories. */
 function meal(kcal: number, protein: number, foods: { p: Food; c: Food; f?: Food; fruit?: Food; veg: boolean }, supplementProtein = 0) {
   const items: string[] = [];
@@ -219,8 +243,10 @@ function meal(kcal: number, protein: number, foods: { p: Food; c: Food; f?: Food
 }
 
 function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }>): PlanEntry[] {
-  const sk = (id: string) => scale[id]?.k ?? 1;
-  const sp = (id: string) => scale[id]?.p ?? 1;
+  // Petit-déjeuner habituel fixe : les autres repas absorbent l'écart de calories et de protéines.
+  const rest = { k: 1, p: 1 };
+  const sk = (id: string) => (scale[id]?.k ?? 1) * (id === 'petit_dej' ? 1 : rest.k);
+  const sp = (id: string) => (scale[id]?.p ?? 1) * (id === 'petit_dej' ? 1 : rest.p);
   const a = i.answers;
   // Aliments aimés, sans les exclus ; ceux qui sont à la maison passent d'abord.
   // Aucun à la maison pour ce repas : on prend un aliment aimé (il ira aux courses).
@@ -252,13 +278,20 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   }
 
   const bfTime = wake + 30;
-  const bf = meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
+  const usual = (a.usualBreakfast ?? []).filter((u) => food(u.foodId) && u.grams > 0);
+  const bf = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee) : meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
     p: pk(a.proteins, d, 'oeuf', (f) => !!f.breakfast),
     c: pk(a.carbs, d, 'avoine', (f) => !!f.breakfast),
     f: pk(a.fats, d, 'amandes', (f) => !!f.breakfast),
     fruit: pk(a.fruits, d, 'banane'),
     veg: false,
   });
+  if (usual.length) {
+    const otherK = i.kcal * (1 - shares[0]!);
+    const otherP = i.proteinG * (1 - 1 / meals);
+    rest.k = otherK > 0 ? Math.max(0.5, (i.kcal - bf.kcal) / otherK) : 1;
+    rest.p = otherP > 0 ? Math.max(0.5, (i.proteinG - bf.protein) / otherP) : 1;
+  }
   out.push({ id: 'petit_dej', time: fromMin(bfTime), kind: 'repas', title: 'Petit-déjeuner', ...bf });
   for (const s of supp('apres_petit_dej')) {
     out.push({ id: `supp-${s.id}`, time: fromMin(bfTime + 20), kind: 'complement', title: s.name, items: [s.doseG ? `${s.doseG} g (ta dose déclarée)` : 'ta dose habituelle', `avec ${s.waterMl ?? 300} ml d’eau`], waterMl: s.waterMl ?? 300 });
