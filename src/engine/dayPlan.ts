@@ -66,6 +66,9 @@ export interface DeclaredSupplement {
 
 export type EggCalibre = 'S' | 'M' | 'L' | 'XL';
 
+/** Repas que tu peux décrire toi-même (en plus du petit-déjeuner). */
+export type MealSlot = 'dejeuner' | 'collation_matin' | 'collation' | 'diner';
+
 export type MilkKind = 'entier' | 'demi' | 'ecreme' | 'vegetal';
 
 export interface BreakfastDetails {
@@ -117,6 +120,8 @@ export interface NutritionAnswers {
   breakfastCoffee?: boolean;
   /** Part de la journée visée pour le petit-déjeuner (%), réglée par toi : appétit du matin. Absent = part standard. */
   breakfastShare?: number;
+  /** « Mes repas » : ce que tu manges d'habitude au déjeuner, au dîner et aux collations (quantités exactes). Le petit-déjeuner reste dans `usualBreakfast`. */
+  usualMeals?: Partial<Record<MealSlot, UsualItem[]>>;
   /** Précisions sur le petit-déjeuner habituel : matière grasse de cuisson et ajouts au café. */
   breakfastDetails?: BreakfastDetails;
   supplements: DeclaredSupplement[];
@@ -144,6 +149,8 @@ export interface PlanEntry {
   adjusted?: 'allégé' | 'renforcé';
   /** Aliments du repas absents du frigo déclaré (rien n'est remplacé sans te le demander). */
   missing?: string[];
+  /** Repas décrit par toi (pris tel quel) ; les autres repas absorbent l'écart. */
+  declared?: boolean;
 }
 
 export interface DayPlanInput {
@@ -152,6 +159,8 @@ export interface DayPlanInput {
   customFoods?: CustomFood[];
   /** Petit-déjeuner choisi pour aujourd'hui seulement : n'est jamais enregistré comme habitude. */
   breakfastOverride?: UsualItem[];
+  /** Repas choisis pour aujourd'hui seulement (jamais enregistrés comme habitude). */
+  mealOverrides?: Partial<Record<MealSlot, UsualItem[]>>;
   kcal: number;
   proteinG: number;
   waterMl: number;
@@ -366,10 +375,11 @@ function meal(kcal: number, protein: number, foods: { p: Food; c: Food; f?: Food
 }
 
 function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }>): PlanEntry[] {
-  // Petit-déjeuner habituel fixe : les autres repas absorbent l'écart de calories et de protéines.
+  // Repas décrits par toi (petit-déjeuner habituel, « Mes repas ») : pris tels quels ; les autres repas absorbent l'écart de calories et de protéines.
   const rest = { k: 1, p: 1 };
-  const sk = (id: string) => (scale[id]?.k ?? 1) * (id === 'petit_dej' ? 1 : rest.k);
-  const sp = (id: string) => (scale[id]?.p ?? 1) * (id === 'petit_dej' ? 1 : rest.p);
+  const fixedIds = new Set<string>();
+  const sk = (id: string) => (scale[id]?.k ?? 1) * (fixedIds.has(id) ? 1 : rest.k);
+  const sp = (id: string) => (scale[id]?.p ?? 1) * (fixedIds.has(id) ? 1 : rest.p);
   const a = i.answers;
   // Aliments aimés, sans les exclus ; ceux qui sont à la maison passent d'abord.
   // Aucun à la maison pour ce repas : on prend un aliment aimé (il ira aux courses).
@@ -398,6 +408,51 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const shares = defaultShares.map((x, idx) => (idx === 0 ? s0 : x * restScale));
   const proteinPer = i.proteinG / meals;
 
+  const custom = i.customFoods ?? [];
+  const valid = (l?: UsualItem[]) => (l ?? []).filter((u) => (food(u.foodId) || custom.some((c) => c.id === u.foodId)) && u.grams > 0);
+  const usual = valid(i.breakfastOverride ?? a.usualBreakfast);
+  const eggOnly: BreakfastDetails = { eggG: a.breakfastDetails?.eggG, eggCalibre: a.breakfastDetails?.eggCalibre };
+  const lists: Record<string, UsualItem[]> = {};
+  const declaredOf = (id: MealSlot) => {
+    const list = valid(i.mealOverrides?.[id] ?? a.usualMeals?.[id]);
+    if (!list.length) return undefined;
+    lists[id] = list;
+    return usualBreakfast(list, false, eggOnly, custom);
+  };
+  const bfDecl = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee, a.breakfastDetails, custom) : undefined;
+  const decl = {
+    dejeuner: declaredOf('dejeuner'),
+    diner: declaredOf('diner'),
+    collation: meals >= 4 ? declaredOf('collation') : undefined,
+    collation_matin: meals === 5 ? declaredOf('collation_matin') : undefined,
+  };
+  // Part nominale de chaque repas dans la journée, et ce que tes repas décrits fixent déjà.
+  const nominal: Record<string, number> = {
+    petit_dej: shares[0]!,
+    dejeuner: shares[meals === 5 ? 2 : 1]!,
+    diner: shares[shares.length - 1]!,
+    ...(meals === 4 ? { collation: shares[2]! } : {}),
+    ...(meals === 5 ? { collation_matin: shares[1]!, collation: shares[3]! } : {}),
+  };
+  const fixed: Record<string, { kcal: number; protein: number }> = {};
+  if (bfDecl) fixed.petit_dej = bfDecl;
+  for (const [id, d2] of Object.entries(decl)) if (d2) fixed[id] = d2;
+  for (const id of Object.keys(fixed)) fixedIds.add(id);
+  if (fixedIds.size) {
+    const generated = Object.keys(nominal).filter((id) => !fixedIds.has(id));
+    const fixedK = Object.values(fixed).reduce((t, f) => t + f.kcal, 0);
+    const fixedP = Object.values(fixed).reduce((t, f) => t + f.protein, 0);
+    const nomK = generated.reduce((t, id) => t + i.kcal * nominal[id]!, 0);
+    const nomP = generated.length * proteinPer;
+    // Les repas restants se partagent l'écart (jamais en dessous de la moitié, jamais au-delà de 160 %).
+    rest.k = nomK > 0 ? Math.min(1.6, Math.max(0.5, (i.kcal - fixedK) / nomK)) : 1;
+    rest.p = nomP > 0 ? Math.min(1.6, Math.max(0.5, (i.proteinG - fixedP) / nomP)) : 1;
+  }
+  const missingOf = (list?: UsualItem[]) => {
+    const m = list ? missingFromPantry(list, a.pantry, custom).map((id) => food(id)?.name ?? custom.find((c) => c.id === id)?.name ?? id) : [];
+    return m.length ? { missing: m } : {};
+  };
+
   out.push({ id: 'reveil', time: fromMin(wake), kind: 'eau', title: 'Réveil', items: ['Grand verre d’eau'], waterMl: 400 });
   if (i.prayers) {
     const L = { fajr: 'Fajr', dhuhr: 'Dohr', asr: 'Asr', maghrib: 'Maghrib', isha: 'Isha' } as const;
@@ -405,24 +460,14 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   }
 
   const bfTime = wake + 30;
-  // Petit-déjeuner du jour choisi seulement pour aujourd'hui, sinon l'habituel déclaré.
-  const custom = i.customFoods ?? [];
-  const usual = (i.breakfastOverride ?? a.usualBreakfast ?? []).filter((u) => (food(u.foodId) || custom.some((c) => c.id === u.foodId)) && u.grams > 0);
-  const bf = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee, a.breakfastDetails, custom) : meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
+  const bf = bfDecl ?? meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
     p: pk(a.proteins, d, 'oeuf', (f) => !!f.breakfast),
     c: pk(a.carbs, d, 'avoine', (f) => !!f.breakfast),
     f: pk(a.fats, d, 'amandes', (f) => !!f.breakfast),
     fruit: pk(a.fruits, d, 'banane'),
     veg: false,
   });
-  if (usual.length) {
-    const otherK = i.kcal * (1 - shares[0]!);
-    const otherP = i.proteinG * (1 - 1 / meals);
-    rest.k = otherK > 0 ? Math.max(0.5, (i.kcal - bf.kcal) / otherK) : 1;
-    rest.p = otherP > 0 ? Math.max(0.5, (i.proteinG - bf.protein) / otherP) : 1;
-  }
-  const missingNames = usual.length ? missingFromPantry(usual, a.pantry, custom).map((id) => food(id)?.name ?? custom.find((c) => c.id === id)?.name ?? id) : [];
-  out.push({ id: 'petit_dej', time: fromMin(bfTime), kind: 'repas', title: 'Petit-déjeuner', ...bf, ...(missingNames.length ? { missing: missingNames } : {}) });
+  out.push({ id: 'petit_dej', time: fromMin(bfTime), kind: 'repas', title: 'Petit-déjeuner', ...bf, ...(bfDecl ? { declared: true } : {}), ...missingOf(bfDecl ? usual : undefined) });
   for (const s of supp('apres_petit_dej')) {
     out.push({ id: `supp-${s.id}`, time: fromMin(bfTime + 20), kind: 'complement', title: s.name, items: [s.doseG ? `${s.doseG} g (ta dose déclarée)` : 'ta dose habituelle', `avec ${s.waterMl ?? 300} ml d’eau`], waterMl: s.waterMl ?? 300 });
   }
@@ -433,30 +478,30 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const wStart = w ? toMin(w.start) : undefined;
   const wEnd = w && wStart !== undefined ? wStart + w.durationMin : undefined;
 
-  const lunch = meal(i.kcal * shares[meals === 3 ? 1 : meals === 4 ? 1 : 2]! * sk('dejeuner'), proteinPer * sp('dejeuner'), {
+  const lunch = decl.dejeuner ?? meal(i.kcal * shares[meals === 3 ? 1 : meals === 4 ? 1 : 2]! * sk('dejeuner'), proteinPer * sp('dejeuner'), {
     p: pk(a.proteins, d + 1, 'poulet', (f) => !f.breakfast),
     c: pk(a.carbs, d + 1, 'riz', (f) => !f.breakfast),
     f: pk(a.fats, d + 1, 'huile_olive', (f) => f.id === 'huile_olive' || f.id === 'avocat'),
     veg: true,
   });
-  out.push({ id: 'dejeuner', time: fromMin(lunchTime), kind: 'repas', title: 'Déjeuner', ...lunch });
+  out.push({ id: 'dejeuner', time: fromMin(lunchTime), kind: 'repas', title: 'Déjeuner', ...lunch, ...(decl.dejeuner ? { declared: true } : {}), ...missingOf(lists.dejeuner) });
 
   if (meals >= 4) {
     // Collation : 90 min avant la séance si elle tombe l'après-midi, sinon 16:30.
     const snackTime = wStart !== undefined && wStart > lunchTime + 150 && wStart < dinnerTime ? wStart - 90 : toMin('16:30');
     const whey = supp('collation')[0];
     const snackShare = shares[meals === 4 ? 2 : 3]!;
-    const snack = meal(i.kcal * snackShare * sk('collation') - (whey?.kcalPerDose ?? 0), proteinPer * sp('collation'), { p: pk(a.proteins, d + 2, 'skyr', (f) => !!f.breakfast && f.id !== 'oeuf'), fruit: pk(a.fruits, d + 2, 'banane'), c: pk(a.carbs, d + 2, 'avoine', (f) => !!f.breakfast), veg: false }, whey?.proteinPerDose ?? 0);
-    if (whey) {
+    const snack = decl.collation ?? meal(i.kcal * snackShare * sk('collation') - (whey?.kcalPerDose ?? 0), proteinPer * sp('collation'), { p: pk(a.proteins, d + 2, 'skyr', (f) => !!f.breakfast && f.id !== 'oeuf'), fruit: pk(a.fruits, d + 2, 'banane'), c: pk(a.carbs, d + 2, 'avoine', (f) => !!f.breakfast), veg: false }, whey?.proteinPerDose ?? 0);
+    if (whey && !decl.collation) {
       snack.kcal += whey.kcalPerDose ?? 0;
       snack.protein += whey.proteinPerDose ?? 0;
     }
-    if (whey) snack.items.unshift(`${whey.name}${whey.doseG ? ` ${whey.doseG} g` : ''}`);
-    out.push({ id: 'collation', time: fromMin(snackTime), kind: 'repas', title: wStart !== undefined && snackTime === wStart - 90 ? 'Collation avant séance' : 'Collation', ...snack });
+    if (whey && !decl.collation) snack.items.unshift(`${whey.name}${whey.doseG ? ` ${whey.doseG} g` : ''}`);
+    out.push({ id: 'collation', time: fromMin(snackTime), kind: 'repas', title: wStart !== undefined && snackTime === wStart - 90 ? 'Collation avant séance' : 'Collation', ...snack, ...(decl.collation ? { declared: true } : {}), ...missingOf(lists.collation) });
   }
   if (meals === 5) {
-    const second = meal(i.kcal * shares[1]! * sk('collation_matin'), proteinPer * sp('collation_matin'), { p: pk(a.proteins, d + 3, 'fromage_blanc', (f) => !!f.breakfast && f.id !== 'oeuf'), c: pk(a.fruits, d + 3, 'pomme'), veg: false });
-    out.push({ id: 'collation_matin', time: fromMin(bfTime + 150), kind: 'repas', title: 'Collation du matin', ...second });
+    const second = decl.collation_matin ?? meal(i.kcal * shares[1]! * sk('collation_matin'), proteinPer * sp('collation_matin'), { p: pk(a.proteins, d + 3, 'fromage_blanc', (f) => !!f.breakfast && f.id !== 'oeuf'), c: pk(a.fruits, d + 3, 'pomme'), veg: false });
+    out.push({ id: 'collation_matin', time: fromMin(bfTime + 150), kind: 'repas', title: 'Collation du matin', ...second, ...(decl.collation_matin ? { declared: true } : {}), ...missingOf(lists.collation_matin) });
   }
 
   if (w && wStart !== undefined && wEnd !== undefined) {
@@ -466,13 +511,13 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
     }
   }
 
-  const dinner = meal(i.kcal * shares[shares.length - 1]! * sk('diner'), proteinPer * sp('diner'), {
+  const dinner = decl.diner ?? meal(i.kcal * shares[shares.length - 1]! * sk('diner'), proteinPer * sp('diner'), {
     p: pk(a.proteins, d + 4, 'saumon', (f) => !f.breakfast),
     c: pk(a.carbs, d + 4, 'pdt', (f) => !f.breakfast),
     f: pk(a.fats, d + 4, 'huile_olive', (f) => f.id === 'huile_olive' || f.id === 'avocat'),
     veg: true,
   });
-  out.push({ id: 'diner', time: fromMin(wEnd !== undefined && wEnd + 30 > dinnerTime && wEnd + 30 <= bed - 90 ? wEnd + 30 : dinnerTime), kind: 'repas', title: 'Dîner', ...dinner });
+  out.push({ id: 'diner', time: fromMin(wEnd !== undefined && wEnd + 30 > dinnerTime && wEnd + 30 <= bed - 90 ? wEnd + 30 : dinnerTime), kind: 'repas', title: 'Dîner', ...dinner, ...(decl.diner ? { declared: true } : {}), ...missingOf(lists.diner) });
 
   // Eau : le reste de la cible réparti en prises régulières entre le réveil et 2 h avant le coucher.
   const planned = out.reduce((s, e) => s + (e.waterMl ?? 0), 0);
@@ -515,7 +560,7 @@ export function buildDayPlan(i: DayPlanInput): PlanEntry[] {
   if (!ids.length) return base;
   const lastEaten = Math.max(...ids.map((id) => toMin(base.find((e) => e.id === id)!.time)));
   const meals = base.filter((e) => e.kind === 'repas');
-  const adjustable = meals.filter((e) => !ids.includes(e.id) && toMin(e.time) > lastEaten);
+  const adjustable = meals.filter((e) => !ids.includes(e.id) && toMin(e.time) > lastEaten && !e.declared);
   const fixedK = meals.filter((e) => !adjustable.includes(e)).reduce((t, e) => t + (ids.includes(e.id) ? eaten[e.id]!.kcal : e.kcal ?? 0), 0);
   const fixedP = meals.filter((e) => !adjustable.includes(e)).reduce((t, e) => t + (ids.includes(e.id) ? eaten[e.id]!.protein : e.protein ?? 0), 0);
   const suppK = base.filter((e) => e.kind === 'complement').reduce((t, e) => t + (e.kcal ?? 0), 0);
@@ -528,7 +573,7 @@ export function buildDayPlan(i: DayPlanInput): PlanEntry[] {
   const scale = Object.fromEntries(adjustable.map((e) => [e.id, { k, p }]));
   return rawPlan(i, scale).map((e) =>
     ids.includes(e.id)
-      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, source: docOf(eaten[e.id]!.source), parts: undefined, missing: undefined }
+      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, source: docOf(eaten[e.id]!.source), parts: undefined, missing: undefined, declared: undefined }
       : adjustable.some((x) => x.id === e.id) && Math.abs(k - 1) > 0.05
         ? { ...e, adjusted: k < 1 ? 'allégé' : 'renforcé' }
         : e,

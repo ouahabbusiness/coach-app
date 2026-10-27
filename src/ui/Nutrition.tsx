@@ -2,7 +2,7 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, Refrigerator, Scale, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pencil, Pill, Refrigerator, Scale, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
 import { Help, Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
@@ -11,8 +11,8 @@ import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
 import { BREAKFAST_SHARES, reviewBreakfast } from '../engine/breakfastReview';
-import { loadBreakfastToday, saveBreakfastToday } from './breakfastToday';
-import { buildDayPlan, EGG_CALIBRES, EGG_COUNT_G, EGG_SOURCE, freezeConfirmed, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type CustomFood, type UsualItem, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { loadBreakfastToday, loadMealsToday, saveBreakfastToday, saveMealsToday, type MealsToday } from './breakfastToday';
+import { buildDayPlan, EGG_CALIBRES, EGG_COUNT_G, EGG_SOURCE, freezeConfirmed, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type CustomFood, type MealSlot, usualBreakfast, type UsualItem, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -198,6 +198,65 @@ function UsualBreakfast({ a, set, products }: { a: NutritionAnswers; set: (p: Pa
         {BREAKFAST_SHARES.map((s) => chip(a.breakfastShare === s.pct, `${s.label} · ${s.pct} %`, () => set({ breakfastShare: s.pct })))}
         {chip(a.breakfastShare === undefined, 'Standard', () => set({ breakfastShare: undefined }))}
       </div>
+    </div>
+  );
+}
+
+/** Éditeur d'un repas : tu choisis des aliments et des quantités ; l'app prend le repas tel quel et ajuste les autres. */
+function MealEditor({ value, onChange, products }: { value: UsualItem[]; onChange: (v: UsualItem[]) => void; products: CustomFood[] }) {
+  const unitOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? EGG_COUNT_G : f?.unitG);
+  const step = (id: string, f?: { unitG?: number }) => unitOf(id, f) ?? 25;
+  const start = (id: string, f?: { unitG?: number }) => (unitOf(id, f) ? 2 * unitOf(id, f)! : 100);
+  const qty = (id: string, f: { unitG?: number } | undefined, g: number) => (unitOf(id, f) ? `${Math.round(g / unitOf(id, f)!)}` : `${g} g`);
+  const change = (id: string, f: { unitG?: number } | undefined, delta: number) => {
+    const cur = value.find((x) => x.foodId === id);
+    if (!cur) return;
+    const grams = cur.grams + delta * step(id, f);
+    onChange(grams <= 0 ? value.filter((x) => x.foodId !== id) : value.map((x) => (x.foodId === id ? { ...x, grams } : x)));
+  };
+  const row = (id: string, f: { name: string; unitG?: number }) => {
+    const cur = value.find((x) => x.foodId === id);
+    return (
+      <div key={id} className="spread">
+        <button className="chip" aria-pressed={!!cur} style={{ flex: 1, justifyContent: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => onChange(cur ? value.filter((x) => x.foodId !== id) : [...value, { foodId: id, grams: start(id, f) }])}>
+          {cur ? <Check size={14} aria-hidden="true" /> : <span aria-hidden="true" style={{ width: 14 }} />}
+          {f.name}
+        </button>
+        {cur && (
+          <span className="row" style={{ gap: 6, marginLeft: 8, flexWrap: 'nowrap' }}>
+            <button className="icon-btn" aria-label={`Moins de ${f.name}`} onClick={() => change(id, f, -1)}>
+              <Minus size={16} aria-hidden="true" />
+            </button>
+            <strong className="num" style={{ minWidth: 44, textAlign: 'center' }}>{qty(id, f, cur.grams)}</strong>
+            <button className="icon-btn" aria-label={`Plus de ${f.name}`} onClick={() => change(id, f, 1)}>
+              <Plus size={16} aria-hidden="true" />
+            </button>
+          </span>
+        )}
+      </div>
+    );
+  };
+  const groups: { g: FoodGroup; label: string }[] = [
+    { g: 'proteine', label: 'Protéines' },
+    { g: 'glucide', label: 'Glucides' },
+    { g: 'legume', label: 'Légumes' },
+    { g: 'lipide', label: 'Lipides' },
+    { g: 'fruit', label: 'Fruits' },
+  ];
+  return (
+    <div className="stack">
+      {groups.map(({ g, label }) => (
+        <div key={g} className="stack">
+          <p className="eyebrow" style={{ margin: '4px 0 0' }}>{label}</p>
+          {FOODS.filter((f) => f.group === g).map((f) => row(f.id, f))}
+        </div>
+      ))}
+      {products.length > 0 && (
+        <div className="stack">
+          <p className="eyebrow" style={{ margin: '4px 0 0' }}>Mes produits · valeurs de l’étiquette</p>
+          {products.map((p) => row(p.id, p))}
+        </div>
+      )}
     </div>
   );
 }
@@ -425,6 +484,7 @@ export function useDayPlan(repo: Repository) {
   const [eaten, setEatenState] = useState<Record<string, EatenMeal>>({});
   const [confirmed, setConfirmed] = useState<string[]>([]);
   const [bfToday, setBfToday] = useState<UsualItem[] | undefined>();
+  const [mealsToday, setMealsToday] = useState<MealsToday>({});
   const [snapshot, setSnapshot] = useState<Record<string, PlanEntry>>({});
   const kitchen = useKitchen(repo);
   const customFoods = useMemo<CustomFood[]>(() => kitchen.mine.map((m) => ({ id: m.id, name: m.name, kcal: m.kcal, protein: m.protein, unitG: m.unitG, unitName: m.unitName })), [kitchen.mine]);
@@ -439,6 +499,7 @@ export function useDayPlan(repo: Repository) {
       setEatenState((await repo.getKv<Record<string, EatenMeal>>(eatenKey(today))) ?? {});
       setConfirmed((await repo.getKv<string[]>(confirmedKey(today))) ?? []);
       setBfToday(await loadBreakfastToday(repo, today));
+      setMealsToday(await loadMealsToday(repo, today));
       setSnapshot((await repo.getKv<Record<string, PlanEntry>>(snapshotKey(today))) ?? {});
       const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
       const monday = new Date(Date.parse(`${today}T12:00:00Z`) - day * 86_400_000).toISOString().slice(0, 10);
@@ -450,8 +511,8 @@ export function useDayPlan(repo: Repository) {
   const plan = useMemo(() => {
     if (!answers || !targets.calories.value || !targets.water.value) return undefined;
     const dayIndex = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
-    return freezeConfirmed(buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers, customFoods, breakfastOverride: bfToday }), snapshot, confirmed);
-  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer, customFoods, bfToday, snapshot, confirmed]); // eslint-disable-line react-hooks/exhaustive-deps
+    return freezeConfirmed(buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers, customFoods, breakfastOverride: bfToday, mealOverrides: mealsToday }), snapshot, confirmed);
+  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer, customFoods, bfToday, mealsToday, snapshot, confirmed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apport CONNU (détaillé ou « exactement le plan ») : seule base du bilan calorique. Coché ou estimé ≠ connu.
   const intake = useMemo(() => (plan ? knownIntake(plan, done, confirmed) : undefined), [plan, done, confirmed]);
@@ -520,15 +581,19 @@ export function useDayPlan(repo: Repository) {
     await saveBreakfastToday(repo, today, items);
     setBfToday(items?.length ? items : undefined);
   };
+  /** « Aujourd'hui seulement » pour un repas : ne change jamais l'habitude. */
+  const setMealToday = async (slot: MealSlot, items: UsualItem[] | undefined) => {
+    setMealsToday(await saveMealsToday(repo, today, slot, items));
+  };
   const saveAnswers = async (next: NutritionAnswers) => {
     await repo.setKv(KEY, next);
     setAnswers(next);
   };
-  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers, bfToday, setBreakfastToday, customFoods };
+  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers, bfToday, setBreakfastToday, customFoods, mealsToday, setMealToday };
 }
 
 export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers, bfToday, setBreakfastToday, customFoods } = useDayPlan(repo);
+  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers, bfToday, setBreakfastToday, customFoods, mealsToday, setMealToday } = useDayPlan(repo);
   const kitchen = useKitchen(repo);
   const [ate, setAte] = useState<PlanEntry | null>(null);
   const [text, setText] = useState('');
@@ -538,6 +603,8 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
   const [got, setGot] = useState<string[]>([]);
   const [unplanned, setUnplanned] = useState<PlanEntry | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [mealEdit, setMealEdit] = useState<{ slot: MealSlot; title: string } | null>(null);
+  const [mealDraft, setMealDraft] = useState<UsualItem[]>([]);
   const [fridge, setFridge] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [uk, setUk] = useState<UnplannedKind>('maison');
@@ -649,6 +716,19 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       </button>
                     )}
                     {e.adjusted && <span className="pill">{e.adjusted} après imprévu</span>}
+                    {e.declared && e.id !== 'petit_dej' && <span className="pill">décrit par toi</span>}
+                    {(['dejeuner', 'diner', 'collation', 'collation_matin'] as const).some((x) => x === e.id) && !e.unplanned && (
+                      <button
+                        className="tl-alt"
+                        onClick={() => {
+                          const slot = e.id as MealSlot;
+                          setMealDraft(mealsToday[slot] ?? answers?.usualMeals?.[slot] ?? []);
+                          setMealEdit({ slot, title: e.title });
+                        }}
+                      >
+                        <Pencil size={12} aria-hidden="true" /> Mon repas
+                      </button>
+                    )}
                     {e.missing?.length ? (
                       <button className="pill" style={{ height: 'auto', padding: '4px 8px', whiteSpace: 'normal' }} onClick={() => setReviewing(true)}>
                         Manque à la maison : {e.missing.join(', ')} · voir l’avis
@@ -747,6 +827,61 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                   </div>
                 );
               })()}
+          </Modal>
+          <Modal open={mealEdit !== null} onClose={() => setMealEdit(null)} title={mealEdit ? `Mon repas · ${mealEdit.title}` : 'Mon repas'}>
+            {mealEdit && answers && (() => {
+              const t = mealDraft.length ? usualBreakfast(mealDraft, false, { eggG: answers.breakfastDetails?.eggG, eggCalibre: answers.breakfastDetails?.eggCalibre }, customFoods) : undefined;
+              const slot = mealEdit.slot;
+              const declaredNow = !!(mealsToday[slot]?.length || answers.usualMeals?.[slot]?.length);
+              const close = () => setMealEdit(null);
+              return (
+                <div className="stack">
+                  <p className="num" style={{ margin: 0, fontWeight: 700 }}>{t ? `≈ ${t.kcal} kcal · ${t.protein} g P` : 'Choisis tes aliments'}</p>
+                  <Help>Tu décris ce que tu manges, l’app le prend tel quel et ajuste les autres repas pour garder ta journée. Valeurs moyennes (estimation), sauf produit scanné.</Help>
+                  <MealEditor value={mealDraft} onChange={setMealDraft} products={customFoods} />
+                  <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn primary"
+                      disabled={!mealDraft.length}
+                      onClick={async () => {
+                        await saveAnswers({ ...answers, usualMeals: { ...answers.usualMeals, [slot]: mealDraft } });
+                        await setMealToday(slot, undefined);
+                        close();
+                        setNotice('Enregistré pour tous les jours. Rien n’est noté comme mangé.');
+                      }}
+                    >
+                      Tous les jours
+                    </button>
+                    <button
+                      className="btn"
+                      disabled={!mealDraft.length}
+                      onClick={async () => {
+                        await setMealToday(slot, mealDraft);
+                        close();
+                        setNotice('Choisi pour aujourd’hui seulement. Rien n’est noté comme mangé.');
+                      }}
+                    >
+                      Aujourd’hui seulement
+                    </button>
+                    {declaredNow && (
+                      <button
+                        className="btn ghost"
+                        onClick={async () => {
+                          const next = { ...answers.usualMeals };
+                          delete next[slot];
+                          await saveAnswers({ ...answers, usualMeals: next });
+                          await setMealToday(slot, undefined);
+                          close();
+                          setNotice('Retour à la proposition de l’app pour ce repas.');
+                        }}
+                      >
+                        Revenir à la proposition de l’app
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </Modal>
           <Modal open={fridge} onClose={() => setFridge(false)} title="Frigo">
             {(() => {
