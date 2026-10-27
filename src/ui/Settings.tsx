@@ -104,6 +104,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </div>
 
+      <VersionCard />
+
       <div className="card">
         <h2>État réel des fonctions</h2>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }} className="stack">
@@ -312,6 +314,36 @@ function LoadCard({ repo }: { repo: Repository }) {
 }
 
 /** Prières : heures calculées sur le téléphone, routine et planning calés dessus. */
+/** Version chargée sur cet appareil vs version publiée (version.json, jamais mis en cache). */
+function VersionCard() {
+  const [online, setOnline] = useState<string | null>(null);
+  const check = async () => {
+    try {
+      const r = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+      setOnline(r.ok ? ((await r.json()) as { version: string }).version : 'indisponible');
+    } catch {
+      setOnline('hors ligne');
+    }
+  };
+  const same = online === __APP_VERSION__;
+  return (
+    <div className="card stack">
+      <h2 style={{ margin: 0 }}>Version</h2>
+      <p className="num" style={{ margin: 0 }}>
+        Sur cet appareil : <b>{__APP_VERSION__}</b> <span className="muted">· construite le {__APP_BUILT_AT__.slice(0, 16).replace('T', ' ')} UTC</span>
+      </p>
+      {online && (
+        <p style={{ margin: 0 }}>
+          En ligne : <b className="num">{online}</b> {same ? '· à jour' : online.length === 7 ? '· différente : ferme complètement l’app puis rouvre-la' : ''}
+        </p>
+      )}
+      <button className="btn sm" onClick={check} style={{ alignSelf: 'flex-start' }}>
+        Vérifier la version en ligne
+      </button>
+    </div>
+  );
+}
+
 function PrayerCard({ repo }: { repo: Repository }) {
   const gps = useConsent(repo, 'location');
   const { settings: s, save } = usePrayer(repo);

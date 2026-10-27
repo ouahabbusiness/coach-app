@@ -92,8 +92,9 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
       const intake: { day: string; kcal: number }[] = [];
       for (const d of days) {
         // Seules les journées entièrement connues comptent (repas détaillés ou « exactement le plan »).
-        const x = await repo.getKv<{ kcal: number; complete?: boolean }>(`intake.${d}`);
-        if (x?.complete === true) intake.push({ day: d, kcal: x.kcal });
+        // Journée incomplète = apport inconnu : exclue (jamais comptée comme 0 ni comme apport partiel).
+        const x = await repo.getKv<{ kcal: number | null; complete?: boolean }>(`intake.${d}`);
+        if (x?.complete === true && typeof x.kcal === 'number') intake.push({ day: d, kcal: x.kcal });
       }
       const rlog = (await repo.getKv<{ day: string; tired: boolean }[]>('readiness.log')) ?? [];
       const fatigueDays = new Set(rlog.filter((x) => x.tired && days.includes(x.day)).map((x) => x.day)).size;

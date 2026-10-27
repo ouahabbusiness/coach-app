@@ -16,6 +16,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // Version publiée : toujours le réseau (sert à vérifier ce qui est réellement en ligne).
+  if (new URL(req.url).pathname.endsWith('/version.json')) return;
 
   // Pages : réseau d'abord, cache en secours.
   if (req.mode === 'navigate') {

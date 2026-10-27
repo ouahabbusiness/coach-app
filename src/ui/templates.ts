@@ -40,6 +40,15 @@ export async function saveTemplates(repo: Repository, list: SessionTemplate[]): 
 }
 
 /** Transforme un modèle en plan figé pour une séance : le plan prévu est conservé tel quel. */
+/**
+ * Consignes d'anciens programmes déjà enregistrés : « 1re série = test max » est remplacée À LA LECTURE par la
+ * calibration sous-maximale. Le programme stocké n'est pas modifié (aucune réécriture de tes données).
+ */
+export function currentCue(cue: string | undefined): string | undefined {
+  if (cue && /test max/i.test(cue)) return 'Calibration sous-maximale : arrête chaque série avec 3 rép. en réserve (pas de max)';
+  return cue;
+}
+
 export function planFromTemplate(t: SessionTemplate, exerciseOf: (variantId: string) => string): SessionPlan {
   const blockType: BlockType = 'straight';
   return {
@@ -63,7 +72,7 @@ export function planFromTemplate(t: SessionTemplate, exerciseOf: (variantId: str
         repRange: line.kind === 'reps' ? line.repRange : undefined,
         lastSetToFailure: line.lastSetToFailure,
         restSeconds: line.restSeconds,
-        cue: line.cue,
+        cue: currentCue(line.cue),
       })),
     ),
   };

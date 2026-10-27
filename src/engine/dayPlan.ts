@@ -126,17 +126,30 @@ export interface EatenMeal {
 export type Documentation = 'sauté' | 'plan confirmé' | 'portions déclarées' | 'estimation' | 'coché';
 
 /**
- * Incertitude relative retenue (choix de conception, pas une mesure) : null = inconnue.
- * Seuls les apports à ±20 % ou mieux entrent dans le bilan calorique.
+ * Niveau de documentation (définitions, pas des pourcentages) :
+ *  - documenté : on sait ce qui a été mangé ET en quelle quantité (rien mangé ; plan confirmé avec ses portions ;
+ *    aliments et quantités saisis) ;
+ *  - estimé : seulement un type et une taille de repas (resto, plat préparé…) ;
+ *  - non documenté : repas coché sans composition ni portion.
+ * Seul « documenté » entre dans le bilan. Un repas exclu a un apport INCONNU, jamais 0.
  */
-export const UNCERTAINTY: Record<Documentation, number | null> = {
-  sauté: 0,
-  'plan confirmé': 0.15,
-  'portions déclarées': 0.2,
-  estimation: 0.4,
-  coché: null,
+export type DocLevel = 'documenté' | 'estimé' | 'non documenté';
+
+export const DOC_LEVEL: Record<Documentation, DocLevel> = {
+  sauté: 'documenté',
+  'plan confirmé': 'documenté',
+  'portions déclarées': 'documenté',
+  estimation: 'estimé',
+  coché: 'non documenté',
 };
-export const MAX_COUNTED_UNCERTAINTY = 0.2;
+
+export const DOC_LABEL: Record<Documentation, string> = {
+  sauté: 'rien mangé',
+  'plan confirmé': 'plan confirmé, portions comprises',
+  'portions déclarées': 'aliments et quantités saisis',
+  estimation: 'type et taille seulement',
+  coché: 'coché, sans composition ni portion',
+};
 
 /** Anciennes saisies : 'détaillé' → portions déclarées, 'estimé' ou absent → estimation. */
 export const docOf = (s: EatenMeal['source']): Documentation => (s === 'détaillé' ? 'portions déclarées' : s === 'estimé' || !s ? 'estimation' : s);
@@ -353,51 +366,53 @@ export interface MealDoc {
   id: string;
   title: string;
   doc: Documentation | 'non noté';
-  kcal?: number;
-  /** Incertitude relative (null = inconnue). */
-  uncertainty: number | null;
+  level: DocLevel | 'non noté';
   counted: boolean;
 }
 
 export interface KnownIntake {
-  /** Somme des apports comptés (documentés à ±20 % ou mieux) + compléments cochés (dose déclarée). */
-  kcal: number;
-  protein: number;
-  /** Marge d'incertitude absolue sur `kcal` (somme des incertitudes de chaque repas compté). */
-  marginKcal: number;
+  /**
+   * Somme des repas DOCUMENTÉS + compléments cochés (dose déclarée). Ce n'est PAS l'apport du jour si des repas
+   * sont exclus : leur apport est inconnu (null), pas 0. Voir `complete`.
+   */
+  documentedKcal: number;
+  documentedProtein: number;
+  /** Apport du jour, seulement si tous les repas sont documentés ; sinon null (inconnu). */
+  kcal: number | null;
   meals: MealDoc[];
   known: number;
-  /** Repas notés mais trop peu documentés pour compter (titres). */
-  unknown: string[];
-  /** Tous les repas de la journée sont comptés : seul ce cas entre dans le bilan calorique. */
+  /** Repas notés mais exclus (estimés ou non documentés) : apport inconnu. */
+  excluded: string[];
+  /** Tous les repas de la journée sont documentés : seul ce cas entre dans le bilan calorique. */
   complete: boolean;
 }
 
 /**
- * Apport du jour classé par DOCUMENTATION et INCERTITUDE. Un repas coché sans confirmation n'a pas d'apport
- * connu ; une estimation par type et taille (±40 %) est affichée mais pas comptée ; « exactement le plan »
- * (±15 %), des portions déclarées (±20 %) et un repas sauté (0) comptent.
+ * Apport du jour classé par NIVEAU DE DOCUMENTATION. Seuls les repas documentés comptent ; un repas estimé ou
+ * simplement coché est exclu et son apport reste inconnu (jamais assimilé à 0). Une journée avec un repas exclu
+ * ou non noté n'a pas d'apport total connu et n'entre pas dans le bilan.
  */
 export function knownIntake(plan: PlanEntry[], done: string[], confirmed: string[]): KnownIntake | undefined {
   const mealsPlan = plan.filter((e) => e.kind === 'repas');
   const supps = plan.filter((e) => e.kind === 'complement' && e.kcal && done.includes(e.id));
   const meals: MealDoc[] = mealsPlan.map((e) => {
     const doc: MealDoc['doc'] = e.unplanned ? docOf(e.source) : confirmed.includes(e.id) ? 'plan confirmé' : done.includes(e.id) ? 'coché' : 'non noté';
-    const uncertainty = doc === 'non noté' ? null : UNCERTAINTY[doc];
-    return { id: e.id, title: e.title, doc, kcal: e.kcal, uncertainty, counted: uncertainty !== null && uncertainty <= MAX_COUNTED_UNCERTAINTY };
+    const level = doc === 'non noté' ? 'non noté' : DOC_LEVEL[doc];
+    return { id: e.id, title: e.title, doc, level, counted: level === 'documenté' };
   });
   if (!meals.some((m) => m.doc !== 'non noté') && !supps.length) return undefined;
   const counted = meals.filter((m) => m.counted);
   const byId = new Map(mealsPlan.map((e) => [e.id, e]));
   const sum = (k: 'kcal' | 'protein') => counted.reduce((t, m) => t + (byId.get(m.id)![k] ?? 0), 0) + supps.reduce((t, e) => t + (e[k] ?? 0), 0);
+  const complete = meals.length > 0 && meals.every((m) => m.counted);
   return {
-    kcal: sum('kcal'),
-    protein: sum('protein'),
-    marginKcal: Math.round(counted.reduce((t, m) => t + (m.kcal ?? 0) * (m.uncertainty ?? 0), 0)),
+    documentedKcal: sum('kcal'),
+    documentedProtein: sum('protein'),
+    kcal: complete ? sum('kcal') : null,
     meals,
     known: counted.length,
-    unknown: meals.filter((m) => m.doc !== 'non noté' && !m.counted).map((m) => m.title),
-    complete: meals.length > 0 && meals.every((m) => m.counted),
+    excluded: meals.filter((m) => m.doc !== 'non noté' && !m.counted).map((m) => m.title),
+    complete,
   };
 }
 

@@ -10,7 +10,7 @@ import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
-import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, knownIntake, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -422,12 +422,15 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                     {(() => {
                       const m = intake?.meals.find((x) => x.id === e.id);
                       if (!m || m.doc === 'non noté' || m.doc === 'plan confirmé') return null;
-                      const u = m.uncertainty === null ? 'apport inconnu' : `±${Math.round(m.uncertainty * 100)} %`;
-                      return <span className="pill">{m.doc} · {u} · {m.counted ? 'compté' : 'non compté'}</span>;
+                      return (
+                        <span className="pill">
+                          {m.level} · {DOC_LABEL[m.doc]} · {m.counted ? 'compté' : 'exclu, apport inconnu'}
+                        </span>
+                      );
                     })()}
                     {e.kind === 'repas' && !e.unplanned && confirmed.includes(e.id) && (
                       <button className="pill" onClick={() => confirmPlan(e.id, false)}>
-                        plan confirmé · ±15 % · compté ✕
+                        documenté · plan confirmé · compté ✕
                       </button>
                     )}
                     {e.kind === 'repas' && !e.unplanned && isDone && !confirmed.includes(e.id) && (
@@ -465,9 +468,10 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
           </ol>
           {intake && (
             <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.78rem' }}>
-              {intake.complete ? 'Journée connue : comptée dans le bilan.' : 'Journée incomplète : pas comptée dans le bilan.'}
-              {showKcal ? ` Apport compté ≈ ${intake.kcal} ± ${intake.marginKcal} kcal · ${intake.protein} g P.` : ''}
-              {intake.unknown.length ? ` Trop peu documentés (non comptés) : ${intake.unknown.join(', ')}.` : ''}
+              {intake.complete
+                ? `Journée documentée : comptée dans le bilan.${showKcal ? ` Apport ≈ ${intake.kcal} kcal · ${intake.documentedProtein} g P.` : ''}`
+                : `Journée incomplète : apport total inconnu, pas compté dans le bilan.${showKcal ? ` Repas documentés seulement : ${intake.documentedKcal} kcal (pas le total du jour).` : ''}`}
+              {intake.excluded.length ? ` Exclus, apport inconnu (pas 0) : ${intake.excluded.join(', ')}.` : ''}
             </p>
           )}
           <Modal open={!!ate} onClose={() => setAte(null)} title={`J’ai mangé · ${ate?.title ?? ''}`}>
