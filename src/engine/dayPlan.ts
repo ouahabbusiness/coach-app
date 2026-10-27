@@ -142,6 +142,8 @@ export interface PlanEntry {
   source?: Documentation | 'détaillé' | 'estimé';
   /** Repas recalculé après un imprévu. */
   adjusted?: 'allégé' | 'renforcé';
+  /** Aliments du repas absents du frigo déclaré (rien n'est remplacé sans te le demander). */
+  missing?: string[];
 }
 
 export interface DayPlanInput {
@@ -418,7 +420,8 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
     rest.k = otherK > 0 ? Math.max(0.5, (i.kcal - bf.kcal) / otherK) : 1;
     rest.p = otherP > 0 ? Math.max(0.5, (i.proteinG - bf.protein) / otherP) : 1;
   }
-  out.push({ id: 'petit_dej', time: fromMin(bfTime), kind: 'repas', title: 'Petit-déjeuner', ...bf });
+  const missingNames = usual.length ? missingFromPantry(usual, a.pantry, custom).map((id) => food(id)?.name ?? custom.find((c) => c.id === id)?.name ?? id) : [];
+  out.push({ id: 'petit_dej', time: fromMin(bfTime), kind: 'repas', title: 'Petit-déjeuner', ...bf, ...(missingNames.length ? { missing: missingNames } : {}) });
   for (const s of supp('apres_petit_dej')) {
     out.push({ id: `supp-${s.id}`, time: fromMin(bfTime + 20), kind: 'complement', title: s.name, items: [s.doseG ? `${s.doseG} g (ta dose déclarée)` : 'ta dose habituelle', `avec ${s.waterMl ?? 300} ml d’eau`], waterMl: s.waterMl ?? 300 });
   }
@@ -524,7 +527,7 @@ export function buildDayPlan(i: DayPlanInput): PlanEntry[] {
   const scale = Object.fromEntries(adjustable.map((e) => [e.id, { k, p }]));
   return rawPlan(i, scale).map((e) =>
     ids.includes(e.id)
-      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, source: docOf(eaten[e.id]!.source), parts: undefined }
+      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, source: docOf(eaten[e.id]!.source), parts: undefined, missing: undefined }
       : adjustable.some((x) => x.id === e.id) && Math.abs(k - 1) > 0.05
         ? { ...e, adjusted: k < 1 ? 'allégé' : 'renforcé' }
         : e,
@@ -640,4 +643,13 @@ export function shoppingList(plans: PlanEntry[][], pantry?: string[]): ShoppingL
  */
 export function freezeConfirmed(plan: PlanEntry[], snapshot: Record<string, PlanEntry>, confirmed: string[]): PlanEntry[] {
   return plan.map((e) => (confirmed.includes(e.id) && snapshot[e.id] ? snapshot[e.id]! : e));
+}
+
+/**
+ * Aliments d'un repas déclaré qui ne sont pas dans le frigo. Sans frigo déclaré (liste vide ou absente), on ne sait pas :
+ * rien n'est signalé comme manquant.
+ */
+export function missingFromPantry(list: UsualItem[], pantry: string[] | undefined, custom: CustomFood[] = []): string[] {
+  if (!pantry?.length) return [];
+  return list.filter((u) => (food(u.foodId) || custom.some((c) => c.id === u.foodId)) && !pantry.includes(u.foodId)).map((u) => u.foodId);
 }

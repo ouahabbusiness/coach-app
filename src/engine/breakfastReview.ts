@@ -2,12 +2,12 @@
 // Aucun avis médical : l'app compare des quantités à des repères ajustables ; valeurs nutritionnelles = moyennes (estimation)
 // sauf pour un produit personnel (étiquette). Une quantité inconnue n'est jamais comptée comme zéro.
 
-import { coffeeExtras, EGG_COUNT_G, EGG_SOURCE, eggBasis, eggUnit, fatExtras, food, usualBreakfast, type BreakfastDetails, type CustomFood, type NutritionAnswers, type UsualItem } from './dayPlan';
+import { coffeeExtras, EGG_COUNT_G, EGG_SOURCE, eggBasis, eggUnit, fatExtras, food, missingFromPantry, usualBreakfast, type BreakfastDetails, type CustomFood, type NutritionAnswers, type UsualItem } from './dayPlan';
 
 type Part = UsualItem;
 
 export interface BreakfastOption {
-  id: 'habituel' | 'moins-jaunes' | 'alterner' | 'fruit';
+  id: 'habituel' | 'moins-jaunes' | 'alterner' | 'fruit' | 'sans-manquant';
   label: string;
   items: string[];
   parts: Part[];
@@ -27,6 +27,9 @@ export interface BreakfastReview {
   options: BreakfastOption[];
   recommendedId: BreakfastOption['id'];
   recommendedWhy: string;
+  /** Aliments de ta version habituelle absents du frigo, et ceux pour lesquels rien n'est à la maison pour les remplacer. */
+  missingNames: string[];
+  noSubstitute: string[];
   /** Informations à préciser (demandées une fois, jamais supposées). */
   missing: string[];
   /** Éléments dont la quantité est inconnue : non comptés, jamais comptés comme zéro. */
@@ -60,6 +63,8 @@ export function breakfastTarget(meals: number | undefined, kcal: number, protein
     : `Repère = ${pct} % de ta journée (${m} repas par jour). Ajuste-le selon ton appétit : ce n’est pas un quota.`;
   return { kcal: Math.round((kcal * pct) / 100), protein: Math.round((proteinG * pct) / 100), sharePct: pct, how };
 }
+
+const byWhat = (id: string) => (id === 'oeuf' ? 'même apport en protéines.' : 'apport comparable au manquant.');
 
 const merge = (parts: Part[], add: Part): Part[] =>
   parts.some((p) => p.foodId === add.foodId) ? parts.map((p) => (p.foodId === add.foodId ? { ...p, grams: p.grams + add.grams } : p)) : [...parts, add];
@@ -121,15 +126,60 @@ export function reviewBreakfast(a: NutritionAnswers, kcal: number, proteinG: num
     options.push(build('fruit', 'Ajouter un fruit', merge(usual, { foodId: 'banane', grams: food('banane')!.unitG ?? 120 }), '+1 banane : fruit du matin, sans rien retirer.'));
   }
 
+  // Frigo : ce qui manque à la maison. Une variante n'utilise que ce qui est au frigo ; sinon on le dit, on ne devine pas.
+  const missingIds = missingFromPantry(usual, a.pantry, custom);
+  const missingNames = missingIds.map((id) => nameOf(id, custom));
+  const noSubstitute: string[] = [];
+  if (missingIds.length) {
+    const pantry = a.pantry ?? [];
+    const PREFER: Record<string, string[]> = {
+      proteine: ['skyr', 'fromage_blanc', 'cottage', 'oeuf', 'blanc_oeuf'],
+      glucide: ['avoine', 'pain', 'cracotte'],
+      lipide: ['amandes', 'cacahuete'],
+      fruit: ['banane', 'pomme', 'fruits_rouges'],
+    };
+    let parts: Part[] = usual.filter((u) => !missingIds.includes(u.foodId));
+    const swaps: string[] = [];
+    for (const id of missingIds) {
+      const gone = food(id);
+      const u = usual.find((x) => x.foodId === id)!;
+      if (!gone) {
+        noSubstitute.push(nameOf(id, custom)); // produit personnel : pas de remplaçant devinable
+        continue;
+      }
+      const realG = id === 'oeuf' ? (u.grams / EGG_COUNT_G) * eggUnit(details) : u.grams;
+      const byProtein = gone.group === 'proteine';
+      const need = byProtein ? (realG * gone.protein) / 100 : (realG * gone.kcal) / 100;
+      const cand = (PREFER[gone.group] ?? []).map((cid) => food(cid)).find((f) => f && f.id !== id && pantry.includes(f.id) && !missingIds.includes(f.id));
+      if (!cand) {
+        noSubstitute.push(gone.name);
+        continue;
+      }
+      let grams: number;
+      if (cand.id === 'oeuf') grams = Math.max(1, Math.round(need / ((eggUnit(details) * cand.protein) / 100))) * EGG_COUNT_G;
+      else if (cand.unitG) grams = Math.max(1, Math.round(need / (byProtein ? (cand.unitG * cand.protein) / 100 : (cand.unitG * cand.kcal) / 100))) * cand.unitG;
+      else grams = r5((need / (byProtein ? cand.protein : cand.kcal)) * 100);
+      parts = merge(parts, { foodId: cand.id, grams });
+      swaps.push(`${gone.name} → ${cand.name}`);
+    }
+    if (swaps.length) {
+      options.push(build('sans-manquant', 'Avec ce que tu as', parts, `${swaps.join(', ')} : ${byWhat(missingIds[0]!)}`));
+    }
+  }
+
   // Recommandation : ta version si elle colle déjà au repère (± 15 % sur les calories et les protéines) ; sinon la variante la plus proche.
   const gap = (o: BreakfastOption) => Math.abs(o.kcal - target.kcal) / target.kcal + Math.abs(o.protein - target.protein) / target.protein;
   const close = (o: BreakfastOption) => Math.abs(o.kcal - target.kcal) / target.kcal <= 0.15 && Math.abs(o.protein - target.protein) / target.protein <= 0.15;
   const habituel = options[0]!;
   const best = options.reduce((m, o) => (gap(o) < gap(m) - 0.02 ? o : m), habituel);
-  const recommended = close(habituel) ? habituel : best;
+  const sansManquant = options.find((o) => o.id === 'sans-manquant');
+  // Ta version habituelle n'est pas faisable si un aliment manque : la version « avec ce que tu as » passe devant.
+  const recommended = sansManquant ?? (close(habituel) ? habituel : best);
   const pct = (v: number, t: number) => `${Math.round((v / t) * 100)} %`;
   const recommendedWhy =
-    recommended.id === 'habituel'
+    recommended.id === 'sans-manquant'
+      ? `Il te manque ${missingNames.join(', ')} à la maison : cette version utilise ce que tu as, avec des quantités qui gardent tes protéines (${pct(recommended.protein, target.protein)} du repère) et tes calories (${pct(recommended.kcal, target.kcal)}).`
+      : recommended.id === 'habituel'
       ? `Ta version colle déjà à ton repère (${pct(habituel.kcal, target.kcal)} des calories, ${pct(habituel.protein, target.protein)} des protéines) : rien à changer.`
       : `Ta version est à ${pct(habituel.kcal, target.kcal)} des calories et ${pct(habituel.protein, target.protein)} des protéines du repère ; celle-ci est à ${pct(recommended.kcal, target.kcal)} et ${pct(recommended.protein, target.protein)}. Compare aussi ce qui change dans la composition.`;
 
@@ -158,5 +208,6 @@ export function reviewBreakfast(a: NutritionAnswers, kcal: number, proteinG: num
         : `Calibre inconnu : œuf M supposé, ≈ ${unit} g comestibles (estimation). Précise le calibre, ou pèse le contenu, pour affiner.`
     : undefined;
   const criteria = `Critères : les calories ET les protéines, chacune à ± 15 % du repère, pour garder ta version. Sinon, la version dont l’écart cumulé (calories + protéines) est le plus faible. Cela ne juge pas la qualité du repas (fibres, graisses, satiété).`;
-  return { target, options, recommendedId: recommended.id, recommendedWhy, missing, unknownNotCounted, generic, eggAssumption, eggSource: eggs ? EGG_SOURCE : undefined, criteria, notes };
+  if (noSubstitute.length) notes.push(`Rien à la maison pour remplacer : ${noSubstitute.join(', ')}. Ajoute-le à tes courses, ou coche ce que tu as dans le Frigo.`);
+  return { target, options, recommendedId: recommended.id, recommendedWhy, missingNames, noSubstitute, missing, unknownNotCounted, generic, eggAssumption, eggSource: eggs ? EGG_SOURCE : undefined, criteria, notes };
 }

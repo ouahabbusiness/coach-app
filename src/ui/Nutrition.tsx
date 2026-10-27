@@ -2,7 +2,7 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, Scale, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, Refrigerator, Scale, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
 import { Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
@@ -538,6 +538,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
   const [got, setGot] = useState<string[]>([]);
   const [unplanned, setUnplanned] = useState<PlanEntry | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [fridge, setFridge] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [uk, setUk] = useState<UnplannedKind>('maison');
   const [us, setUs] = useState<UnplannedSize>('normale');
@@ -567,6 +568,11 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
           <button className="btn sm" onClick={() => go({ name: 'kitchen' })}>
             <ChefHat size={14} aria-hidden="true" /> Ma cuisine
           </button>
+          {answers && (
+            <button className="btn sm" onClick={() => setFridge(true)}>
+              <Refrigerator size={14} aria-hidden="true" /> Frigo
+            </button>
+          )}
           {plan && (
           <button className="btn sm" onClick={async () => (setGot((await repo.getKv<string[]>(`shopping.${today}`)) ?? []), setShopping(true))}>
             <ShoppingCart size={14} aria-hidden="true" /> Courses de la semaine
@@ -643,6 +649,11 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       </button>
                     )}
                     {e.adjusted && <span className="pill">{e.adjusted} après imprévu</span>}
+                    {e.missing?.length ? (
+                      <button className="pill" style={{ height: 'auto', padding: '4px 8px', whiteSpace: 'normal' }} onClick={() => setReviewing(true)}>
+                        Manque à la maison : {e.missing.join(', ')} · voir l’avis
+                      </button>
+                    ) : null}
                     {e.id === 'petit_dej' && answers?.usualBreakfast?.length ? (
                       <button className="tl-alt" onClick={() => setReviewing(true)}>
                         <Scale size={12} aria-hidden="true" /> Avis
@@ -737,6 +748,48 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                 );
               })()}
           </Modal>
+          <Modal open={fridge} onClose={() => setFridge(false)} title="Frigo">
+            {(() => {
+              if (!answers) return null;
+              const groups: { g: FoodGroup; label: string }[] = [
+                { g: 'proteine', label: 'Protéines' },
+                { g: 'glucide', label: 'Glucides' },
+                { g: 'lipide', label: 'Lipides' },
+                { g: 'fruit', label: 'Fruits' },
+              ];
+              // Première ouverture : on propose ce que tu manges d'habitude ; rien n'est enregistré avant ton premier geste.
+              const suggested = [...new Set([...answers.proteins, ...answers.carbs, ...answers.fats, ...answers.fruits, ...(answers.usualBreakfast ?? []).map((u) => u.foodId)])];
+              const have = answers.pantry?.length ? answers.pantry : suggested;
+              const toggle = async (id: string) => {
+                const next = have.includes(id) ? have.filter((x) => x !== id) : [...have, id];
+                await saveAnswers({ ...answers, pantry: next });
+              };
+              const row = (id: string, name: string) => (
+                <button key={id} className="cq-opt" aria-pressed={have.includes(id)} onClick={() => toggle(id)}>
+                  <span className="cq-opt-l">{name}</span>
+                </button>
+              );
+              return (
+                <div className="stack">
+                  <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Coche ce que tu as à la maison. Décoche ce que tu n’as plus : tes plats et ton petit-déjeuner le savent.</p>
+                  {!answers.pantry?.length && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>Pré-coché avec ce que tu manges d’habitude. Ton premier geste l’enregistre.</p>}
+                  {groups.map(({ g, label }) => (
+                    <div key={g} className="stack">
+                      <p className="eyebrow" style={{ margin: '4px 0 0' }}>{label}</p>
+                      <div className="cq-grid">{FOODS.filter((f) => f.group === g).map((f) => row(f.id, f.name))}</div>
+                    </div>
+                  ))}
+                  {customFoods.length > 0 && (
+                    <div className="stack">
+                      <p className="eyebrow" style={{ margin: '4px 0 0' }}>Mes produits</p>
+                      <div className="cq-grid">{customFoods.map((c) => row(c.id, c.name))}</div>
+                    </div>
+                  )}
+                  <button className="btn primary" onClick={() => setFridge(false)}>Terminé</button>
+                </div>
+              );
+            })()}
+          </Modal>
           <Modal open={reviewing} onClose={() => setReviewing(false)} title="Avis · petit-déjeuner">
             {(() => {
               const r = answers && kcal ? reviewBreakfast(answers, kcal.kcal, kcal.proteinG, { custom: customFoods }) : undefined;
@@ -760,6 +813,9 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                     </div>
                     <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.78rem' }}>Si tu es en dessous ou au-dessus, les autres repas s’ajustent : tu ne manges pas sans faim pour atteindre un chiffre.</p>
                   </div>
+                  {r.missingNames.length > 0 && (
+                    <span className="pill" style={{ height: 'auto', padding: '4px 8px', whiteSpace: 'normal' }}>Manque à la maison : {r.missingNames.join(', ')}</span>
+                  )}
                   {bfToday && <span className="pill">Version d’aujourd’hui seulement · ton habituel reste inchangé</span>}
                   {r.missing.length > 0 && (
                     <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

@@ -146,3 +146,50 @@ describe('aujourd’hui seulement ≠ habitude', () => {
     expect(normal.items).toContain('4 œufs');
   });
 });
+
+describe('frigo : un aliment manque à la maison', () => {
+  const habit: NutritionAnswers = {
+    ...base,
+    usualBreakfast: [{ foodId: 'cottage', grams: 150 }, { foodId: 'oeuf', grams: 4 * 60 }, { foodId: 'cracotte', grams: 36 }],
+  };
+  const fridge = ['oeuf', 'cracotte', 'skyr', 'poulet', 'riz'];
+
+  it('le plan signale ce qui manque mais ne remplace rien tout seul', () => {
+    const bf = buildDayPlan({ answers: { ...habit, pantry: fridge }, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 1 }).find((e) => e.id === 'petit_dej')!;
+    expect(bf.missing).toEqual(['Cottage cheese']);
+    expect(bf.items).toContain('150 g cottage cheese');
+  });
+
+  it('frigo non déclaré ou vide : rien n’est signalé comme manquant', () => {
+    for (const pantry of [undefined, []]) {
+      const bf = buildDayPlan({ answers: { ...habit, pantry }, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 1 }).find((e) => e.id === 'petit_dej')!;
+      expect(bf.missing).toBeUndefined();
+    }
+  });
+
+  it('l’avis propose « avec ce que tu as », avec les protéines gardées, et le recommande', () => {
+    const r = reviewBreakfast({ ...habit, pantry: fridge }, 2600, 140)!;
+    expect(r.missingNames).toEqual(['Cottage cheese']);
+    const v = r.options.find((o) => o.id === 'sans-manquant')!;
+    expect(v.changes.join(' | ')).toMatch(/Cottage cheese : 150 g → 0 g/);
+    expect(v.changes.join(' | ')).toMatch(/Skyr : 0 g → \d+ g/);
+    expect(v.parts.some((p) => p.foodId === 'cottage')).toBe(false);
+    expect(Math.abs(v.dProtein)).toBeLessThanOrEqual(2);
+    expect(r.recommendedId).toBe('sans-manquant');
+    expect(r.recommendedWhy).toMatch(/Il te manque Cottage cheese à la maison/);
+  });
+
+  it('rien à la maison pour remplacer : on le dit, on ne devine pas', () => {
+    const r = reviewBreakfast({ ...habit, usualBreakfast: [{ foodId: 'cottage', grams: 150 }, { foodId: 'cracotte', grams: 36 }], pantry: ['cracotte', 'poulet'] }, 2600, 140)!;
+    expect(r.options.some((o) => o.id === 'sans-manquant')).toBe(false);
+    expect(r.noSubstitute).toEqual(['Cottage cheese']);
+    expect(r.notes.join(' ')).toMatch(/Rien à la maison pour remplacer : Cottage cheese/);
+  });
+
+  it('plusieurs manques : chacun remplacé par ce qui est au frigo', () => {
+    const r = reviewBreakfast({ ...habit, pantry: ['skyr', 'avoine', 'poulet'] }, 2600, 140)!;
+    expect(r.missingNames).toEqual(['Cottage cheese', 'Œufs', 'Cracottes']);
+    const v = r.options.find((o) => o.id === 'sans-manquant')!;
+    expect(v.parts.every((p) => ['skyr', 'avoine'].includes(p.foodId))).toBe(true);
+  });
+});
