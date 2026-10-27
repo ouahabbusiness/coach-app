@@ -1327,3 +1327,12 @@ body:has(.run-live.full) { background-image: none; }
 /* Fenêtres : titre + croix de fermeture */
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .modal-head h2 { margin: 0; }
+
+/* Accueil : carte « séance du jour » plus grande */
+.today-hero { padding: 18px 16px; gap: 14px; min-height: 96px; }
+.today-hero .icon-chip { width: 48px; height: 48px; border-radius: 14px; }
+.today-hero .icon-chip svg { width: 22px; height: 22px; }
+.today-hero .row-title { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; white-space: normal; }
+.today-hero .eyebrow { font-size: 0.78rem; }
+.today-hero .icon-btn.primary { width: 48px; height: 48px; }
+.today-hero.accomplie .icon-chip { background: var(--accent); color: #fff; }

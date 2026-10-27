@@ -9,6 +9,7 @@ import { loadTemplates, saveTemplates, type SessionTemplate, type TemplateLine }
 import { startSessionFromTemplate } from './actions';
 import { estimateMinutes } from '../engine/disruption';
 import type { Route } from './App';
+import { RunCard } from './RunCard';
 
 const ROLE_LABEL: Record<SetRole, string> = {
   warmup: 'Échauffement',
@@ -102,6 +103,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
         );
       })}
       {templates.length === 0 && <p className="muted">Aucune séance.</p>}
+      <RunCard repo={repo} go={go} />
       <div className="row" style={{ marginTop: 4 }}>
         <button className="btn primary" onClick={() => setEditing({ id: newId(), title: '', lines: [], updatedAt: Date.now() })}>
           <Plus size={18} aria-hidden="true" /> Nouvelle

@@ -3,12 +3,13 @@
 
 import { useEffect, useState } from 'react';
 import { PostFeedback } from './PostFeedback';
-import { ChevronLeft, Dumbbell, Flame, Heart, Timer, TriangleAlert, Trophy } from 'lucide-react';
+import { ChevronLeft, Dumbbell, FileText, Flame, Heart, Timer, TriangleAlert, Trophy } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { NOVEMBER_2026, habitStatus } from '../engine/challenge';
 import { challengeValues, dailyKey, type DailyMetrics } from '../engine/daily';
 import { currentResult, localDay, sessionOutcome, summarizeSession, timings } from '../engine/derive';
 import { project } from '../engine/session';
+import { FEEL_LABELS, INITIATION_SESSIONS, initiationRank, sessionReport, type FeelLevel, type SessionFeel } from '../engine/sessionReport';
 import type { SessionState, SetResult } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { Modal, Notice, OutcomeBadge } from './common';
@@ -20,6 +21,7 @@ interface SessionExtra {
   avgBpm?: number;
 }
 const extraKey = (id: string) => `session.extra.${id}`;
+const feelKey = (id: string) => `session.feel.${id}`;
 
 function cell(r: SetResult | undefined, kind: 'reps' | 'hold'): string {
   if (!r) return '—';
@@ -34,6 +36,11 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
   const [editing, setEditing] = useState<keyof SessionExtra | null>(null);
   const [draft, setDraft] = useState('');
   const { entries } = useChallengeEntries(repo);
+  const [feel, setFeel] = useState<SessionFeel | undefined>();
+  const [note, setNote] = useState('');
+  const [initiation, setInitiation] = useState<number | undefined>();
+  const [reportOpen, setReportOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     repo.sessionEvents(sessionId).then((ev) => {
@@ -42,6 +49,13 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
       if (s) repo.getKv<DailyMetrics>(dailyKey(localDay(s.startedAt, s.timeZone))).then(setDaily);
     });
     repo.getKv<SessionExtra>(extraKey(sessionId)).then((e) => e && setExtra(e));
+    repo.getKv<SessionFeel>(feelKey(sessionId)).then((f) => {
+      if (f) {
+        setFeel(f);
+        setNote(f.note ?? '');
+      }
+    });
+    repo.listSessions().then((rows) => setInitiation(initiationRank(rows, sessionId)));
   }, [repo, sessionId]);
 
   if (st === undefined) return <p>Chargement…</p>;
@@ -61,6 +75,23 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
 
   const safety = outcome === 'stopped_for_safety';
   const title = safety ? 'Séance arrêtée' : outcome === 'completed' ? 'Séance terminée !' : outcome === 'partial' ? 'Séance partielle' : 'Séance en cours';
+
+  /** Ressenti de fin de séance : enregistré tout de suite, modifiable. */
+  const saveFeel = async (level: FeelLevel | undefined, text: string) => {
+    if (!level) return;
+    const next: SessionFeel = { level, note: text.trim() || undefined, at: Date.now() };
+    await repo.setKv(feelKey(sessionId), next);
+    setFeel(next);
+  };
+  const report = sessionReport(st, { feel, initiation, activeKcal: extra.activeKcal, avgBpm: extra.avgBpm });
+  const copyReport = async () => {
+    try {
+      await navigator.clipboard.writeText(report);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   const saveExtra = async (clear = false) => {
     if (!editing) return;
@@ -88,9 +119,40 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
         </p>
       </div>
 
+      {initiation && (
+        <div className="stack" style={{ marginBottom: 12 }}>
+          <span className="pill" style={{ alignSelf: 'center' }}>Séance d’initiation {initiation}/{INITIATION_SESSIONS}</span>
+          <p className="muted" style={{ margin: 0, textAlign: 'center', fontSize: '0.8rem' }}>Les premières séances servent à calibrer charges et répétitions : pas de conclusion sur ta progression.</p>
+        </div>
+      )}
+
       {safety && (
         <Notice tone="danger">Arrêt suite à une douleur signalée. Pas de diagnostic : demande un avis médical si elle persiste.</Notice>
       )}
+
+      <section className="ui-card stack" aria-label="Ton ressenti">
+        <p className="eyebrow" style={{ margin: 0 }}>Ton ressenti</p>
+        <div className="chips" role="group" aria-label="Difficulté ressentie">
+          {(Object.keys(FEEL_LABELS) as FeelLevel[]).map((k) => (
+            <button key={k} className="chip" aria-pressed={feel?.level === k} onClick={() => saveFeel(k, note)}>
+              {FEEL_LABELS[k]}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          aria-label="Un mot sur ta séance"
+          placeholder="Un mot (ex. classique)"
+          value={note}
+          maxLength={120}
+          disabled={!feel}
+          onChange={(e) => {
+            setNote(e.target.value);
+            if (feel) saveFeel(feel.level, e.target.value);
+          }}
+        />
+        <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Noté dans le rapport. Il ne change pas tes charges tout seul.</p>
+      </section>
 
       <PostFeedback repo={repo} st={st} />
 
@@ -204,9 +266,19 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
         </div>
       </details>
 
-      <button className="btn primary big" style={{ marginTop: 16 }} onClick={onHome}>
+      <button className="btn block" style={{ marginTop: 16 }} onClick={() => { setCopied(false); setReportOpen(true); }}>
+        <FileText size={16} aria-hidden="true" /> Rapport de la séance
+      </button>
+      <button className="btn primary big" style={{ marginTop: 12 }} onClick={onHome}>
         Retour à l’accueil
       </button>
+
+      <Modal open={reportOpen} onClose={() => setReportOpen(false)} title="Rapport de séance">
+        <div className="stack">
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '0.85rem', maxHeight: '55vh', overflow: 'auto' }}>{report}</pre>
+          <button className="btn primary" onClick={copyReport}>{copied ? 'Copié' : 'Copier le rapport'}</button>
+        </div>
+      </Modal>
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing === 'avgBpm' ? 'Fréquence cardiaque moyenne' : 'Calories actives'}>
         {editing && (

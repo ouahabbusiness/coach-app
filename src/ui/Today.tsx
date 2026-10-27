@@ -10,7 +10,7 @@ import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
 import { addWater, daysUntil } from '../engine/daily';
 import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
-import { RunModal, WhyModal, useTargets } from './Targets';
+import { WhyModal, useTargets } from './Targets';
 import { NextStepCard } from './Nutrition';
 import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
@@ -195,6 +195,7 @@ const EDIT_META: Record<Field, { title: string; unit: string; hint: string; step
 type Hero =
   | { kind: 'open'; id: string; title: string; done: number; total: number }
   | { kind: 'planned'; item: PlannedItem; tpl?: SessionTemplate }
+  | { kind: 'done'; id: string; title: string; partial: boolean; extra: number }
   | { kind: 'none' };
 
 export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) => void; night: { phase: string; pastBed: boolean; bedtime?: string; now: Date } }) {
@@ -208,8 +209,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const habits = useDayHabits(repo, today);
   const { daily, saveDaily } = habits;
   const [sheet, setSheet] = useState(false);
-  const [why, setWhy] = useState<'water' | 'kcal' | 'run' | null>(null);
-  const [running, setRunning] = useState(false);
+  const [why, setWhy] = useState<'water' | 'kcal' | null>(null);
   const reading = useReading(repo);
   const { mode: winterMode } = useWinterMode(repo);
   const winter = winterInfo(winterMode, today, winterForced());
@@ -241,7 +241,15 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         .filter((i) => i.weekStart === weekStart(today) && i.day === day && (i.kind === 'seance' || i.kind === 'course') && (!i.adjustment || i.adjustment.decision === 'adaptée'))
         .filter((i) => itemStatus(i, today, today, sessions) === 'prévu')
         .sort((a, b) => toMin(a.start) - toMin(b.start))[0];
-      setHero(next ? { kind: 'planned', item: next, tpl: templates.find((t) => t.id === next.templateId) } : { kind: 'none' });
+      // Rien de prévu mais une séance terminée aujourd'hui : « séance accomplie » (la dernière), pas « rien de prévu ».
+      const finished = sessions.filter((r) => r.outcome !== 'in_progress').sort((a, b) => b.startedAt - a.startedAt);
+      setHero(
+        next
+          ? { kind: 'planned', item: next, tpl: templates.find((t) => t.id === next.templateId) }
+          : finished.length
+            ? { kind: 'done', id: finished[0]!.id, title: finished[0]!.title, partial: finished[0]!.outcome !== 'completed', extra: finished.length - 1 }
+            : { kind: 'none' },
+      );
     })();
   }, [repo, today, tz]);
 
@@ -269,7 +277,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const targets = useTargets(repo, weight.days, trainingMin);
   const waterL = targets.water.value;
   const kcal = targets.calories.value;
-  const runKm = targets.run.value?.km;
   const pageNow = reading.book ? currentPage(reading.log, reading.book.id) : undefined;
   const sleepBars = Math.min(8, Math.round(daily?.sleepH ?? 0));
 
@@ -316,15 +323,16 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         </button>
       )}
 
-      <section className="ui-card list-row" aria-label="Séance du jour">
+      <section className={`ui-card list-row today-hero ${hero?.kind === 'done' ? 'accomplie' : ''}`} aria-label="Séance du jour">
         <span className="icon-chip accent">
           <Dumbbell size={16} aria-hidden="true" />
         </span>
         <div className="grow">
           <p className="eyebrow">
-            {hero?.kind === 'open' ? 'En cours' : hero?.kind === 'planned' ? `${hero.item.kind === 'course' ? 'Course' : 'Séance'} · ${hero.item.start}${hero.item.adapted ? ' · adaptée' : ''}` : 'Séance du jour'}
+            {hero?.kind === 'open' ? 'En cours' : hero?.kind === 'done' ? (hero.partial ? 'Séance partielle' : 'Séance accomplie') : hero?.kind === 'planned' ? `${hero.item.kind === 'course' ? 'Course' : 'Séance'} · ${hero.item.start}${hero.item.adapted ? ' · adaptée' : ''}` : 'Séance du jour'}
           </p>
-          <p className="row-title">{hero?.kind === 'open' ? hero.title : hero?.kind === 'planned' ? hero.item.title : 'Rien de prévu'}</p>
+          <p className="row-title">{hero?.kind === 'open' || hero?.kind === 'done' ? hero.title : hero?.kind === 'planned' ? hero.item.title : 'Rien de prévu'}</p>
+          {hero?.kind === 'done' && hero.extra > 0 && <p className="row-meta num">+ {hero.extra} autre{hero.extra > 1 ? 's' : ''} aujourd’hui</p>}
           {hero?.kind === 'open' && <p className="row-meta num">{hero.done}/{hero.total} séries</p>}
           {hero?.kind === 'planned' && hero.item.detail && <p className="row-meta">{hero.item.detail}</p>}
           {hero?.kind === 'planned' && hero.tpl && (
@@ -349,6 +357,11 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
             <Play size={18} aria-hidden="true" />
           </button>
         )}
+        {hero?.kind === 'done' && (
+          <button className="btn sm primary" onClick={() => go({ name: 'summary', id: hero.id })}>
+            <ClipboardList size={14} aria-hidden="true" /> Rapport
+          </button>
+        )}
         {hero?.kind === 'none' && (
           <button className="btn sm" onClick={() => go({ name: 'planning' })}>
             Planifier
@@ -357,33 +370,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
       </section>
 
       <NextStepCard repo={repo} go={go} />
-
-      <section className={`ui-card list-row run-row ${targets.ranToday ? 'done' : ''}`} aria-label="Course">
-        <button className="icon-chip accent" onClick={() => setWhy('run')} aria-label="Pourquoi cette distance">
-          <Footprints size={16} aria-hidden="true" />
-        </button>
-        <div className="grow">
-          <p className="eyebrow">{targets.ranToday ? 'Course faite' : targets.run.value?.move === 'départ' ? 'Course · départ' : 'Prochaine course'}</p>
-          <p className="row-title num">{runKm !== undefined ? `${runKm.toLocaleString('fr-BE')} km` : '—'}</p>
-        </div>
-        {targets.ranToday ? (
-          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-          <span className="pill num">✓ {targets.runs.filter((r) => r.day === today).reduce((n, r) => n + r.km, 0).toLocaleString('fr-BE')} km</span>
-          <button className="icon-btn primary" aria-label="Lancer une autre course" onClick={() => go({ name: 'run' })}>
-            <Play size={16} aria-hidden="true" />
-          </button>
-          </div>
-        ) : (
-          <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-            <button className="btn sm ghost" onClick={() => setRunning(true)} aria-label="Saisir une course faite">
-              <Pencil size={14} aria-hidden="true" />
-            </button>
-            <button className="btn sm primary" onClick={() => go({ name: 'run' })}>
-              <Play size={14} aria-hidden="true" /> Go
-            </button>
-          </div>
-        )}
-      </section>
 
       <div className="kpi-grid">
         <Kpi icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')} value={daily?.sleepH !== undefined ? fmtHours(daily.sleepH) : '—'}>
@@ -530,7 +516,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         }}
         result={waterL ? <>{(waterL / 1000).toLocaleString('fr-BE')} <small>L</small></> : undefined}
       />
-      <WhyModal open={why === 'run'} onClose={() => setWhy(null)} title="Course" c={targets.run} result={runKm !== undefined ? <>{runKm.toLocaleString('fr-BE')} <small>km</small></> : undefined} />
       <WhyModal
         open={why === 'kcal'}
         onClose={() => setWhy(null)}
@@ -576,7 +561,6 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           <ChevronRight size={16} aria-hidden="true" />
         </button>
       </WhyModal>
-      <RunModal open={running} onClose={() => setRunning(false)} repo={repo} t={targets} onProved={() => habits.setCheck('run', true)} />
 
       <HabitsSheet open={sheet} onClose={() => setSheet(false)} h={habits} onReading={() => go({ name: 'reading' })} />
 
