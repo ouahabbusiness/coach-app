@@ -765,24 +765,29 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                 await saveAnswers({ ...answers, pantry: next });
               };
               const row = (id: string, name: string) => (
-                <button key={id} className="cq-opt" aria-pressed={have.includes(id)} onClick={() => toggle(id)}>
-                  <span className="cq-opt-l">{name}</span>
+                <button key={id} className="chip" aria-pressed={have.includes(id)} onClick={() => toggle(id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {have.includes(id) ? <Check size={14} aria-hidden="true" /> : <span aria-hidden="true" style={{ width: 14 }} />}
+                  {name}
                 </button>
               );
               return (
                 <div className="stack">
                   <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Coche ce que tu as à la maison. Décoche ce que tu n’as plus : tes plats et ton petit-déjeuner le savent.</p>
+                  <p style={{ margin: 0, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span className="chip" aria-pressed="true" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Check size={14} aria-hidden="true" /> bleu + coche = au frigo</span>
+                    <span className="chip" aria-pressed="false">gris = plus à la maison</span>
+                  </p>
                   {!answers.pantry?.length && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>Pré-coché avec ce que tu manges d’habitude. Ton premier geste l’enregistre.</p>}
                   {groups.map(({ g, label }) => (
                     <div key={g} className="stack">
                       <p className="eyebrow" style={{ margin: '4px 0 0' }}>{label}</p>
-                      <div className="cq-grid">{FOODS.filter((f) => f.group === g).map((f) => row(f.id, f.name))}</div>
+                      <div className="chips">{FOODS.filter((f) => f.group === g).map((f) => row(f.id, f.name))}</div>
                     </div>
                   ))}
                   {customFoods.length > 0 && (
                     <div className="stack">
                       <p className="eyebrow" style={{ margin: '4px 0 0' }}>Mes produits</p>
-                      <div className="cq-grid">{customFoods.map((c) => row(c.id, c.name))}</div>
+                      <div className="chips">{customFoods.map((c) => row(c.id, c.name))}</div>
                     </div>
                   )}
                   <button className="btn primary" onClick={() => setFridge(false)}>Terminé</button>
