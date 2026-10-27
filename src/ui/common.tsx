@@ -31,6 +31,8 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
       aria-labelledby="modal-title"
       // Toucher en dehors de la fenêtre (sur le fond sombre) la ferme.
       onClick={(e) => {
+        // Seul un toucher sur le fond (la fenêtre elle-même comme cible) ferme : un bouton activé au clavier (coordonnées 0) ne la ferme pas.
+        if (e.target !== e.currentTarget) return;
         const r = e.currentTarget.getBoundingClientRect();
         if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose();
       }}

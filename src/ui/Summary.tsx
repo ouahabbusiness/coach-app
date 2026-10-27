@@ -15,6 +15,7 @@ import type { Repository } from '../storage/db';
 import { Modal, Notice, OutcomeBadge } from './common';
 import { useChallengeEntries } from './Challenge';
 import { fmtDateTime, fmtDuration } from './support';
+import { useSession } from './useSession';
 
 interface SessionExtra {
   activeKcal?: number;
@@ -36,6 +37,12 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
   const [editing, setEditing] = useState<keyof SessionExtra | null>(null);
   const [draft, setDraft] = useState('');
   const { entries } = useChallengeEntries(repo);
+  const { send } = useSession(repo, sessionId);
+  const [fixing, setFixing] = useState<{ id: string; name: string; load?: number } | null>(null);
+  const [fixReps, setFixReps] = useState('');
+  const [fixKg, setFixKg] = useState('');
+  const [fixRir, setFixRir] = useState<number | undefined>();
+  const [fixError, setFixError] = useState<string | null>(null);
   const [feel, setFeel] = useState<SessionFeel | undefined>();
   const [note, setNote] = useState('');
   const [initiation, setInitiation] = useState<number | undefined>();
@@ -75,6 +82,24 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
 
   const safety = outcome === 'stopped_for_safety';
   const title = safety ? 'Séance arrêtée' : outcome === 'completed' ? 'Séance terminée !' : outcome === 'partial' ? 'Séance partielle' : 'Séance en cours';
+
+  /** Répétitions saisies après coup pour une série faite (jamais préremplies). */
+  const saveFix = async () => {
+    if (!fixing) return;
+    const reps = Number(fixReps.replace(',', '.'));
+    if (fixReps.trim() === '' || !Number.isFinite(reps) || reps < 0) return setFixError('Saisis le nombre de répétitions réellement faites.');
+    const result: SetResult = { reps };
+    if (fixKg.trim() !== '') {
+      const kg = Number(fixKg.replace(',', '.'));
+      if (!Number.isFinite(kg) || kg < 0) return setFixError('Charge invalide.');
+      result.loadKg = kg;
+    }
+    if (fixRir !== undefined) result.rir = fixRir;
+    const res = await send({ type: 'record_result', plannedSetId: fixing.id, result });
+    if (!res.ok) return setFixError('Valeur refusée : vérifie les nombres saisis.');
+    setSt(project(await repo.sessionEvents(sessionId)));
+    setFixing(null);
+  };
 
   /** Ressenti de fin de séance : enregistré tout de suite, modifiable. */
   const saveFeel = async (level: FeelLevel | undefined, text: string) => {
@@ -244,7 +269,28 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
                     <tr key={s.plannedSetId}>
                       <td>{i + 1}</td>
                       <td>{s.planned.kind === 'reps' ? s.planned.targetReps : `${s.planned.targetSeconds} s`}</td>
-                      <td>{s.status === 'skipped' ? 'Passée' : s.status === 'pending' ? 'Non faite' : cell(s.actual, s.planned.kind)}</td>
+                      <td>
+                        {s.status === 'skipped' ? (
+                          'Passée'
+                        ) : s.status === 'pending' ? (
+                          'Non démarrée'
+                        ) : s.actual ? (
+                          cell(s.actual, s.planned.kind)
+                        ) : (
+                          <button
+                            className="btn sm"
+                            onClick={() => {
+                              setFixing({ id: s.plannedSetId, name: findVariant(g.variantId)?.variant.name ?? g.variantId, load: s.planned.loadKg });
+                              setFixReps('');
+                              setFixKg(s.planned.loadKg !== undefined ? String(s.planned.loadKg) : '');
+                              setFixRir(undefined);
+                              setFixError(null);
+                            }}
+                          >
+                            Faite · saisir
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -272,6 +318,31 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
       <button className="btn primary big" style={{ marginTop: 12 }} onClick={onHome}>
         Retour à l’accueil
       </button>
+
+      <Modal open={fixing !== null} onClose={() => setFixing(null)} title={fixing ? `Saisir · ${fixing.name}` : 'Saisir'}>
+        {fixing && (
+          <div className="stack">
+            <p className="muted" style={{ margin: 0 }}>Cette série est notée faite, mais ses répétitions n’ont pas été enregistrées. Rien n’est supposé : saisis ce que tu as vraiment fait.</p>
+            <label className="field">
+              Répétitions faites
+              <input type="text" inputMode="numeric" value={fixReps} onChange={(e) => setFixReps(e.target.value)} />
+            </label>
+            <label className="field">
+              Charge (kg)
+              <input type="text" inputMode="decimal" value={fixKg} onChange={(e) => setFixKg(e.target.value)} />
+            </label>
+            <div className="chips" role="group" aria-label="Répétitions en réserve">
+              {[0, 1, 2, 3, 4].map((r) => (
+                <button key={r} className="chip" aria-pressed={fixRir === r} onClick={() => setFixRir(fixRir === r ? undefined : r)}>
+                  RIR {r}
+                </button>
+              ))}
+            </div>
+            {fixError && <p role="alert" style={{ color: 'var(--danger)', fontWeight: 600, margin: 0 }}>{fixError}</p>}
+            <button className="btn primary" onClick={saveFix}>Enregistrer</button>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={reportOpen} onClose={() => setReportOpen(false)} title="Rapport de séance">
         <div className="stack">

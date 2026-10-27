@@ -37,10 +37,16 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
       for (const b of blocks) {
         const sets = st.sets.filter((x) => x.planned.blockId === b && x.planned.role === 'work');
         const p = sets[0]!.planned;
-        const results = sets.filter((x) => x.status === 'done').map(currentResult).filter((r): r is SetResult => !!r);
+        const doneSets = sets.filter((x) => x.status === 'done');
+        const results = doneSets.map(currentResult).filter((r): r is SetResult => !!r);
         const watch: string[] = [];
         if (st.pain.some((x) => sets.some((y) => y.planned.id === x.plannedSetId))) watch.push('douleur signalée');
         if (results.some((r) => r.rir === undefined) && p.kind === 'reps') watch.push('réserve non notée');
+        // Une série faite dont les répétitions n'ont pas été enregistrées reste « faite », mais son résultat est inconnu (pas zéro).
+        const noResult = doneSets.length - results.length;
+        if (noResult > 0) watch.push(`${noResult} série${noResult > 1 ? 's' : ''} faite${noResult > 1 ? 's' : ''} sans répétitions enregistrées : inconnu, pas zéro. Saisis-les dans Détail.`);
+        const notStarted = sets.filter((x) => x.status === 'pending').length;
+        if (notStarted > 0) watch.push(`${notStarted} série${notStarted > 1 ? 's' : ''} jamais démarrée${notStarted > 1 ? 's' : ''}`);
         const skipped = sets.filter((x) => x.status === 'skipped');
         if (skipped.length) watch.push(`${skipped.length} série(s) sautée(s) : ${skipped[0]!.skipReason ?? ''}`);
         let decision: Decision | undefined;
@@ -52,7 +58,7 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
         }
         out.push({
           name: findVariant(p.variantId)?.variant.name ?? p.variantId,
-          done: results.length,
+          done: doneSets.length,
           planned: sets.length,
           prescribed: p.kind === 'reps' ? `${sets.length} × ${p.repRange ? `${p.repRange[0]}–${p.repRange[1]}` : p.targetReps ?? '?'}${p.loadKg ? ` à ${p.loadKg} kg` : ''}` : `${sets.length} × ${p.targetSeconds ?? '?'} s`,
           achieved: results.length ? results.map((r) => (p.kind === 'reps' ? r.reps ?? '?' : `${r.seconds ?? '?'}s`)).join(' / ') : '—',

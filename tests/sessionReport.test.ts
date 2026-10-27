@@ -78,3 +78,32 @@ describe('séances d’initiation', () => {
     expect(Object.keys(FEEL_LABELS)).toHaveLength(5);
   });
 });
+
+describe('séance faite mais répétitions non enregistrées', () => {
+  it('reste « faite », résultat inconnu ; saisie possible après la fin ; une série jamais démarrée ne peut pas être inventée', async () => {
+    const repo = new Repository(new CoachDb('rapport-3'));
+    const id = await startSessionFromTemplate(repo, tpl);
+    const work = project(await repo.sessionEvents(id))!.sets.filter((s) => s.planned.role === 'work');
+    // série 1 enregistrée ; série 2 faite sans résultat ; série 3 jamais démarrée
+    await run(repo, id, { type: 'start_set', plannedSetId: work[0]!.planned.id });
+    await run(repo, id, { type: 'end_set', plannedSetId: work[0]!.planned.id });
+    await run(repo, id, { type: 'record_result', plannedSetId: work[0]!.planned.id, result: { reps: 8, loadKg: 10, rir: 2 } });
+    await run(repo, id, { type: 'start_set', plannedSetId: work[1]!.planned.id });
+    await run(repo, id, { type: 'end_set', plannedSetId: work[1]!.planned.id });
+    await run(repo, id, { type: 'end_session' });
+
+    let st = project(await repo.sessionEvents(id))!;
+    expect(st.sets.filter((s) => s.status === 'done')).toHaveLength(2);
+    expect(sessionReport(st)).toMatch(/1 série\(s\) sans résultat saisi : inconnu, pas zéro/);
+
+    // saisie après coup de la série faite : acceptée
+    await run(repo, id, { type: 'record_result', plannedSetId: work[1]!.planned.id, result: { reps: 9, loadKg: 10 } });
+    st = project(await repo.sessionEvents(id))!;
+    expect(sessionReport(st)).not.toMatch(/sans résultat saisi/);
+    expect(sessionReport(st)).toMatch(/9 · 10 kg/);
+
+    // série jamais démarrée : on ne peut pas lui inventer un résultat
+    const res = decide(st, { type: 'record_result', plannedSetId: work[2]!.planned.id, result: { reps: 8 } }, { now: Date.now(), newId: () => 'x1', sessionId: id });
+    expect(res.ok).toBe(false);
+  });
+});
