@@ -101,3 +101,28 @@ describe('routine calée sur les prières', () => {
     expect(p.find((e) => e.id === 'dejeuner')!.time).toBe('12:44');
   });
 });
+
+describe('ce que j’ai à la maison', () => {
+  const week = (a: NutritionAnswers) => Array.from({ length: 7 }, (_, d) => buildDayPlan({ answers: a, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: d }));
+
+  it('déjeuner et dîner utilisent d’abord ce qui est à la maison', () => {
+    const home = ['poulet', 'riz', 'huile_olive'];
+    const plans = week({ ...answers, proteins: ['oeuf', 'poulet', 'skyr'], pantry: home });
+    for (const p of plans) {
+      const mains = p.filter((e) => e.id === 'dejeuner' || e.id === 'diner');
+      expect(mains).toHaveLength(2);
+      for (const m of mains) for (const x of m.parts ?? []) if (['oeuf', 'poulet', 'skyr'].includes(x.foodId)) expect(home).toContain(x.foodId);
+    }
+  });
+
+  it('rien à la maison dans un groupe : on garde les aliments aimés (jamais de repas vide)', () => {
+    const p = buildDayPlan({ answers: { ...answers, pantry: ['riz'] }, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 0 });
+    expect(p.some((e) => e.kind === 'repas' && (e.parts ?? []).some((x) => ['oeuf', 'poulet', 'skyr'].includes(x.foodId)))).toBe(true);
+  });
+
+  it('pantry absent : comportement inchangé', () => {
+    const a = buildDayPlan({ answers, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 2 });
+    const b = buildDayPlan({ answers: { ...answers, pantry: [] }, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: 2 });
+    expect(b).toEqual(a);
+  });
+});

@@ -70,6 +70,8 @@ export interface NutritionAnswers {
   fats: string[];
   fruits: string[];
   exclude: string[];
+  /** Aliments réellement à la maison : le plan les préfère ; le reste passe aux courses. Absent = pas déclaré. */
+  pantry?: string[];
   supplements: DeclaredSupplement[];
   cooking?: 'rapide' | 'normal';
 }
@@ -220,7 +222,15 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const sk = (id: string) => scale[id]?.k ?? 1;
   const sp = (id: string) => scale[id]?.p ?? 1;
   const a = i.answers;
-  const ok = (ids: string[]) => ids.filter((x) => !a.exclude.includes(x));
+  // Aliments aimés, sans les exclus ; ceux qui sont à la maison passent d'abord.
+  // Aucun à la maison pour ce repas : on prend un aliment aimé (il ira aux courses).
+  const pk = (ids: string[], k: number, fallback: string, filter?: (f: Food) => boolean) => {
+    const allowed = ids.filter((x) => !a.exclude.includes(x));
+    const fits = (xs: string[]) => xs.map(food).filter((f): f is Food => !!f && (!filter || filter(f)));
+    const have = a.pantry?.length ? fits(allowed.filter((x) => a.pantry!.includes(x))) : [];
+    const pool = have.length ? have : fits(allowed);
+    return pool.length ? pool[k % pool.length]! : food(fallback)!;
+  };
   // Lever : 10 min avant Fajr si la routine est calée sur la prière, sinon l'heure déclarée.
   const wake = i.prayers?.wakeAtFajr ? toMin(i.prayers.times.fajr) - 10 : toMin(a.wake ?? '07:00');
   // Coucher après minuit : compté sur le lendemain (ex. 00:30 → 24:30).
@@ -243,10 +253,10 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
 
   const bfTime = wake + 30;
   const bf = meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
-    p: pick(ok(a.proteins), d, 'oeuf', (f) => !!f.breakfast),
-    c: pick(ok(a.carbs), d, 'avoine', (f) => !!f.breakfast),
-    f: pick(ok(a.fats), d, 'amandes', (f) => !!f.breakfast),
-    fruit: pick(ok(a.fruits), d, 'banane'),
+    p: pk(a.proteins, d, 'oeuf', (f) => !!f.breakfast),
+    c: pk(a.carbs, d, 'avoine', (f) => !!f.breakfast),
+    f: pk(a.fats, d, 'amandes', (f) => !!f.breakfast),
+    fruit: pk(a.fruits, d, 'banane'),
     veg: false,
   });
   out.push({ id: 'petit_dej', time: fromMin(bfTime), kind: 'repas', title: 'Petit-déjeuner', ...bf });
@@ -261,9 +271,9 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   const wEnd = w && wStart !== undefined ? wStart + w.durationMin : undefined;
 
   const lunch = meal(i.kcal * shares[meals === 3 ? 1 : meals === 4 ? 1 : 2]! * sk('dejeuner'), proteinPer * sp('dejeuner'), {
-    p: pick(ok(a.proteins), d + 1, 'poulet', (f) => !f.breakfast),
-    c: pick(ok(a.carbs), d + 1, 'riz', (f) => !f.breakfast),
-    f: pick(ok(a.fats), d + 1, 'huile_olive', (f) => f.id === 'huile_olive' || f.id === 'avocat'),
+    p: pk(a.proteins, d + 1, 'poulet', (f) => !f.breakfast),
+    c: pk(a.carbs, d + 1, 'riz', (f) => !f.breakfast),
+    f: pk(a.fats, d + 1, 'huile_olive', (f) => f.id === 'huile_olive' || f.id === 'avocat'),
     veg: true,
   });
   out.push({ id: 'dejeuner', time: fromMin(lunchTime), kind: 'repas', title: 'Déjeuner', ...lunch });
@@ -273,7 +283,7 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
     const snackTime = wStart !== undefined && wStart > lunchTime + 150 && wStart < dinnerTime ? wStart - 90 : toMin('16:30');
     const whey = supp('collation')[0];
     const snackShare = shares[meals === 4 ? 2 : 3]!;
-    const snack = meal(i.kcal * snackShare * sk('collation') - (whey?.kcalPerDose ?? 0), proteinPer * sp('collation'), { p: pick(ok(a.proteins), d + 2, 'skyr', (f) => !!f.breakfast && f.id !== 'oeuf'), fruit: pick(ok(a.fruits), d + 2, 'banane'), c: pick(ok(a.carbs), d + 2, 'avoine', (f) => !!f.breakfast), veg: false }, whey?.proteinPerDose ?? 0);
+    const snack = meal(i.kcal * snackShare * sk('collation') - (whey?.kcalPerDose ?? 0), proteinPer * sp('collation'), { p: pk(a.proteins, d + 2, 'skyr', (f) => !!f.breakfast && f.id !== 'oeuf'), fruit: pk(a.fruits, d + 2, 'banane'), c: pk(a.carbs, d + 2, 'avoine', (f) => !!f.breakfast), veg: false }, whey?.proteinPerDose ?? 0);
     if (whey) {
       snack.kcal += whey.kcalPerDose ?? 0;
       snack.protein += whey.proteinPerDose ?? 0;
@@ -282,7 +292,7 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
     out.push({ id: 'collation', time: fromMin(snackTime), kind: 'repas', title: wStart !== undefined && snackTime === wStart - 90 ? 'Collation avant séance' : 'Collation', ...snack });
   }
   if (meals === 5) {
-    const second = meal(i.kcal * shares[1]! * sk('collation_matin'), proteinPer * sp('collation_matin'), { p: pick(ok(a.proteins), d + 3, 'fromage_blanc', (f) => !!f.breakfast && f.id !== 'oeuf'), c: pick(ok(a.fruits), d + 3, 'pomme'), veg: false });
+    const second = meal(i.kcal * shares[1]! * sk('collation_matin'), proteinPer * sp('collation_matin'), { p: pk(a.proteins, d + 3, 'fromage_blanc', (f) => !!f.breakfast && f.id !== 'oeuf'), c: pk(a.fruits, d + 3, 'pomme'), veg: false });
     out.push({ id: 'collation_matin', time: fromMin(bfTime + 150), kind: 'repas', title: 'Collation du matin', ...second });
   }
 
@@ -294,9 +304,9 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   }
 
   const dinner = meal(i.kcal * shares[shares.length - 1]! * sk('diner'), proteinPer * sp('diner'), {
-    p: pick(ok(a.proteins), d + 4, 'saumon', (f) => !f.breakfast),
-    c: pick(ok(a.carbs), d + 4, 'pdt', (f) => !f.breakfast),
-    f: pick(ok(a.fats), d + 4, 'huile_olive', (f) => f.id === 'huile_olive' || f.id === 'avocat'),
+    p: pk(a.proteins, d + 4, 'saumon', (f) => !f.breakfast),
+    c: pk(a.carbs, d + 4, 'pdt', (f) => !f.breakfast),
+    f: pk(a.fats, d + 4, 'huile_olive', (f) => f.id === 'huile_olive' || f.id === 'avocat'),
     veg: true,
   });
   out.push({ id: 'diner', time: fromMin(wEnd !== undefined && wEnd + 30 > dinnerTime && wEnd + 30 <= bed - 90 ? wEnd + 30 : dinnerTime), kind: 'repas', title: 'Dîner', ...dinner });
@@ -431,12 +441,14 @@ export interface ShoppingLine {
   grams: number;
   /** Ce qu'il faut acheter, arrondi à ce qui se vend. */
   buy: string;
+  /** Déclaré à la maison (rien à acheter, sauf s'il en manque). */
+  home?: boolean;
 }
 
 const AISLE: Record<FoodGroup, Aisle> = { proteine: 'Frais : viandes, poissons, œufs, laitiers', glucide: 'Épicerie', lipide: 'Épicerie', legume: 'Fruits et légumes', fruit: 'Fruits et légumes' };
 
 /** Liste de courses : somme des repas des plans, arrondie à des quantités achetables (estimation). */
-export function shoppingList(plans: PlanEntry[][]): ShoppingLine[] {
+export function shoppingList(plans: PlanEntry[][], pantry?: string[]): ShoppingLine[] {
   const total = new Map<string, number>();
   for (const plan of plans) for (const e of plan) for (const p of e.parts ?? []) total.set(p.foodId, (total.get(p.foodId) ?? 0) + p.grams);
   const lines: ShoppingLine[] = [];
@@ -457,7 +469,7 @@ export function shoppingList(plans: PlanEntry[][]): ShoppingLine[] {
       const raw = f.id === 'riz' || f.id === 'pates' ? grams * 0.4 : grams;
       buy = `${Math.ceil(raw / 100) * 100} g${f.id === 'riz' || f.id === 'pates' ? ' (cru)' : ''}`;
     }
-    lines.push({ foodId: id, name: f.name, aisle: AISLE[f.group], grams: Math.round(grams), buy });
+    lines.push({ foodId: id, name: f.name, aisle: AISLE[f.group], grams: Math.round(grams), buy, ...(pantry?.includes(id) ? { home: true } : {}) });
   }
   const order: Aisle[] = ['Frais : viandes, poissons, œufs, laitiers', 'Fruits et légumes', 'Épicerie'];
   return lines.sort((a, b) => order.indexOf(a.aisle) - order.indexOf(b.aisle) || a.name.localeCompare(b.name));

@@ -115,6 +115,20 @@ const NSTEPS: NStep[] = [
   { id: 'lipides', say: 'Tes bonnes graisses.', done: (a) => a.fats.length > 0, render: (a, set) => <Multi group="lipide" value={a.fats} onChange={(v) => set({ fats: v })} /> },
   { id: 'fruits', say: 'Tes fruits.', done: (a) => a.fruits.length > 0, render: (a, set) => <Multi group="fruit" value={a.fruits} onChange={(v) => set({ fruits: v })} /> },
   {
+    id: 'maison',
+    say: 'Ce que tu as déjà à la maison. Je te prépare tes plats avec ça d’abord ; le reste ira dans tes courses.',
+    done: () => true,
+    render: (a, set) => (
+      <div className="cq-grid">
+        {FOODS.filter((f) => f.group !== 'legume').map((f) => (
+          <button key={f.id} className="cq-opt" aria-pressed={(a.pantry ?? []).includes(f.id)} onClick={() => set({ pantry: (a.pantry ?? []).includes(f.id) ? (a.pantry ?? []).filter((x) => x !== f.id) : [...(a.pantry ?? []), f.id] })}>
+            <span className="cq-opt-l">{f.name}</span>
+          </button>
+        ))}
+      </div>
+    ),
+  },
+  {
     id: 'exclus',
     say: 'Ce que tu ne manges pas : allergie, intolérance ou dégoût. Je ne te le proposerai jamais.',
     done: () => true,
@@ -530,7 +544,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
           </Modal>
           <Modal open={shopping} onClose={() => setShopping(false)} title="Courses · 7 jours">
             {(() => {
-              const list = shoppingList(week);
+              const list = shoppingList(week, answers?.pantry);
               const aisles = [...new Set(list.map((l) => l.aisle))];
               const toggleGot = async (id: string) => {
                 const next = got.includes(id) ? got.filter((x) => x !== id) : [...got, id];
@@ -549,6 +563,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                               {got.includes(l.foodId) ? <Check size={14} aria-hidden="true" /> : null}
                             </button>
                             <span className="grow">{l.name}</span>
+                            {l.home && <span className="pill">maison</span>}
                             <span className="num shop-qty">{l.buy}</span>
                           </li>
                         ))}
