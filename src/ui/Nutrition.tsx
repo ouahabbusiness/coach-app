@@ -10,8 +10,8 @@ import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
-import { reviewBreakfast } from '../engine/breakfastReview';
-import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { BREAKFAST_SHARES, reviewBreakfast } from '../engine/breakfastReview';
+import { buildDayPlan, EGG_DEFAULT_G, eggUnit, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type CustomFood, type UsualItem, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -26,6 +26,7 @@ const KEY = 'nutrition.answers';
 const doneKey = (day: string) => `dayplan.done.${day}`;
 const eatenKey = (day: string) => `dayplan.eaten.${day}`;
 const confirmedKey = (day: string) => `dayplan.confirmed.${day}`;
+const breakfastKey = (day: string) => `dayplan.breakfast.${day}`;
 
 /** Compléments déclarés par Hmidou le 26/10/2026 : pré-remplis, dose et valeurs à recopier de l'emballage. */
 const DECLARED: DeclaredSupplement[] = [
@@ -49,69 +50,164 @@ function Multi({ group, value, onChange }: { group: FoodGroup; value: string[]; 
   );
 }
 
-type UsualItem = { foodId: string; grams: number };
 
-/** Petit-déjeuner habituel : on coche ce qu'on mange d'ordinaire et on règle les quantités. */
-function UsualBreakfast({ value, coffee, details, onChange, onDetails }: { value: UsualItem[]; coffee: boolean; details?: BreakfastDetails; onChange: (v: UsualItem[], coffee: boolean) => void; onDetails: (d: BreakfastDetails) => void }) {
-  const step = (f: Food) => f.unitG ?? 25;
-  const start = (f: Food) => (f.id === 'oeuf' ? 4 * (f.unitG ?? 60) : f.unitG ? 2 * f.unitG : 100);
-  const qty = (f: Food, g: number) => (f.unitG ? `${Math.round(g / f.unitG)}` : `${g} g`);
-  const change = (f: Food, delta: number) => {
-    const cur = value.find((x) => x.foodId === f.id);
+const EGG_SIZES = [
+  { g: 45, label: 'Petit · 45 g' },
+  { g: 53, label: 'Moyen · 53 g' },
+  { g: 63, label: 'Gros · 63 g' },
+  { g: 73, label: 'Très gros · 73 g' },
+] as const;
+const MILKS = [
+  { k: 'entier', label: 'Entier' },
+  { k: 'demi', label: 'Demi-écrémé' },
+  { k: 'ecreme', label: 'Écrémé' },
+  { k: 'vegetal', label: 'Végétal' },
+] as const;
+
+/** Champ numérique libre (g ou ml) : vide = pas précisé. */
+function QtyInput({ label, value, unit, onChange }: { label: string; value?: number; unit: string; onChange: (v?: number) => void }) {
+  return (
+    <label className="row" style={{ gap: 6, alignItems: 'center' }}>
+      <span className="muted" style={{ fontSize: '0.8rem' }}>{label}</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        style={{ width: 72 }}
+        aria-label={`${label} (${unit})`}
+        value={value ?? ''}
+        onChange={(e) => {
+          const n = Number(e.target.value.replace(',', '.'));
+          onChange(e.target.value.trim() === '' || !Number.isFinite(n) || n < 0 ? undefined : n);
+        }}
+      />
+      <span className="muted">{unit}</span>
+    </label>
+  );
+}
+
+/** Petit-déjeuner habituel : ce qu'on mange d'ordinaire, quantités, café, cuisson. Une quantité inconnue reste « inconnue » (jamais 0). */
+function UsualBreakfast({ a, set, products }: { a: NutritionAnswers; set: (p: Partial<NutritionAnswers>) => void; products: CustomFood[] }) {
+  const value = a.usualBreakfast ?? [];
+  const coffee = !!a.breakfastCoffee;
+  const d: BreakfastDetails = a.breakfastDetails ?? {};
+  const unitOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? eggUnit(d) : f?.unitG);
+  const stepOf = (id: string, f?: { unitG?: number }) => unitOf(id, f) ?? 25;
+  const startOf = (id: string, f?: { unitG?: number }) => (id === 'oeuf' ? 4 * eggUnit(d) : unitOf(id, f) ? 2 * unitOf(id, f)! : 100);
+  const qty = (id: string, f: { unitG?: number } | undefined, g: number) => (unitOf(id, f) ? `${Math.round(g / unitOf(id, f)!)}` : `${g} g`);
+  const setValue = (v: UsualItem[]) => set({ usualBreakfast: v });
+  const setDetails = (p: Partial<BreakfastDetails>) => set({ breakfastDetails: { ...d, ...p } });
+  const change = (id: string, f: { unitG?: number } | undefined, delta: number) => {
+    const cur = value.find((x) => x.foodId === id);
     if (!cur) return;
-    const grams = cur.grams + delta * step(f);
-    onChange(grams <= 0 ? value.filter((x) => x.foodId !== f.id) : value.map((x) => (x.foodId === f.id ? { ...x, grams } : x)), coffee);
+    const grams = cur.grams + delta * stepOf(id, f);
+    setValue(grams <= 0 ? value.filter((x) => x.foodId !== id) : value.map((x) => (x.foodId === id ? { ...x, grams } : x)));
   };
+  /** Changer le calibre garde le même nombre d'œufs. */
+  const setEgg = (eggG?: number) => {
+    const cur = value.find((x) => x.foodId === 'oeuf');
+    const n = cur ? Math.max(1, Math.round(cur.grams / eggUnit(d))) : 0;
+    set({
+      breakfastDetails: { ...d, eggG },
+      ...(cur ? { usualBreakfast: value.map((x) => (x.foodId === 'oeuf' ? { ...x, grams: n * (eggG ?? EGG_DEFAULT_G) } : x)) } : {}),
+    });
+  };
+
+  const row = (id: string, f: { name: string; unitG?: number }) => {
+    const cur = value.find((x) => x.foodId === id);
+    return (
+      <div key={id} className="spread">
+        <button className="cq-opt" style={{ flex: 1 }} aria-pressed={!!cur} onClick={() => setValue(cur ? value.filter((x) => x.foodId !== id) : [...value, { foodId: id, grams: startOf(id, f) }])}>
+          <span className="cq-opt-l">{f.name}</span>
+        </button>
+        {cur && (
+          <span className="row" style={{ gap: 6, marginLeft: 8 }}>
+            <button className="icon-btn" aria-label={`Moins de ${f.name}`} onClick={() => change(id, f, -1)}>
+              <Minus size={16} aria-hidden="true" />
+            </button>
+            <strong className="num" style={{ minWidth: 44, textAlign: 'center' }}>{qty(id, f, cur.grams)}</strong>
+            <button className="icon-btn" aria-label={`Plus de ${f.name}`} onClick={() => change(id, f, 1)}>
+              <Plus size={16} aria-hidden="true" />
+            </button>
+          </span>
+        )}
+      </div>
+    );
+  };
+
+  const chip = (on: boolean, label: string, onClick: () => void) => (
+    <button key={label} className="chip" aria-pressed={on} onClick={onClick}>
+      {label}
+    </button>
+  );
+  const noir = d.milkMl === 0 && d.sugarG === 0 && !d.coffeeUnknown;
+
   return (
     <div className="stack">
-      {FOODS.filter((f) => f.breakfast).map((f) => {
-        const cur = value.find((x) => x.foodId === f.id);
-        return (
-          <div key={f.id} className="spread">
-            <button className="cq-opt" style={{ flex: 1 }} aria-pressed={!!cur} onClick={() => onChange(cur ? value.filter((x) => x.foodId !== f.id) : [...value, { foodId: f.id, grams: start(f) }], coffee)}>
-              <span className="cq-opt-l">{f.name}</span>
-            </button>
-            {cur && (
-              <span className="row" style={{ gap: 6, marginLeft: 8 }}>
-                <button className="icon-btn" aria-label={`Moins de ${f.name}`} onClick={() => change(f, -1)}>
-                  <Minus size={16} aria-hidden="true" />
-                </button>
-                <strong className="num" style={{ minWidth: 44, textAlign: 'center' }}>{qty(f, cur.grams)}</strong>
-                <button className="icon-btn" aria-label={`Plus de ${f.name}`} onClick={() => change(f, 1)}>
-                  <Plus size={16} aria-hidden="true" />
-                </button>
-              </span>
-            )}
+      {FOODS.filter((f) => f.breakfast).map((f) => row(f.id, f))}
+      {products.length > 0 && (
+        <>
+          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Mes produits · valeurs de l’étiquette</p>
+          {products.map((p) => row(p.id, p))}
+        </>
+      )}
+
+      {value.some((x) => x.foodId === 'oeuf') && (
+        <>
+          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Œuf · poids sans coquille</p>
+          <div className="chips" role="group" aria-label="Calibre de l’œuf">
+            {EGG_SIZES.map((s) => chip(d.eggG === s.g, s.label, () => setEgg(s.g)))}
+            {chip(d.eggG === undefined, 'Je ne sais pas · 60 g estimé', () => setEgg(undefined))}
           </div>
-        );
-      })}
-      <button className="cq-opt" aria-pressed={coffee} onClick={() => onChange(value, !coffee)}>
-        <span className="cq-opt-l">Café</span>
-      </button>
+          <QtyInput label="Autre poids" unit="g" value={d.eggG && !EGG_SIZES.some((s) => s.g === d.eggG) ? d.eggG : undefined} onChange={(v) => setEgg(v && v > 0 ? v : undefined)} />
+        </>
+      )}
+
       {value.length > 0 && (
         <>
           <p className="eyebrow" style={{ margin: '6px 0 0' }}>Matière grasse de cuisson</p>
-          <div className="chips" role="group" aria-label="Matière grasse de cuisson">
-            {([[0, 'Aucune'], [5, '5 g'], [10, '10 g'], [15, '15 g']] as const).map(([g, l]) => (
-              <button key={g} className="chip" aria-pressed={details?.fatG === g} onClick={() => onDetails({ ...details, fatG: g })}>
-                {l}
-              </button>
-            ))}
+          <div className="chips" role="group" aria-label="Type de matière grasse">
+            {chip(d.fatKind === 'huile', 'Huile', () => setDetails({ fatKind: 'huile', fatUnknown: false }))}
+            {chip(d.fatKind === 'beurre', 'Beurre', () => setDetails({ fatKind: 'beurre', fatUnknown: false }))}
+            {chip(d.fatKind === 'autre', 'Autre', () => setDetails({ fatKind: 'autre', fatUnknown: false }))}
           </div>
-          {coffee && (
-            <>
-              <p className="eyebrow" style={{ margin: '6px 0 0' }}>Dans le café</p>
-              <div className="chips" role="group" aria-label="Dans le café">
-                {([['noir', 'Noir'], ['lait', 'Lait'], ['sucre', 'Sucre'], ['lait-sucre', 'Lait + sucre']] as const).map(([c, l]) => (
-                  <button key={c} className="chip" aria-pressed={details?.coffee === c} onClick={() => onDetails({ ...details, coffee: c })}>
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+          <div className="chips" role="group" aria-label="Quantité de matière grasse">
+            {chip(d.fatG === 0 && !d.fatUnknown, 'Aucune', () => setDetails({ fatG: 0, fatUnknown: false }))}
+            {[5, 10, 15].map((g) => chip(d.fatG === g && !d.fatUnknown, `${g} g`, () => setDetails({ fatG: g, fatUnknown: false })))}
+            {chip(!!d.fatUnknown, 'Inconnu', () => setDetails({ fatG: undefined, fatUnknown: true }))}
+          </div>
+          <QtyInput label="Autre quantité" unit="g" value={d.fatG !== undefined && ![0, 5, 10, 15].includes(d.fatG) ? d.fatG : undefined} onChange={(v) => setDetails({ fatG: v, fatUnknown: false })} />
         </>
       )}
+
+      <button className="cq-opt" aria-pressed={coffee} onClick={() => set({ breakfastCoffee: !coffee })}>
+        <span className="cq-opt-l">Café</span>
+      </button>
+      {coffee && (
+        <>
+          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Dans le café</p>
+          <div className="chips" role="group" aria-label="Café">
+            {chip(noir, 'Noir', () => setDetails({ milkMl: 0, sugarG: 0, coffeeUnknown: false }))}
+            {chip(!!d.coffeeUnknown, 'Inconnu', () => setDetails({ milkMl: undefined, sugarG: undefined, coffeeUnknown: true }))}
+          </div>
+          <div className="chips" role="group" aria-label="Type de lait">
+            {MILKS.map((m) => chip(d.milkKind === m.k, m.label, () => setDetails({ milkKind: m.k, coffeeUnknown: false })))}
+          </div>
+          <div className="chips" role="group" aria-label="Quantité de lait">
+            {[0, 30, 50, 100].map((ml) => chip(d.milkMl === ml && !d.coffeeUnknown, `${ml} ml`, () => setDetails({ milkMl: ml, coffeeUnknown: false })))}
+          </div>
+          <QtyInput label="Autre quantité de lait" unit="ml" value={d.milkMl !== undefined && ![0, 30, 50, 100].includes(d.milkMl) ? d.milkMl : undefined} onChange={(v) => setDetails({ milkMl: v, coffeeUnknown: false })} />
+          <div className="chips" role="group" aria-label="Sucre">
+            {[0, 4, 8].map((g) => chip(d.sugarG === g && !d.coffeeUnknown, g === 0 ? 'Sans sucre' : `${g} g sucre`, () => setDetails({ sugarG: g, coffeeUnknown: false })))}
+          </div>
+          <QtyInput label="Autre quantité de sucre" unit="g" value={d.sugarG !== undefined && ![0, 4, 8].includes(d.sugarG) ? d.sugarG : undefined} onChange={(v) => setDetails({ sugarG: v, coffeeUnknown: false })} />
+        </>
+      )}
+
+      <p className="eyebrow" style={{ margin: '6px 0 0' }}>Appétit le matin</p>
+      <div className="chips" role="group" aria-label="Appétit le matin">
+        {BREAKFAST_SHARES.map((s) => chip(a.breakfastShare === s.pct, `${s.label} · ${s.pct} %`, () => set({ breakfastShare: s.pct })))}
+        {chip(a.breakfastShare === undefined, 'Standard', () => set({ breakfastShare: undefined }))}
+      </div>
     </div>
   );
 }
@@ -142,7 +238,7 @@ interface NStep {
   id: string;
   say: string;
   done: (a: NutritionAnswers) => boolean;
-  render: (a: NutritionAnswers, set: (p: Partial<NutritionAnswers>) => void) => React.ReactNode;
+  render: (a: NutritionAnswers, set: (p: Partial<NutritionAnswers>) => void, products: CustomFood[]) => React.ReactNode;
 }
 
 const NSTEPS: NStep[] = [
@@ -186,7 +282,7 @@ const NSTEPS: NStep[] = [
     id: 'petitdej',
     say: 'Ton petit-déjeuner habituel, si tu en as un. Je le garde tel quel et j’ajuste les autres repas. Passe si tu n’en as pas.',
     done: () => true,
-    render: (a, set) => <UsualBreakfast value={a.usualBreakfast ?? []} coffee={!!a.breakfastCoffee} details={a.breakfastDetails} onChange={(v, c) => set({ usualBreakfast: v, breakfastCoffee: c })} onDetails={(d) => set({ breakfastDetails: d })} />,
+    render: (a, set, products) => <UsualBreakfast a={a} set={set} products={products} />,
   },
   {
     id: 'maison',
@@ -262,6 +358,8 @@ const NSTEPS: NStep[] = [
 export function NutritionSetup({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
   const [a, setA] = useState<NutritionAnswers | null>(null);
   const [step, setStep] = useState(0);
+  const kitchen = useKitchen(repo);
+  const products = useMemo<CustomFood[]>(() => kitchen.mine.map((m) => ({ id: m.id, name: m.name, kcal: m.kcal, protein: m.protein, unitG: m.unitG, unitName: m.unitName })), [kitchen.mine]);
   useEffect(() => {
     (async () => {
       const prev = await loadNutrition(repo);
@@ -293,7 +391,7 @@ export function NutritionSetup({ repo, go }: { repo: Repository; go: (r: Route) 
         <section className="cq-say" key={cur.id}>
           <p className="cq-who">Coach</p>
           <p className="cq-q">{cur.say}</p>
-          <div className="card ob-card">{cur.render(a, set)}</div>
+          <div className="card ob-card">{cur.render(a, set, products)}</div>
         </section>
       </main>
       <div className="controls">
@@ -336,6 +434,9 @@ export function useDayPlan(repo: Repository) {
   const [done, setDone] = useState<string[]>([]);
   const [eaten, setEatenState] = useState<Record<string, EatenMeal>>({});
   const [confirmed, setConfirmed] = useState<string[]>([]);
+  const [bfToday, setBfToday] = useState<UsualItem[] | undefined>();
+  const kitchen = useKitchen(repo);
+  const customFoods = useMemo<CustomFood[]>(() => kitchen.mine.map((m) => ({ id: m.id, name: m.name, kcal: m.kcal, protein: m.protein, unitG: m.unitG, unitName: m.unitName })), [kitchen.mine]);
   const targets = useTargets(repo, weight.days, workout?.durationMin ?? 0);
   const { settings: prayer } = usePrayer(repo);
   const prayers = prayer?.enabled ? { times: timesFor(today, prayer), wakeAtFajr: prayer.wakeAtFajr } : undefined;
@@ -346,6 +447,7 @@ export function useDayPlan(repo: Repository) {
       setDone((await repo.getKv<string[]>(doneKey(today))) ?? []);
       setEatenState((await repo.getKv<Record<string, EatenMeal>>(eatenKey(today))) ?? {});
       setConfirmed((await repo.getKv<string[]>(confirmedKey(today))) ?? []);
+      setBfToday((await repo.getKv<UsualItem[]>(breakfastKey(today)))?.filter(Boolean).length ? await repo.getKv<UsualItem[]>(breakfastKey(today)) : undefined);
       const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
       const monday = new Date(Date.parse(`${today}T12:00:00Z`) - day * 86_400_000).toISOString().slice(0, 10);
       const item = (await loadPlanning(repo)).filter((i) => i.weekStart === monday && i.day === day && (i.kind === 'seance' || i.kind === 'course') && (!i.adjustment || i.adjustment.decision === 'adaptée')).sort((x, y) => toMin(x.start) - toMin(y.start))[0];
@@ -356,8 +458,8 @@ export function useDayPlan(repo: Repository) {
   const plan = useMemo(() => {
     if (!answers || !targets.calories.value || !targets.water.value) return undefined;
     const dayIndex = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
-    return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers });
-  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer]); // eslint-disable-line react-hooks/exhaustive-deps
+    return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers, customFoods, breakfastOverride: bfToday });
+  }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer, customFoods, bfToday]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apport CONNU (détaillé ou « exactement le plan ») : seule base du bilan calorique. Coché ou estimé ≠ connu.
   const intake = useMemo(() => (plan ? knownIntake(plan, done, confirmed) : undefined), [plan, done, confirmed]);
@@ -410,18 +512,23 @@ export function useDayPlan(repo: Repository) {
   const week = useMemo(() => {
     if (!answers || !targets.calories.value || !targets.water.value) return [];
     const d0 = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
-    return Array.from({ length: 7 }, (_, k) => buildDayPlan({ answers, kcal: targets.calories.value!.kcal, proteinG: targets.calories.value!.proteinG, waterMl: targets.water.value!, dayIndex: (d0 + k) % 7 }));
-  }, [answers, targets.calories.value, targets.water.value, today]);
+    return Array.from({ length: 7 }, (_, k) => buildDayPlan({ answers, kcal: targets.calories.value!.kcal, proteinG: targets.calories.value!.proteinG, waterMl: targets.water.value!, dayIndex: (d0 + k) % 7, customFoods }));
+  }, [answers, targets.calories.value, targets.water.value, today, customFoods]);
 
+  /** « Utiliser aujourd'hui » : change seulement le petit-déjeuner du jour ; l'habitude reste intacte. */
+  const setBreakfastToday = async (items: UsualItem[] | undefined) => {
+    await repo.setKv(breakfastKey(today), items ?? []);
+    setBfToday(items?.length ? items : undefined);
+  };
   const saveAnswers = async (next: NutritionAnswers) => {
     await repo.setKv(KEY, next);
     setAnswers(next);
   };
-  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers };
+  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers, bfToday, setBreakfastToday, customFoods };
 }
 
 export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers } = useDayPlan(repo);
+  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers, bfToday, setBreakfastToday, customFoods } = useDayPlan(repo);
   const kitchen = useKitchen(repo);
   const [ate, setAte] = useState<PlanEntry | null>(null);
   const [text, setText] = useState('');
@@ -431,6 +538,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
   const [got, setGot] = useState<string[]>([]);
   const [unplanned, setUnplanned] = useState<PlanEntry | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [uk, setUk] = useState<UnplannedKind>('maison');
   const [us, setUs] = useState<UnplannedSize>('normale');
   if (answers === undefined) return null;
@@ -439,6 +547,9 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
   return (
     <>
       <h1>Nutrition</h1>
+      {notice && (
+        <p role="status" className="pill" style={{ marginBottom: 8, height: 'auto', padding: '6px 10px', whiteSpace: 'normal' }} onClick={() => setNotice(null)}>{notice}</p>
+      )}
       <div className="kpi-grid">
         <div className="ui-card kpi">
           <span className="kpi-label">Calories cible</span>
@@ -628,49 +739,110 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
           </Modal>
           <Modal open={reviewing} onClose={() => setReviewing(false)} title="Avis · petit-déjeuner">
             {(() => {
-              const r = answers && kcal ? reviewBreakfast(answers, kcal.kcal, kcal.proteinG) : undefined;
+              const r = answers && kcal ? reviewBreakfast(answers, kcal.kcal, kcal.proteinG, { custom: customFoods }) : undefined;
               if (!answers || !r) return <p className="muted">Pas assez de données pour comparer.</p>;
               const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+              const done = (msg: string) => {
+                setReviewing(false);
+                setNotice(msg);
+              };
               return (
                 <div className="stack">
-                  <p className="num" style={{ margin: 0, fontWeight: 700 }}>Cible d’un repas ≈ {r.target.kcal} kcal · {r.target.protein} g P</p>
+                  <div>
+                    <p className="num" style={{ margin: 0, fontWeight: 700 }}>Repère ≈ {r.target.kcal} kcal · {r.target.protein} g P</p>
+                    <p className="muted" style={{ margin: '2px 0 6px', fontSize: '0.78rem' }}>{r.target.how}</p>
+                    <div className="chips" role="group" aria-label="Appétit le matin">
+                      {BREAKFAST_SHARES.map((s) => (
+                        <button key={s.pct} className="chip" aria-pressed={r.target.sharePct === s.pct} onClick={() => saveAnswers({ ...answers, breakfastShare: s.pct })}>
+                          {s.label} · {s.pct} %
+                        </button>
+                      ))}
+                    </div>
+                    <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.78rem' }}>Si tu es en dessous ou au-dessus, les autres repas s’ajustent : tu ne manges pas sans faim pour atteindre un chiffre.</p>
+                  </div>
+                  {bfToday && <span className="pill">Version d’aujourd’hui seulement · ton habituel reste inchangé</span>}
                   {r.missing.length > 0 && (
                     <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                       {r.missing.map((m) => (
-                        <span key={m} className="pill">À préciser : {m}</span>
+                        <span key={m} className="pill" style={{ height: 'auto', padding: '4px 8px', whiteSpace: 'normal' }}>À préciser : {m}</span>
                       ))}
                       <button className="btn sm" onClick={() => (setReviewing(false), go({ name: 'nutritionSetup' }))}>Préciser</button>
                     </div>
                   )}
+                  {r.unknownNotCounted.length > 0 && (
+                    <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>Quantité inconnue, non comptée (pas zéro) : {r.unknownNotCounted.join(', ')}.</p>
+                  )}
+                  <div className="ui-card" style={{ margin: 0 }} aria-label="Recommandation">
+                    <p className="eyebrow" style={{ margin: 0 }}>Recommandé</p>
+                    <p className="row-title" style={{ margin: 0, whiteSpace: 'normal' }}>{r.options.find((o) => o.id === r.recommendedId)?.label}</p>
+                    <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>{r.recommendedWhy}</p>
+                  </div>
                   {r.options.map((o) => (
                     <section key={o.id} className="ui-card" style={{ margin: 0 }} aria-label={o.label}>
                       <div className="spread">
                         <strong>{o.label}</strong>
-                        {o.id === r.recommendedId && <span className="pill">plus proche de ta cible</span>}
+                        {o.id === r.recommendedId && <span className="pill">recommandé</span>}
                       </div>
                       <p className="tl-items" style={{ margin: 0 }}>{o.items.join(' · ')}</p>
                       <p className="num" style={{ margin: 0 }}>
                         ≈ {o.kcal} kcal · {o.protein} g P
                         {o.id !== 'habituel' && <span className="muted"> ({sign(o.dKcal)} kcal · {sign(o.dProtein)} g P vs habituel)</span>}
                       </p>
+                      {o.changes.length > 0 && (
+                        <ul className="mini-list">
+                          {o.changes.map((c) => (
+                            <li key={c}>{c}</li>
+                          ))}
+                        </ul>
+                      )}
                       <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{o.why}</p>
-                      {o.id !== 'habituel' && (
+                      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                        {o.id !== 'habituel' && (
+                          <button
+                            className="btn sm"
+                            onClick={async () => {
+                              await setBreakfastToday(o.parts);
+                              done('Version choisie pour aujourd’hui seulement. Rien n’est noté comme mangé.');
+                            }}
+                          >
+                            Utiliser aujourd’hui
+                          </button>
+                        )}
+                        {o.id !== 'habituel' && (
+                          <button
+                            className="btn sm"
+                            onClick={async () => {
+                              if (!window.confirm(`Enregistrer « ${o.label} » comme ton nouveau petit-déjeuner habituel ? Les prochains jours changent.`)) return;
+                              await saveAnswers({ ...answers, usualBreakfast: o.parts });
+                              await setBreakfastToday(undefined);
+                              done('Nouvelle habitude enregistrée. Rien n’est noté comme mangé.');
+                            }}
+                          >
+                            Enregistrer comme habitude
+                          </button>
+                        )}
                         <button
-                          className="btn sm"
+                          className="btn sm primary"
                           onClick={async () => {
-                            await saveAnswers({ ...answers, usualBreakfast: o.parts });
-                            setReviewing(false);
+                            await setEaten('petit_dej', { label: o.label, kcal: o.kcal, protein: o.protein, source: 'estimé' });
+                            done('Noté comme mangé (estimation). Les autres repas sont recalculés.');
                           }}
                         >
-                          Utiliser cette version
+                          Confirmer ce que j’ai mangé
                         </button>
-                      )}
+                      </div>
                     </section>
                   ))}
+                  {r.eggAssumption && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{r.eggAssumption}</p>}
+                  {r.generic.length > 0 && (
+                    <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
+                      Calcul avec des valeurs génériques (moyennes) : {r.generic.join(', ')}. Scanne ton produit dans Ma cuisine, puis ajoute-le dans « Mes produits » de l’entretien, pour utiliser ses valeurs.
+                    </p>
+                  )}
                   {r.notes.map((n) => (
                     <p key={n} className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{n}</p>
                   ))}
-                  <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Comparaison chiffrée avec tes cibles, pas un avis médical. Valeurs moyennes (estimation).</p>
+                  <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Comparaison chiffrée avec un repère ajustable, pas un avis médical. Choisir une version ne veut pas dire que tu l’as mangée.</p>
                 </div>
               );
             })()}

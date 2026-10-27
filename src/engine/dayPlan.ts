@@ -64,10 +64,37 @@ export interface DeclaredSupplement {
   waterMl?: number;
 }
 
+export type MilkKind = 'entier' | 'demi' | 'ecreme' | 'vegetal';
+
 export interface BreakfastDetails {
-  /** Matière grasse de cuisson (g) : 0 = aucune ; absent = pas encore précisé. */
+  /** Poids sans coquille d'un œuf (g). Absent = moyenne de 60 g, affichée comme estimation. */
+  eggG?: number;
+  /** Matière grasse de cuisson. Quantité absente = pas encore précisée ; `fatUnknown` = elle existe mais on ne la connaît pas (non comptée, jamais 0). */
+  fatKind?: 'huile' | 'beurre' | 'autre';
   fatG?: number;
+  fatUnknown?: boolean;
+  /** Ajouts au café. 0 = rien (café noir). Absent = pas précisé ; `coffeeUnknown` = inconnu (non compté, jamais 0). */
+  milkKind?: MilkKind;
+  milkMl?: number;
+  sugarG?: number;
+  coffeeUnknown?: boolean;
+  /** Ancien format (4 choix) : lu seulement s'il n'y a pas de quantités. */
   coffee?: 'noir' | 'lait' | 'sucre' | 'lait-sucre';
+}
+
+/** Produit personnel utilisable à la place d'un aliment générique (valeurs de l'étiquette, pour 100 g). */
+export interface CustomFood {
+  id: string;
+  name: string;
+  kcal: number;
+  protein: number;
+  unitG?: number;
+  unitName?: string;
+}
+
+export interface UsualItem {
+  foodId: string;
+  grams: number;
 }
 
 export interface NutritionAnswers {
@@ -84,6 +111,8 @@ export interface NutritionAnswers {
   /** Petit-déjeuner habituel déclaré (quantités exactes) : il remplace le petit-déjeuner généré. */
   usualBreakfast?: { foodId: string; grams: number }[];
   breakfastCoffee?: boolean;
+  /** Part de la journée visée pour le petit-déjeuner (%), réglée par toi : appétit du matin. Absent = part standard. */
+  breakfastShare?: number;
   /** Précisions sur le petit-déjeuner habituel : matière grasse de cuisson et ajouts au café. */
   breakfastDetails?: BreakfastDetails;
   supplements: DeclaredSupplement[];
@@ -113,6 +142,10 @@ export interface PlanEntry {
 
 export interface DayPlanInput {
   answers: NutritionAnswers;
+  /** Produits personnels (étiquette) utilisables dans le petit-déjeuner habituel. */
+  customFoods?: CustomFood[];
+  /** Petit-déjeuner choisi pour aujourd'hui seulement : n'est jamais enregistré comme habitude. */
+  breakfastOverride?: UsualItem[];
   kcal: number;
   proteinG: number;
   waterMl: number;
@@ -209,44 +242,82 @@ function portion(f: Food, grams: number): { label: string; g: number } {
   return { label: `${g} g ${f.name.toLowerCase()}`, g };
 }
 
-/** Ajouts au café déclarés (valeurs moyennes : 50 ml de lait ≈ 25 kcal, 1 sucre de 4 g ≈ 16 kcal). */
-const COFFEE_EXTRA = {
-  noir: { label: 'Café', kcal: 0, protein: 0 },
-  lait: { label: 'Café au lait', kcal: 25, protein: 1.7 },
-  sucre: { label: 'Café sucré', kcal: 16, protein: 0 },
-  'lait-sucre': { label: 'Café au lait sucré', kcal: 41, protein: 1.7 },
-} as const;
+/** Poids sans coquille d'un œuf : celui déclaré, sinon la moyenne (estimation). */
+export const EGG_DEFAULT_G = 60;
+export const eggUnit = (d?: BreakfastDetails) => d?.eggG ?? EGG_DEFAULT_G;
 
-/** Petit-déjeuner déclaré par l'utilisateur : quantités exactes, valeurs moyennes (estimation). */
-export function usualBreakfast(list: { foodId: string; grams: number }[], coffee: boolean, details?: BreakfastDetails) {
+/** Lait : valeurs moyennes pour 100 ml (estimation). */
+const MILK: Record<MilkKind, { kcal: number; protein: number; label: string }> = {
+  entier: { kcal: 64, protein: 3.3, label: 'lait entier' },
+  demi: { kcal: 46, protein: 3.4, label: 'lait demi-écrémé' },
+  ecreme: { kcal: 34, protein: 3.4, label: 'lait écrémé' },
+  vegetal: { kcal: 40, protein: 1.5, label: 'boisson végétale' },
+};
+const SUGAR_KCAL_PER_G = 3.9;
+const FAT_KCAL: Record<'huile' | 'beurre' | 'autre', number> = { huile: 900, beurre: 740, autre: 800 };
+
+/** Ajouts au café : calories et protéines comptées seulement quand la quantité est connue. */
+export function coffeeExtras(d?: BreakfastDetails): { label: string; kcal: number; protein: number; known: boolean } {
+  if (d?.coffeeUnknown) return { label: 'Café (ajouts inconnus, non comptés)', kcal: 0, protein: 0, known: false };
+  let milkMl = d?.milkMl;
+  let sugarG = d?.sugarG;
+  let kind = d?.milkKind;
+  if (milkMl === undefined && sugarG === undefined && d?.coffee) {
+    milkMl = d.coffee === 'lait' || d.coffee === 'lait-sucre' ? 50 : 0;
+    sugarG = d.coffee === 'sucre' || d.coffee === 'lait-sucre' ? 4 : 0;
+    kind = kind ?? 'demi';
+  }
+  if (milkMl === undefined || sugarG === undefined) return { label: 'Café', kcal: 0, protein: 0, known: false };
+  const m = MILK[kind ?? 'demi'];
+  const kcal = (m.kcal * milkMl) / 100 + SUGAR_KCAL_PER_G * sugarG;
+  const label = milkMl === 0 && sugarG === 0 ? 'Café noir' : `Café${milkMl ? ` + ${milkMl} ml ${m.label}` : ''}${sugarG ? ` + ${sugarG} g sucre` : ''}`;
+  return { label, kcal, protein: (m.protein * milkMl) / 100, known: true };
+}
+
+/** Matière grasse de cuisson : comptée seulement si la quantité est connue. */
+export function fatExtras(d?: BreakfastDetails): { label?: string; kcal: number; known: boolean; part?: { foodId: string; grams: number } } {
+  if (d?.fatUnknown) return { label: 'Matière grasse de cuisson (quantité inconnue, non comptée)', kcal: 0, known: false };
+  if (d?.fatG === undefined) return { kcal: 0, known: false };
+  if (d.fatG === 0) return { kcal: 0, known: true };
+  const kind = d.fatKind ?? 'huile';
+  return {
+    label: `${d.fatG} g ${kind === 'beurre' ? 'beurre' : kind === 'huile' ? 'huile' : 'matière grasse'} de cuisson`,
+    kcal: (FAT_KCAL[kind] * d.fatG) / 100,
+    known: true,
+    part: kind === 'huile' ? { foodId: 'huile_olive', grams: d.fatG } : undefined,
+  };
+}
+
+/** Petit-déjeuner déclaré par l'utilisateur : quantités exactes, valeurs moyennes sauf produit personnel (estimation). */
+export function usualBreakfast(list: UsualItem[], coffee: boolean, details?: BreakfastDetails, custom: CustomFood[] = []) {
   const items: string[] = [];
   const parts: { foodId: string; grams: number }[] = [];
   let k = 0;
   let pr = 0;
   for (const u of list) {
-    const f = food(u.foodId)!;
-    const n = f.unitG ? Math.max(1, Math.round(u.grams / f.unitG)) : 0;
-    const g = f.unitG ? n * f.unitG : r5(u.grams);
-    items.push(f.unitG ? `${n} ${f.unitName}${n > 1 ? 's' : ''}` : `${g} g ${f.name.toLowerCase()}`);
+    const f: { id: string; name: string; kcal: number; protein: number; unitG?: number; unitName?: string } | undefined = food(u.foodId) ?? custom.find((c) => c.id === u.foodId);
+    if (!f) continue;
+    const unit = u.foodId === 'oeuf' ? eggUnit(details) : f.unitG;
+    const n = unit ? Math.max(1, Math.round(u.grams / unit)) : 0;
+    const g = unit ? n * unit : r5(u.grams);
+    items.push(unit ? `${n} ${f.unitName ?? 'portion'}${n > 1 ? 's' : ''}${custom.some((c) => c.id === f.id) ? ' · ' + f.name : ''}` : `${g} g ${f.name.toLowerCase()}`);
     parts.push({ foodId: f.id, grams: g });
     k += (f.kcal * g) / 100;
     pr += (f.protein * g) / 100;
   }
-  if (details?.fatG) {
-    // Matière grasse de cuisson (huile ou beurre) : comptée comme de l'huile, ordre de grandeur.
-    const oil = food('huile_olive')!;
-    items.push(`${details.fatG} g matière grasse de cuisson`);
-    parts.push({ foodId: oil.id, grams: details.fatG });
-    k += (oil.kcal * details.fatG) / 100;
-  }
+  const fat = fatExtras(details);
+  if (fat.label) items.push(fat.label);
+  if (fat.part) parts.push(fat.part);
+  k += fat.kcal;
   if (coffee) {
-    const c = COFFEE_EXTRA[details?.coffee ?? 'noir'];
+    const c = coffeeExtras(details);
     items.push(c.label);
     k += c.kcal;
     pr += c.protein;
   }
   return { items, parts, kcal: Math.round(k), protein: Math.round(pr) };
 }
+
 
 /** Construit un repas : protéine pour la part de protéines, puis glucides et lipides pour compléter les calories. */
 function meal(kcal: number, protein: number, foods: { p: Food; c: Food; f?: Food; fruit?: Food; veg: boolean }, supplementProtein = 0) {
@@ -307,8 +378,10 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
   }
 
   const bfTime = wake + 30;
-  const usual = (a.usualBreakfast ?? []).filter((u) => food(u.foodId) && u.grams > 0);
-  const bf = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee, a.breakfastDetails) : meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
+  // Petit-déjeuner du jour choisi seulement pour aujourd'hui, sinon l'habituel déclaré.
+  const custom = i.customFoods ?? [];
+  const usual = (i.breakfastOverride ?? a.usualBreakfast ?? []).filter((u) => (food(u.foodId) || custom.some((c) => c.id === u.foodId)) && u.grams > 0);
+  const bf = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee, a.breakfastDetails, custom) : meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
     p: pk(a.proteins, d, 'oeuf', (f) => !!f.breakfast),
     c: pk(a.carbs, d, 'avoine', (f) => !!f.breakfast),
     f: pk(a.fats, d, 'amandes', (f) => !!f.breakfast),
