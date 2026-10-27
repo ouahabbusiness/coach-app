@@ -2,7 +2,7 @@
 // Cocher une prise d'eau l'ajoute au compteur d'eau du jour. Quantités = estimations.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
+import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, Scale, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
 import { Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
@@ -10,7 +10,8 @@ import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
-import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { reviewBreakfast } from '../engine/breakfastReview';
+import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type BreakfastDetails, type Food, type DeclaredSupplement, type EatenMeal, knownIntake, DOC_LABEL, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -51,7 +52,7 @@ function Multi({ group, value, onChange }: { group: FoodGroup; value: string[]; 
 type UsualItem = { foodId: string; grams: number };
 
 /** Petit-déjeuner habituel : on coche ce qu'on mange d'ordinaire et on règle les quantités. */
-function UsualBreakfast({ value, coffee, onChange }: { value: UsualItem[]; coffee: boolean; onChange: (v: UsualItem[], coffee: boolean) => void }) {
+function UsualBreakfast({ value, coffee, details, onChange, onDetails }: { value: UsualItem[]; coffee: boolean; details?: BreakfastDetails; onChange: (v: UsualItem[], coffee: boolean) => void; onDetails: (d: BreakfastDetails) => void }) {
   const step = (f: Food) => f.unitG ?? 25;
   const start = (f: Food) => (f.id === 'oeuf' ? 4 * (f.unitG ?? 60) : f.unitG ? 2 * f.unitG : 100);
   const qty = (f: Food, g: number) => (f.unitG ? `${Math.round(g / f.unitG)}` : `${g} g`);
@@ -87,6 +88,30 @@ function UsualBreakfast({ value, coffee, onChange }: { value: UsualItem[]; coffe
       <button className="cq-opt" aria-pressed={coffee} onClick={() => onChange(value, !coffee)}>
         <span className="cq-opt-l">Café</span>
       </button>
+      {value.length > 0 && (
+        <>
+          <p className="eyebrow" style={{ margin: '6px 0 0' }}>Matière grasse de cuisson</p>
+          <div className="chips" role="group" aria-label="Matière grasse de cuisson">
+            {([[0, 'Aucune'], [5, '5 g'], [10, '10 g'], [15, '15 g']] as const).map(([g, l]) => (
+              <button key={g} className="chip" aria-pressed={details?.fatG === g} onClick={() => onDetails({ ...details, fatG: g })}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {coffee && (
+            <>
+              <p className="eyebrow" style={{ margin: '6px 0 0' }}>Dans le café</p>
+              <div className="chips" role="group" aria-label="Dans le café">
+                {([['noir', 'Noir'], ['lait', 'Lait'], ['sucre', 'Sucre'], ['lait-sucre', 'Lait + sucre']] as const).map(([c, l]) => (
+                  <button key={c} className="chip" aria-pressed={details?.coffee === c} onClick={() => onDetails({ ...details, coffee: c })}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -161,7 +186,7 @@ const NSTEPS: NStep[] = [
     id: 'petitdej',
     say: 'Ton petit-déjeuner habituel, si tu en as un. Je le garde tel quel et j’ajuste les autres repas. Passe si tu n’en as pas.',
     done: () => true,
-    render: (a, set) => <UsualBreakfast value={a.usualBreakfast ?? []} coffee={!!a.breakfastCoffee} onChange={(v, c) => set({ usualBreakfast: v, breakfastCoffee: c })} />,
+    render: (a, set) => <UsualBreakfast value={a.usualBreakfast ?? []} coffee={!!a.breakfastCoffee} details={a.breakfastDetails} onChange={(v, c) => set({ usualBreakfast: v, breakfastCoffee: c })} onDetails={(d) => set({ breakfastDetails: d })} />,
   },
   {
     id: 'maison',
@@ -388,11 +413,15 @@ export function useDayPlan(repo: Repository) {
     return Array.from({ length: 7 }, (_, k) => buildDayPlan({ answers, kcal: targets.calories.value!.kcal, proteinG: targets.calories.value!.proteinG, waterMl: targets.water.value!, dayIndex: (d0 + k) % 7 }));
   }, [answers, targets.calories.value, targets.water.value, today]);
 
-  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake };
+  const saveAnswers = async (next: NutritionAnswers) => {
+    await repo.setKv(KEY, next);
+    setAnswers(next);
+  };
+  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers };
 }
 
 export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake } = useDayPlan(repo);
+  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake, saveAnswers } = useDayPlan(repo);
   const kitchen = useKitchen(repo);
   const [ate, setAte] = useState<PlanEntry | null>(null);
   const [text, setText] = useState('');
@@ -401,6 +430,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
   const showKcal = useTracking(repo).prefs.showCalories;
   const [got, setGot] = useState<string[]>([]);
   const [unplanned, setUnplanned] = useState<PlanEntry | null>(null);
+  const [reviewing, setReviewing] = useState(false);
   const [uk, setUk] = useState<UnplannedKind>('maison');
   const [us, setUs] = useState<UnplannedSize>('normale');
   if (answers === undefined) return null;
@@ -502,6 +532,11 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       </button>
                     )}
                     {e.adjusted && <span className="pill">{e.adjusted} après imprévu</span>}
+                    {e.id === 'petit_dej' && answers?.usualBreakfast?.length ? (
+                      <button className="tl-alt" onClick={() => setReviewing(true)}>
+                        <Scale size={12} aria-hidden="true" /> Avis
+                      </button>
+                    ) : null}
                     {e.kind === 'repas' && !e.unplanned && (
                       <button
                         className="tl-alt"
@@ -590,6 +625,55 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                   </div>
                 );
               })()}
+          </Modal>
+          <Modal open={reviewing} onClose={() => setReviewing(false)} title="Avis · petit-déjeuner">
+            {(() => {
+              const r = answers && kcal ? reviewBreakfast(answers, kcal.kcal, kcal.proteinG) : undefined;
+              if (!answers || !r) return <p className="muted">Pas assez de données pour comparer.</p>;
+              const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+              return (
+                <div className="stack">
+                  <p className="num" style={{ margin: 0, fontWeight: 700 }}>Cible d’un repas ≈ {r.target.kcal} kcal · {r.target.protein} g P</p>
+                  {r.missing.length > 0 && (
+                    <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                      {r.missing.map((m) => (
+                        <span key={m} className="pill">À préciser : {m}</span>
+                      ))}
+                      <button className="btn sm" onClick={() => (setReviewing(false), go({ name: 'nutritionSetup' }))}>Préciser</button>
+                    </div>
+                  )}
+                  {r.options.map((o) => (
+                    <section key={o.id} className="ui-card" style={{ margin: 0 }} aria-label={o.label}>
+                      <div className="spread">
+                        <strong>{o.label}</strong>
+                        {o.id === r.recommendedId && <span className="pill">plus proche de ta cible</span>}
+                      </div>
+                      <p className="tl-items" style={{ margin: 0 }}>{o.items.join(' · ')}</p>
+                      <p className="num" style={{ margin: 0 }}>
+                        ≈ {o.kcal} kcal · {o.protein} g P
+                        {o.id !== 'habituel' && <span className="muted"> ({sign(o.dKcal)} kcal · {sign(o.dProtein)} g P vs habituel)</span>}
+                      </p>
+                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{o.why}</p>
+                      {o.id !== 'habituel' && (
+                        <button
+                          className="btn sm"
+                          onClick={async () => {
+                            await saveAnswers({ ...answers, usualBreakfast: o.parts });
+                            setReviewing(false);
+                          }}
+                        >
+                          Utiliser cette version
+                        </button>
+                      )}
+                    </section>
+                  ))}
+                  {r.notes.map((n) => (
+                    <p key={n} className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{n}</p>
+                  ))}
+                  <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Comparaison chiffrée avec tes cibles, pas un avis médical. Valeurs moyennes (estimation).</p>
+                </div>
+              );
+            })()}
           </Modal>
           <Modal open={shopping} onClose={() => setShopping(false)} title="Courses · 7 jours">
             {(() => {

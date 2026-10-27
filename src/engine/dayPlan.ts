@@ -29,6 +29,7 @@ export const FOODS: Food[] = [
   { id: 'saumon', name: 'Saumon', group: 'proteine', kcal: 200, protein: 20 },
   { id: 'skyr', name: 'Skyr', group: 'proteine', kcal: 63, protein: 11, breakfast: true },
   { id: 'fromage_blanc', name: 'Fromage blanc 0 %', group: 'proteine', kcal: 47, protein: 7.5, breakfast: true },
+  { id: 'blanc_oeuf', name: 'Blancs d’œuf', group: 'proteine', kcal: 52, protein: 10.9, breakfast: true },
   { id: 'cottage', name: 'Cottage cheese', group: 'proteine', kcal: 98, protein: 11, breakfast: true },
   { id: 'lentilles', name: 'Lentilles cuites', group: 'proteine', kcal: 115, protein: 9 },
   { id: 'avoine', name: 'Flocons d’avoine', group: 'glucide', kcal: 370, protein: 13, breakfast: true },
@@ -63,6 +64,12 @@ export interface DeclaredSupplement {
   waterMl?: number;
 }
 
+export interface BreakfastDetails {
+  /** Matière grasse de cuisson (g) : 0 = aucune ; absent = pas encore précisé. */
+  fatG?: number;
+  coffee?: 'noir' | 'lait' | 'sucre' | 'lait-sucre';
+}
+
 export interface NutritionAnswers {
   wake?: string;
   bedtime?: string;
@@ -77,6 +84,8 @@ export interface NutritionAnswers {
   /** Petit-déjeuner habituel déclaré (quantités exactes) : il remplace le petit-déjeuner généré. */
   usualBreakfast?: { foodId: string; grams: number }[];
   breakfastCoffee?: boolean;
+  /** Précisions sur le petit-déjeuner habituel : matière grasse de cuisson et ajouts au café. */
+  breakfastDetails?: BreakfastDetails;
   supplements: DeclaredSupplement[];
   cooking?: 'rapide' | 'normal';
 }
@@ -200,8 +209,16 @@ function portion(f: Food, grams: number): { label: string; g: number } {
   return { label: `${g} g ${f.name.toLowerCase()}`, g };
 }
 
+/** Ajouts au café déclarés (valeurs moyennes : 50 ml de lait ≈ 25 kcal, 1 sucre de 4 g ≈ 16 kcal). */
+const COFFEE_EXTRA = {
+  noir: { label: 'Café', kcal: 0, protein: 0 },
+  lait: { label: 'Café au lait', kcal: 25, protein: 1.7 },
+  sucre: { label: 'Café sucré', kcal: 16, protein: 0 },
+  'lait-sucre': { label: 'Café au lait sucré', kcal: 41, protein: 1.7 },
+} as const;
+
 /** Petit-déjeuner déclaré par l'utilisateur : quantités exactes, valeurs moyennes (estimation). */
-function usualBreakfast(list: { foodId: string; grams: number }[], coffee: boolean) {
+export function usualBreakfast(list: { foodId: string; grams: number }[], coffee: boolean, details?: BreakfastDetails) {
   const items: string[] = [];
   const parts: { foodId: string; grams: number }[] = [];
   let k = 0;
@@ -215,7 +232,19 @@ function usualBreakfast(list: { foodId: string; grams: number }[], coffee: boole
     k += (f.kcal * g) / 100;
     pr += (f.protein * g) / 100;
   }
-  if (coffee) items.push('Café');
+  if (details?.fatG) {
+    // Matière grasse de cuisson (huile ou beurre) : comptée comme de l'huile, ordre de grandeur.
+    const oil = food('huile_olive')!;
+    items.push(`${details.fatG} g matière grasse de cuisson`);
+    parts.push({ foodId: oil.id, grams: details.fatG });
+    k += (oil.kcal * details.fatG) / 100;
+  }
+  if (coffee) {
+    const c = COFFEE_EXTRA[details?.coffee ?? 'noir'];
+    items.push(c.label);
+    k += c.kcal;
+    pr += c.protein;
+  }
   return { items, parts, kcal: Math.round(k), protein: Math.round(pr) };
 }
 
@@ -279,7 +308,7 @@ function rawPlan(i: DayPlanInput, scale: Record<string, { k: number; p: number }
 
   const bfTime = wake + 30;
   const usual = (a.usualBreakfast ?? []).filter((u) => food(u.foodId) && u.grams > 0);
-  const bf = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee) : meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
+  const bf = usual.length ? usualBreakfast(usual, !!a.breakfastCoffee, a.breakfastDetails) : meal(i.kcal * shares[0]! * sk('petit_dej'), proteinPer * sp('petit_dej'), {
     p: pk(a.proteins, d, 'oeuf', (f) => !!f.breakfast),
     c: pk(a.carbs, d, 'avoine', (f) => !!f.breakfast),
     f: pk(a.fats, d, 'amandes', (f) => !!f.breakfast),
