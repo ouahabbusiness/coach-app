@@ -96,9 +96,16 @@ export function conflicts(day: number, start: string, durationMin: number, fixed
 /** Événements fixes déduits de l'onboarding (travail, trajets, sommeil). Rien n'est inventé si l'info manque. */
 export function fixedEventsFromAnswers(a: OnboardingAnswers): FixedEvent[] {
   const out: FixedEvent[] = [];
-  const { workDays, workStart, workEnd, commuteMin } = a.schedule;
+  const { workDays, workStart, workEnd, commuteMin, lunchStart, lunchEnd } = a.schedule;
   if (workDays.length > 0 && workStart && workEnd) {
-    out.push({ id: 'travail', kind: 'travail', label: 'Travail', days: workDays, start: workStart, end: workEnd });
+    // Pause de midi déclarée (dans la journée de travail) : le travail est coupé en deux, le trou reste libre pour une séance ou une course.
+    const lunchOk = !!lunchStart && !!lunchEnd && toMin(workStart) < toMin(lunchStart) && toMin(lunchStart) < toMin(lunchEnd) && toMin(lunchEnd) < toMin(workEnd);
+    if (lunchOk) {
+      out.push({ id: 'travail-matin', kind: 'travail', label: 'Travail', days: workDays, start: workStart, end: lunchStart! });
+      out.push({ id: 'travail-apres-midi', kind: 'travail', label: 'Travail', days: workDays, start: lunchEnd!, end: workEnd });
+    } else {
+      out.push({ id: 'travail', kind: 'travail', label: 'Travail', days: workDays, start: workStart, end: workEnd });
+    }
     if (commuteMin && commuteMin > 0) {
       out.push({ id: 'trajet-aller', kind: 'trajet', label: 'Trajet', days: workDays, start: fromMin(toMin(workStart) - commuteMin), end: workStart });
       out.push({ id: 'trajet-retour', kind: 'trajet', label: 'Trajet', days: workDays, start: workEnd, end: fromMin(toMin(workEnd) + commuteMin) });

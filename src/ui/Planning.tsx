@@ -207,7 +207,11 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
 
       {DAY_NAMES.map((name, day) => {
         const date = dateOf(week, day);
-        const work = (fixed ?? []).find((ev) => ev.kind === 'travail' && ev.days.includes(day));
+        // Journée de travail : de l'heure la plus tôt à la plus tard (la pause de midi coupe le travail en deux blocs).
+        const workBlocks = (fixed ?? []).filter((ev) => ev.kind === 'travail' && ev.days.includes(day));
+        const work = workBlocks.length
+          ? { start: workBlocks.map((b) => b.start).sort()[0]!, end: workBlocks.map((b) => b.end).sort().at(-1)! }
+          : undefined;
         const sleep = (fixed ?? []).find((ev) => ev.kind === 'sommeil');
         const dayItems = weekItems.filter((i) => i.day === day).sort((a, b) => toMin(a.start) - toMin(b.start));
         const daySessions = sessionsByDate.get(date) ?? [];

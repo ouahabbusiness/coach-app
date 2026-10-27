@@ -104,3 +104,24 @@ describe('objectifs versionnés', () => {
     expect(goalChanges(h[0], h[1]!)).toEqual(['targetDate']);
   });
 });
+
+describe('pause de midi', () => {
+  const withSchedule = (s: Record<string, unknown>) => {
+    const a = emptyAnswers();
+    a.schedule = { workDays: [1, 2, 3, 4], workStart: '09:00', workEnd: '17:00', ...s };
+    return fixedEventsFromAnswers(a).filter((e) => e.kind === 'travail');
+  };
+
+  it('coupe le travail en deux et libère le créneau du midi', () => {
+    const work = withSchedule({ lunchStart: '12:00', lunchEnd: '13:00' });
+    expect(work.map((e) => [e.start, e.end])).toEqual([['09:00', '12:00'], ['13:00', '17:00']]);
+    expect(conflicts(1, '12:00', 60, work)).toHaveLength(0);
+    expect(conflicts(1, '11:30', 60, work)).toHaveLength(1);
+  });
+
+  it('sans pause déclarée ou pause incohérente : un seul bloc, rien d’inventé', () => {
+    expect(withSchedule({})).toHaveLength(1);
+    expect(withSchedule({ lunchStart: '13:00', lunchEnd: '12:00' })).toHaveLength(1);
+    expect(withSchedule({ lunchStart: '08:00', lunchEnd: '09:30' })).toHaveLength(1);
+  });
+});

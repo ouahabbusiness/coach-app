@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChartLine, House, MessageSquare, Settings as SettingsIcon, Utensils } from 'lucide-react';
+import { CalendarDays, ChartLine, Dumbbell, House, MessageSquare, Settings as SettingsIcon, Utensils } from 'lucide-react';
 import { CoachDb, Repository, type SessionSummaryRow } from '../storage/db';
 import { OutcomeBadge } from './common';
 import { Program } from './Program';
@@ -58,12 +58,14 @@ export type Route =
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string };
 
+// `to` : écran ouvert par l'onglet.
 const TABS = [
-  { name: 'today', label: 'Aujourd’hui', Icon: House },
-  { name: 'program', label: 'Programme', Icon: CalendarDays },
-  { name: 'nutrition', label: 'Nutrition', Icon: Utensils },
-  { name: 'progress', label: 'Progrès', Icon: ChartLine },
-  { name: 'coach', label: 'Coach', Icon: MessageSquare },
+  { key: 'today', to: 'today', label: 'Aujourd’hui', Icon: House },
+  { key: 'training', to: 'program', label: 'Entraînement', Icon: Dumbbell },
+  { key: 'planning', to: 'planning', label: 'Semaine', Icon: CalendarDays },
+  { key: 'nutrition', to: 'nutrition', label: 'Nutrition', Icon: Utensils },
+  { key: 'progress', to: 'progress', label: 'Progrès', Icon: ChartLine },
+  { key: 'coach', to: 'coach', label: 'Coach', Icon: MessageSquare },
 ] as const;
 
 export function App() {
@@ -161,12 +163,12 @@ export function App() {
       </main>
       <nav className="navwrap" aria-label="Navigation principale">
         <div className="tabbar">
-          {TABS.map(({ name, label, Icon }) => (
+          {TABS.map(({ key, to, label, Icon }) => (
             <button
-              key={name}
+              key={key}
               aria-label={label}
-              aria-current={route.name === name || (name === 'program' && route.name === 'planning') ? 'page' : undefined}
-              onClick={() => go(name === 'program' ? { name: 'planning' } : { name })}
+              aria-current={route.name === to ? 'page' : undefined}
+              onClick={() => go({ name: to })}
             >
               <Icon size={19} aria-hidden="true" />
             </button>

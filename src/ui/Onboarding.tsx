@@ -344,6 +344,20 @@ export const STEPS: Step[] = [
           <Time label="Début" value={a.schedule.workStart} onChange={(v) => set((x) => void (x.schedule.workStart = v))} />
           <Time label="Fin" value={a.schedule.workEnd} onChange={(v) => set((x) => void (x.schedule.workEnd = v))} />
         </div>
+        <div className="grid2">
+          <Time label="Pause midi : début" value={a.schedule.lunchStart} onChange={(v) => set((x) => void (x.schedule.lunchStart = v || undefined))} />
+          <Time label="Pause midi : fin" value={a.schedule.lunchEnd} onChange={(v) => set((x) => void (x.schedule.lunchEnd = v || undefined))} />
+        </div>
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend style={{ fontWeight: 500, marginBottom: 6 }}>Tapis de marche pendant le travail</legend>
+          <div className="chips">
+            {DAYS_SHORT.map((d, i) => (
+              <button key={i} className="chip" aria-label={DAY_NAMES[i]} aria-pressed={(a.schedule.treadmillDays ?? []).includes(i)} onClick={() => set((x) => void (x.schedule.treadmillDays = toggle(x.schedule.treadmillDays ?? [], i).sort()))}>
+                {d}
+              </button>
+            ))}
+          </div>
+        </fieldset>
         <Num label="Trajet (un sens)" unit="min" value={a.schedule.commuteMin} onChange={(v) => set((x) => void (x.schedule.commuteMin = v))} />
         <Text label="Week-end et exceptions" hint="ex. le samedi je travaille le matin" multiline value={a.schedule.weekendNotes} onChange={(v) => set((x) => void (x.schedule.weekendNotes = v))} />
       </>

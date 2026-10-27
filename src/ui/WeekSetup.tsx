@@ -156,9 +156,23 @@ export function AgendaPage({ repo, go }: { repo: Repository; go: (r: Route) => v
                       <input type="time" value={st.schedule.workEnd ?? ''} onChange={(e) => set({ schedule: { ...st.schedule, workEnd: e.target.value } })} />
                     </label>
                   </div>
+                  <div className="grid2">
+                    <label className="field">
+                      Pause midi : début
+                      <input type="time" value={st.schedule.lunchStart ?? ''} onChange={(e) => set({ schedule: { ...st.schedule, lunchStart: e.target.value || undefined } })} />
+                    </label>
+                    <label className="field">
+                      Pause midi : fin
+                      <input type="time" value={st.schedule.lunchEnd ?? ''} onChange={(e) => set({ schedule: { ...st.schedule, lunchEnd: e.target.value || undefined } })} />
+                    </label>
+                  </div>
                   <label className="field">
                     Trajet (aller, min)
                     <input type="text" inputMode="numeric" value={st.schedule.commuteMin ?? ''} onChange={(e) => set({ schedule: { ...st.schedule, commuteMin: Number(e.target.value) || undefined } })} />
+                  </label>
+                  <label className="field">
+                    Tapis de marche pendant le travail
+                    <DayPick value={st.schedule.treadmillDays ?? []} onChange={(v) => set({ schedule: { ...st.schedule, treadmillDays: v } })} />
                   </label>
                 </div>
               )}

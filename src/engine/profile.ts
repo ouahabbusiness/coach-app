@@ -42,7 +42,7 @@ export interface OnboardingAnswers {
   goal: GoalDraft;
   equipment: { items: string[]; kettlebellKg?: string; notes?: string };
   food: { restrictions?: string; allergies?: string; later?: boolean };
-  schedule: { workDays: number[]; workStart?: string; workEnd?: string; commuteMin?: number; weekendNotes?: string };
+  schedule: { workDays: number[]; workStart?: string; workEnd?: string; commuteMin?: number; weekendNotes?: string; lunchStart?: string; lunchEnd?: string; treadmillDays?: number[] };
   sleep: { bedtime?: string; wake?: string; preferredSlots: Slot[]; sessionsPerWeek?: number; sessionMinutes?: number };
   coaching: { tone?: 'ferme' | 'neutre' | 'doux' };
 }

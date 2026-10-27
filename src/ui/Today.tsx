@@ -218,6 +218,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const lastWeight = weight.days[weight.days.length - 1];
   const weightTrend = trend(weight.days, today);
   const [weighing, setWeighing] = useState(false);
+  const [treadmillDay, setTreadmillDay] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -225,6 +226,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
       setGoal(goals[goals.length - 1]);
       const ob = await loadOnboarding(repo);
       setOnboardingStep(ob.completedAt ? null : ob.step);
+      setTreadmillDay((ob.answers.schedule.treadmillDays ?? []).includes((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7));
 
       const open = await repo.openSession();
       if (open) {
@@ -404,7 +406,11 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
             <button className="pill" onClick={() => openEditor('steps')}>
               <Watch size={12} aria-hidden="true" /> {daily?.steps !== undefined ? fmtNum(daily.steps) : 'montre'}
             </button>
-            <button className="pill" onClick={() => openEditor('treadmillSteps')}>
+            <button
+              className="pill"
+              style={treadmillDay && !daily?.treadmillSteps ? { background: 'var(--accent)', color: '#fff' } : undefined}
+              onClick={() => openEditor('treadmillSteps')}
+            >
               + tapis{daily?.treadmillSteps ? ` ${fmtNum(daily.treadmillSteps)}` : ''}
             </button>
           </div>
