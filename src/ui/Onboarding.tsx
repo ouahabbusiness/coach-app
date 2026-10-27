@@ -147,8 +147,8 @@ export const STEPS: Step[] = [
     render: (a, set) => (
       <>
         <ul style={{ margin: 0, paddingLeft: 18 }} className="stack">
-          <li>Tout reste sur cet appareil, dans le navigateur. Pas de compte, pas de serveur.</li>
-          <li>Rien n’est envoyé à une IA ou à un tiers.</li>
+          <li>Tes données restent sur cet appareil, dans le navigateur. Pas de compte, pas de serveur à nous, aucune IA.</li>
+          <li>Exceptions, seulement avec ton accord au moment de l’utiliser : position arrondie (spots), zone de carte (OpenStreetMap), numéro de code-barres (Open Food Facts). Détail et limites : Réglages → Où vont mes données.</li>
           <li>Tu peux exporter tes données à tout moment (Réglages). Fais-le régulièrement : le navigateur peut effacer les données d’un site peu utilisé.</li>
         </ul>
         <label className="row" style={{ minHeight: 44 }}>
