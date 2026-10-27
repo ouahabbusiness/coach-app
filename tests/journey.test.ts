@@ -124,8 +124,14 @@ describe('parcours complet du coach', () => {
         vi.setSystemTime(new Date(`${d}T18:00:00`));
         await doSession(repo, await startSessionFromTemplate(repo, two), Array(6).fill(same));
       }
-      const rep = await recoveryReport(repo);
+      // Blocage sans fatigue observée : pas d'allègement (la cause n'est pas la fatigue).
+      let rep = await recoveryReport(repo);
       expect(rep.trends.map((t) => t.trend)).toEqual(['stable', 'stable']);
+      expect(rep.proposal.propose).toBe(false);
+      expect(rep.proposal.first[0]).toContain('sans fatigue');
+      // Fatigue déclarée 3 jours sur 14 → allègement proposé (à valider).
+      await repo.setKv('readiness.log', ['2026-11-10', '2026-11-12', '2026-11-14'].map((day) => ({ day, tired: true })));
+      rep = await recoveryReport(repo);
       expect(rep.proposal.propose).toBe(true);
 
       await acceptDeload(repo, rep.proposal.reasons);
@@ -140,6 +146,36 @@ describe('parcours complet du coach', () => {
       expect((await recoveryReport(repo)).reevaluate).toBe(true);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('transition de charge (kettlebell 12 → 16 kg, saut > 10 %) : 1 essai réussi → 2 séries sur 3 à 16 ; tenues → toutes ; essai raté → retour à 12', async () => {
+    const kb: SessionTemplate = { id: 'prog-KB', title: 'Rowing', updatedAt: 0, lines: [{ id: 'k1', variantId: 'kb-row-1arm', kind: 'reps', role: 'work', sets: 3, targetReps: 10, repRange: [10, 15], targetRir: 2, loadKg: 12, restSeconds: 90 }] };
+    for (const [name, testReps, expected] of [['journey-tr-ok', 10, [16, 16, 12]], ['journey-tr-ko', 7, [12, 12, 12]]] as const) {
+      const repo = await freshRepo(name);
+      await repo.setKv('equipment.kettlebells', [6, 12, 16]);
+      const s1 = await startSessionFromTemplate(repo, kb);
+      await doSession(repo, s1, Array(3).fill({ reps: 15, rir: 2, loadKg: 12 }));
+      const s2 = await startSessionFromTemplate(repo, kb);
+      // Seule la 1re série passe à la charge d'essai.
+      expect((await planOf(repo, s2)).map((x) => x.loadKg)).toEqual([16, 12, 12]);
+      expect((await loadJournal(repo)).at(-1)).toMatchObject({ action: 'transition', rule: 'transition de charge' });
+      await doSession(repo, s2, [{ reps: testReps, rir: 2, loadKg: 16 }, { reps: 15, rir: 2, loadKg: 12 }, { reps: 15, rir: 2, loadKg: 12 }]);
+      const s3 = await startSessionFromTemplate(repo, kb);
+      expect((await planOf(repo, s3)).map((x) => x.loadKg)).toEqual(expected);
+      expect((await loadJournal(repo)).at(-1)?.rule).toBe(testReps >= 10 ? 'transition : étape suivante' : 'transition non confirmée');
+      if (testReps >= 10) {
+        // Les 2 séries à 16 kg tenues dans la même séance → toutes les séries passent à 16 kg.
+        await doSession(repo, s3, [{ reps: 10, rir: 2, loadKg: 16 }, { reps: 10, rir: 2, loadKg: 16 }, { reps: 15, rir: 2, loadKg: 12 }]);
+        const s4 = await startSessionFromTemplate(repo, kb);
+        expect((await planOf(repo, s4)).map((x) => x.loadKg)).toEqual([16, 16, 16]);
+        expect((await loadJournal(repo)).at(-1)?.rule).toBe('transition confirmée');
+        continue;
+      }
+      // Idempotence : relancer la même décision ne duplique pas le journal.
+      const n = (await loadJournal(repo)).length;
+      await startSessionFromTemplate(repo, kb);
+      expect((await loadJournal(repo)).filter((e) => e.rule.startsWith('transition')).length).toBeLessThanOrEqual(n);
     }
   });
 });

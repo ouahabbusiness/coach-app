@@ -1,6 +1,6 @@
 // Données de test fictives.
 import { describe, expect, it } from 'vitest';
-import { deloadLine, deloadProposal, deloadSets, trendOf, type Perf } from '../src/engine/stagnation';
+import { analyzeCauses, decideDeload, deloadLine, deloadProposal, deloadSets, detectStagnation, trendOf, type Perf } from '../src/engine/stagnation';
 
 const p = (day: string, load: number, reps: number): Perf => ({ day, load, reps, rirKnown: true });
 
@@ -22,6 +22,18 @@ describe('stagnation et récupération', () => {
     expect(r1.propose).toBe(false);
     expect(r1.first[0]).toContain('Régularité');
     expect(deloadProposal(t, { tiredDays: 0, done: 8, planned: 8, rirNotedRatio: 0.2 }).first[0]).toContain('réserve');
+  });
+
+  it('détection, causes et décision séparées : constat seul ≠ décision', () => {
+    const t = [{ name: 'Tractions lestées', trend: 'stable' as const }, { name: 'Dips', trend: 'stable' as const }];
+    const d = detectStagnation(t);
+    expect(d).toMatchObject({ detected: true, stuck: ['Tractions lestées', 'Dips'], down: [] });
+    const c = analyzeCauses(d, { tiredDays: 0, done: 8, planned: 8, rirNotedRatio: 0.9 });
+    expect(c.find((x) => x.id === 'fatigue')!.status).toBe('écartée');
+    expect(decideDeload(d, c).propose).toBe(false);
+    const c2 = analyzeCauses(d, { tiredDays: 4, done: 8, planned: 8, rirNotedRatio: 0.9 });
+    expect(c2.find((x) => x.id === 'fatigue')!.status).toBe('probable');
+    expect(decideDeload(d, c2).propose).toBe(true);
   });
 
   it('deux exercices bloqués, régulier, données correctes → phase allégée proposée (à valider)', () => {

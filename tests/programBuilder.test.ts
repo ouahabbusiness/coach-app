@@ -20,6 +20,27 @@ describe('recommandations du coach', () => {
 });
 
 describe('programme', () => {
+  it('EMOM lesté connu (12 kg × 6/min) → tractions lestées à 12 kg, charge connue, calibration, pas un max', () => {
+    const known = [{ variantId: 'pullup-weighted', loadKg: 12, reps: 6, source: 'EMOM 12 min × 6 rép. à 12 kg' }];
+    const p = buildProgram({ ...base, maxPullups: null, priority: 'muscle' }, loads, [6, 12], known);
+    const l = p.templates.flatMap((t) => t.lines).find((x) => x.variantId === 'pullup-weighted')!;
+    expect(l.loadKg).toBe(12);
+    expect(l.cue).toContain('calibration');
+    expect(l.lastSetToFailure).toBe(false);
+    expect(p.notes.join(' ')).toContain('pas un max');
+    expect(p.notes.join(' ')).toContain('propre à ce format');
+    // Dips inconnus : calibration sous-maximale, jamais de test maximal.
+    const d = buildProgram({ ...base, maxDips: null }, loads);
+    const dl = d.templates.flatMap((t) => t.lines).find((x) => x.variantId === 'dips-bars')!;
+    expect(dl.cue).toContain('sous-maximale');
+    expect(d.templates.flatMap((t) => t.lines).filter((x) => x.variantId === 'dips-bars' && /max/i.test(x.cue ?? '') && !/pas de max/.test(x.cue ?? ''))).toEqual([]);
+    // Aucune ligne lestée sans charge.
+    expect(p.templates.flatMap((t) => t.lines).filter((x) => x.variantId === 'pullup-weighted' && !x.loadKg)).toEqual([]);
+    // Douleur aux coudes : la charge connue n'est pas imposée.
+    const safe = buildProgram({ ...base, pains: ['coudes'] }, loads, [6, 12], known);
+    expect(safe.templates.flatMap((t) => t.lines).some((x) => x.variantId === 'pullup-weighted')).toBe(false);
+  });
+
   it('hybride : 3 séances + 3 courses, exercices tous dans le catalogue', () => {
     const p = buildProgram(base, loads);
     expect(p.week.filter((w) => w.kind === 'seance')).toHaveLength(3);

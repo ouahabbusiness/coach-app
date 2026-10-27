@@ -119,7 +119,7 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     for (const s of plan.sets) if (forced.has(s.blockId)) delete rest[s.variantId];
     await repo.setKv(OVERRIDES, rest);
   }
-  const firstOfBlock = new Set<string>();
+  const blockIdx = new Map<string, number>();
   return {
     ...plan,
     sets: plan.sets.map((set) => {
@@ -128,9 +128,11 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       if (f !== undefined) return { ...set, loadKg: f, targetReps: set.repRange?.[0] ?? set.targetReps, progression: `Baisse validée par toi : ${f} kg` };
       const d = decisions.get(set.blockId);
       if (d) {
-        const first = !firstOfBlock.has(set.blockId);
-        firstOfBlock.add(set.blockId);
-        if (d.transition && first) return { ...set, loadKg: d.transition.loadKg, targetReps: d.transition.target, progression: d.reason, cue: `Série d’essai à ${d.transition.loadKg} kg` };
+        const idx = (blockIdx.get(set.blockId) ?? 0) + 1;
+        blockIdx.set(set.blockId, idx);
+        // Transition : seules les `transition.sets` premières séries passent à la nouvelle charge.
+        if (d.transition && idx <= d.transition.sets) return { ...set, loadKg: d.transition.loadKg, targetReps: d.transition.target, progression: d.reason, cue: `Série à ${d.transition.loadKg} kg (${idx}/${d.transition.sets} à la nouvelle charge)` };
+        if (d.transition) return { ...set, loadKg: d.after.loadKg ?? set.loadKg, targetReps: d.after.target, progression: d.reason };
         // Proposition non validée : on garde la prescription actuelle.
         const after = d.proposal ? d.before : d.after;
         const changed = after.loadKg !== d.before.loadKg || after.target !== d.before.target;

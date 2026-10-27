@@ -126,5 +126,25 @@ export const withConsent = (c: Consents, k: ConsentKey, granted: boolean, now = 
   [k]: { granted, at: now.toISOString(), version: CONSENT_VERSION },
 });
 
+/** Limites honnêtes des vérifications et de la suppression (affichées dans Réglages). */
+export const LIMITS: { title: string; items: string[] }[] = [
+  {
+    title: 'Ce que la vérification réseau couvre',
+    items: [
+      'Un test automatique liste les adresses écrites dans le code de l’app et échoue si l’une n’est pas déclarée ici.',
+      'Il ne voit pas une adresse construite pendant l’exécution, ni les requêtes du navigateur ou d’iOS lui-même (mises à jour, vérifications Apple, Safari).',
+      'Contrôle manuel ponctuel dans un navigateur de test : aucune requête vers OpenStreetMap avant ton accord. Pas encore observé sur ton iPhone.',
+    ],
+  },
+  {
+    title: 'Ce que « Tout supprimer » efface… et n’efface pas',
+    items: [
+      'Efface : la base de l’app sur cet appareil (séances, poids, photos, programme, réglages, accords) et le cache de l’app, puis vérifie qu’il reste 0 élément.',
+      'N’efface pas : les fichiers d’export déjà téléchargés (app Fichiers), les journaux techniques gardés par GitHub, OpenStreetMap ou Open Food Facts (adresse IP, requêtes), les sauvegardes iCloud de l’appareil.',
+      'Safari et l’app ajoutée à l’écran d’accueil ont des données séparées : supprime dans chacune si tu utilises les deux.',
+    ],
+  },
+];
+
 /** Tous les hôtes déclarés (accord ou information). */
 export const declaredHosts = () => [...Object.values(FLOWS), ...INFO_FLOWS].flatMap((f) => f.hosts);

@@ -50,23 +50,89 @@ export interface DeloadProposal {
   first: string[];
 }
 
-/**
- * Proposition de phase allégée. Jamais sur une seule séance ; jamais si le vrai problème est ailleurs
- * (données insuffisantes, régularité faible) — dans ce cas, on dit quoi corriger d'abord.
- */
-export function deloadProposal(trends: { name: string; trend: Trend }[], r: RecoveryInput): DeloadProposal {
-  const first: string[] = [];
+// Trois étapes séparées, chacune traçable : 1) détection (constat chiffré), 2) analyse des causes (hypothèses avec
+// leur preuve), 3) décision éventuelle (allègement proposé seulement si la fatigue est la cause la plus plausible).
+
+export interface Detection {
+  /** Exercices jugeables (≥ 3 séances comparables / 14 jours). */
+  judged: number;
+  stuck: string[];
+  down: string[];
+  detected: boolean;
+}
+
+/** 1) Détection : uniquement un constat sur les séances comparables, aucune interprétation. */
+export function detectStagnation(trends: { name: string; trend: Trend }[]): Detection {
   const judged = trends.filter((t) => t.trend !== 'insuffisant');
-  if (r.rirNotedRatio < 0.5) first.push('Note ta réserve (RIR) sur la plupart des séries : sans elle, impossible de distinguer fatigue et stagnation.');
-  if (r.planned > 0 && r.done / r.planned < 0.75) first.push(`Régularité ${r.done}/${r.planned} : d’abord tenir les séances prévues, une phase allégée ne réglerait rien.`);
-  if (!judged.length) first.push('Pas encore assez de séances comparables pour juger.');
-  if (first.length) return { propose: false, reasons: [], first };
-  const stuck = judged.filter((t) => t.trend !== 'progrès');
-  const down = judged.filter((t) => t.trend === 'baisse');
+  const stuck = judged.filter((t) => t.trend !== 'progrès').map((t) => t.name);
+  const down = judged.filter((t) => t.trend === 'baisse').map((t) => t.name);
+  return { judged: judged.length, stuck, down, detected: stuck.length >= 2 || down.length >= 1 };
+}
+
+export type CauseId = 'données' | 'régularité' | 'fatigue' | 'programme';
+
+export interface Cause {
+  id: CauseId;
+  status: 'probable' | 'possible' | 'écartée' | 'inconnue';
+  evidence: string;
+}
+
+/** 2) Analyse des causes : chaque hypothèse avec son indice. Rien n'est décidé ici. */
+export function analyzeCauses(d: Detection, r: RecoveryInput): Cause[] {
+  const ratio = r.planned > 0 ? r.done / r.planned : 1;
+  const causes: Cause[] = [
+    r.rirNotedRatio < 0.5
+      ? { id: 'données', status: 'probable', evidence: `Réserve notée sur ${Math.round(r.rirNotedRatio * 100)} % des séries : impossible de distinguer fatigue et stagnation.` }
+      : { id: 'données', status: 'écartée', evidence: `Réserve notée sur ${Math.round(r.rirNotedRatio * 100)} % des séries.` },
+    r.planned === 0
+      ? { id: 'régularité', status: 'inconnue', evidence: 'Aucune séance planifiée sur 14 jours.' }
+      : ratio < 0.75
+        ? { id: 'régularité', status: 'probable', evidence: `${r.done}/${r.planned} séances faites sur 14 jours.` }
+        : { id: 'régularité', status: 'écartée', evidence: `${r.done}/${r.planned} séances faites sur 14 jours.` },
+    r.tiredDays >= 3
+      ? { id: 'fatigue', status: 'probable', evidence: `${r.tiredDays} jours de mauvaise nuit ou fatigue sur 14 (contrôle avant séance).` }
+      : d.down.length
+        ? { id: 'fatigue', status: 'possible', evidence: `Baisse sur ${d.down.join(', ')} ; ${r.tiredDays} jour(s) de fatigue déclarée.` }
+        : { id: 'fatigue', status: 'écartée', evidence: `${r.tiredDays} jour(s) de fatigue déclarée sur 14.` },
+    { id: 'programme', status: d.stuck.length >= 2 ? 'possible' : 'écartée', evidence: d.stuck.length >= 2 ? 'Plusieurs exercices bloqués malgré une pratique régulière : la plage ou la variante peuvent être à revoir après une phase allégée.' : 'Un seul exercice concerné.' },
+  ];
+  return causes;
+}
+
+/**
+ * 3) Décision éventuelle. Jamais sans détection ; jamais si les données ou la régularité expliquent mieux le constat
+ * (on dit alors quoi corriger d'abord). Allègement proposé (à valider) si la fatigue est probable ou possible
+ * avec plusieurs exercices bloqués.
+ */
+export function decideDeload(d: Detection, causes: Cause[]): DeloadProposal {
+  const first: string[] = [];
+  const st = (id: CauseId) => causes.find((c) => c.id === id)!;
+  if (!d.judged) first.push('Pas encore assez de séances comparables pour juger.');
+  if (st('données').status === 'probable') first.push(`Note ta réserve (RIR) sur la plupart des séries. ${st('données').evidence}`);
+  if (st('régularité').status === 'probable') first.push(`Régularité d’abord : ${st('régularité').evidence} Une phase allégée ne réglerait rien.`);
+  if (first.length || !d.detected) return { propose: false, reasons: [], first };
+  const fatigue = st('fatigue');
   const reasons: string[] = [];
-  if (stuck.length >= 2) reasons.push(`Pas de progrès sur ${stuck.map((t) => t.name).join(', ')}.`);
-  if (down.length >= 1 && r.tiredDays >= 3) reasons.push(`Baisse (${down.map((t) => t.name).join(', ')}) + ${r.tiredDays} jours de fatigue en 2 semaines.`);
-  return { propose: reasons.length > 0, reasons, first: [] };
+  if (d.stuck.length >= 2) reasons.push(`Constat : pas de progrès sur ${d.stuck.join(', ')}.`);
+  if (d.down.length) reasons.push(`Constat : baisse sur ${d.down.join(', ')}.`);
+  reasons.push(`Cause retenue : fatigue ${fatigue.status} (${fatigue.evidence})`);
+  const propose = fatigue.status === 'probable' || (fatigue.status === 'possible' && d.stuck.length >= 2);
+  if (propose) return { propose, reasons, first: [] };
+  return {
+    propose: false,
+    reasons: [],
+    first: [
+      fatigue.status === 'écartée' && d.stuck.length >= 2
+        ? 'Blocage sans fatigue observée : un allègement n’est pas justifié. Après 1 séance comparable de plus, le coach proposera de changer de plage ou de variante (à valider).'
+        : 'Une baisse isolée sans fatigue déclarée : on observe encore 1 séance comparable avant toute décision.',
+    ],
+  };
+}
+
+/** Enchaîne les trois étapes (compatibilité). */
+export function deloadProposal(trends: { name: string; trend: Trend }[], r: RecoveryInput): DeloadProposal {
+  const d = detectStagnation(trends);
+  return decideDeload(d, analyzeCauses(d, r));
 }
 
 /** Clé de stockage de la phase allégée. */

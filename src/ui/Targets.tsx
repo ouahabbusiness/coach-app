@@ -91,8 +91,9 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
       const days = Array.from({ length: 14 }, (_, k) => new Date(Date.parse(`${today}T12:00:00Z`) - k * 864e5).toISOString().slice(0, 10));
       const intake: { day: string; kcal: number }[] = [];
       for (const d of days) {
-        const x = await repo.getKv<{ kcal: number }>(`intake.${d}`);
-        if (x) intake.push({ day: d, kcal: x.kcal });
+        // Seules les journées entièrement connues comptent (repas détaillés ou « exactement le plan »).
+        const x = await repo.getKv<{ kcal: number; complete?: boolean }>(`intake.${d}`);
+        if (x?.complete === true) intake.push({ day: d, kcal: x.kcal });
       }
       const rlog = (await repo.getKv<{ day: string; tired: boolean }[]>('readiness.log')) ?? [];
       const fatigueDays = new Set(rlog.filter((x) => x.tired && days.includes(x.day)).map((x) => x.day)).size;

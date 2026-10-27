@@ -3,7 +3,7 @@
 import { findVariant } from '../catalog/exercises';
 import { currentResult, localDay } from '../engine/derive';
 import { project } from '../engine/session';
-import { DELOAD, deloadProposal, perfIndex, trendOf, type Deload, type DeloadProposal, type Perf, type Trend } from '../engine/stagnation';
+import { analyzeCauses, decideDeload, DELOAD, detectStagnation, perfIndex, trendOf, type Cause, type Deload, type DeloadProposal, type Detection, type Perf, type Trend } from '../engine/stagnation';
 import type { SessionState } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { loadPlanning } from './Planning';
@@ -23,6 +23,9 @@ export interface ExerciseTrend {
 
 export interface RecoveryReport {
   trends: ExerciseTrend[];
+  /** 1) constat, 2) causes, 3) décision : séparés et affichés comme tels. */
+  detection: Detection;
+  causes: Cause[];
   proposal: DeloadProposal;
   deload?: Deload;
   /** La phase allégée est finie : réévaluation à afficher. */
@@ -79,11 +82,13 @@ export async function recoveryReport(repo: Repository, today = localDay(Date.now
   const items = (await loadPlanning(repo)).filter((i) => i.kind === 'seance' && !(i.adjustment && i.adjustment.decision !== 'adaptée')).map((i) => ({ ...i, date: dateOf(i.weekStart, i.day) })).filter((i) => i.date >= since14 && i.date < today);
   const done = items.filter((i) => i.sessionId).length;
   const deload = await loadDeload(repo);
-  let proposal = deloadProposal(trends, { tiredDays, done, planned: items.length, rirNotedRatio: workDone ? rirNoted / workDone : 0 });
+  const detection = detectStagnation(trends);
+  const causes = analyzeCauses(detection, { tiredDays, done, planned: items.length, rirNotedRatio: workDone ? rirNoted / workDone : 0 });
+  let proposal = decideDeload(detection, causes);
   // Pas de nouvelle proposition pendant une phase allégée, ni dans les 14 jours après un refus ou une fin.
   const quiet = deload && (deload.status === 'active' ? today <= deload.to : addDays(deload.to, 14) >= today);
   if (quiet) proposal = { propose: false, reasons: [], first: [] };
-  return { trends, proposal, deload, reevaluate: !!deload && deload.status === 'active' && today > deload.to };
+  return { trends, detection, causes, proposal, deload, reevaluate: !!deload && deload.status === 'active' && today > deload.to };
 }
 
 export async function acceptDeload(repo: Repository, reasons: string[], today = localDay(Date.now(), deviceTimeZone())): Promise<Deload> {

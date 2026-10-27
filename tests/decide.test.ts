@@ -54,9 +54,11 @@ describe('double progression (choix de conception)', () => {
     expect(d).toMatchObject({ action: 'augmenter', after: { loadKg: 16 } });
   });
 
-  it('essai réussi → tout bascule ; essai non confirmé → retour à l’ancienne charge', () => {
+  it('un essai réussi ne fait pas tout basculer : moitié des séries d’abord, puis tout ; essai non confirmé → retour', () => {
     const mixed = (testReps: number, testRir?: number): Sample => ({ results: [{ reps: testReps, loadKg: 16, rir: testRir }, { reps: 10, loadKg: 12, rir: 2 }, { reps: 10, loadKg: 12, rir: 2 }], planned: 3, comparable: true });
-    expect(decide('x', { ...rx, loadKg: 12 }, [mixed(7, 2)], kb)).toMatchObject({ action: 'augmenter', after: { loadKg: 16, target: 6 }, rule: 'transition confirmée' });
+    expect(decide('x', { ...rx, loadKg: 12 }, [mixed(7, 2)], kb)).toMatchObject({ action: 'transition', transition: { loadKg: 16, sets: 2 }, after: { loadKg: 12 }, rule: 'transition : étape suivante' });
+    const twoAt16: Sample = { results: [{ reps: 7, loadKg: 16, rir: 2 }, { reps: 6, loadKg: 16, rir: 2 }, { reps: 10, loadKg: 12, rir: 2 }], planned: 3, comparable: true };
+    expect(decide('x', { ...rx, loadKg: 12 }, [twoAt16], kb)).toMatchObject({ action: 'augmenter', after: { loadKg: 16, target: 6 }, rule: 'transition confirmée' });
     expect(decide('x', { ...rx, loadKg: 12 }, [mixed(5, 1)], kb)).toMatchObject({ action: 'maintenir', after: { loadKg: 12 }, rule: 'transition non confirmée' });
     expect(decide('x', { ...rx, loadKg: 12 }, [mixed(7)], kb).missing).toContain('réserve de la série d’essai');
   });

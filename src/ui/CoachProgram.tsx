@@ -17,6 +17,7 @@ import {
   recRuns,
   recStrictness,
   recWeeks,
+  type KnownLoad,
   type Pain,
   type Program,
   type ProgramAnswers,
@@ -416,6 +417,7 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
   const [step, setStep] = useState(-1);
   const [loads, setLoads] = useState<number[]>([]);
   const [kbs, setKbs] = useState<number[]>([6, 12]);
+  const [known, setKnown] = useState<KnownLoad[]>([]);
   const [startNext, setStartNext] = useState(true);
   const [saved, setSaved] = useState(false);
   const [placed, setPlaced] = useState<string[]>([]);
@@ -426,7 +428,15 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
     (async () => {
       setLoads(availableLoads(await loadPieces(repo)));
       setKbs(await loadKettlebells(repo));
-      const ob = (await loadOnboarding(repo)).answers;
+      // Charges déjà tenues hors programme (EMOM lesté) : départ connu au lieu d'une estimation.
+      const free = (await loadFree(repo)).filter((b) => b.loadKg && b.targetPerRound).sort((x, y) => y.at - x.at);
+      setKnown(
+        free.slice(0, 1).map((b) => {
+          const total = b.rounds.some((r) => r !== null) ? b.rounds.reduce<number>((t, r) => t + (r ?? 0), 0) : b.declaredTotal;
+          return { variantId: b.variantId, loadKg: b.loadKg!, reps: b.targetPerRound!, source: `${b.format === 'emom' ? 'EMOM' : 'séries'} ${b.rounds.length} min × ${b.targetPerRound} rép. à ${b.loadKg} kg${total !== undefined ? `, ${total} rép. au total` : ''} le ${b.day}` };
+        }),
+      );
+      const ob =(await loadOnboarding(repo)).answers;
       setTone(ob.coaching.tone && ob.coaching.tone !== 'ferme' ? 'neutre' : 'dur');
       const prev = await repo.getKv<ProgramAnswers>(ANSWERS);
       if (prev) return setA(prev);
@@ -448,7 +458,7 @@ export function CoachProgram({ repo, go }: { repo: Repository; go: (r: Route) =>
       return next;
     });
 
-  const program = useMemo(() => (a && step >= STEPS.length ? buildProgram(a, loads, kbs) : undefined), [a, step, loads, kbs]);
+  const program = useMemo(() => (a && step >= STEPS.length ? buildProgram(a, loads, kbs, known) : undefined), [a, step, loads, kbs, known]);
   if (!a) return null;
 
   const total = STEPS.length;
@@ -863,31 +873,39 @@ function RecoveryCard({ rec, onAccept, onRefuse, onClose }: { rec: RecoveryRepor
       </section>
     );
   }
-  if (rec.proposal.propose) {
-    return (
-      <section className="ui-card stack light-card" aria-label="Phase allégée proposée" style={{ marginTop: 10 }}>
-        <p className="eyebrow" style={{ margin: 0 }}>Coach · à valider</p>
-        <p className="row-title" style={{ margin: 0 }}>Phase allégée de 6 jours</p>
-        {rec.proposal.reasons.map((r) => (
-          <p key={r} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{r}</p>
+  if (!stuck.length || (!rec.proposal.propose && !rec.proposal.first.length)) return null;
+  // Trois blocs distincts : constat, causes (avec leur indice), décision.
+  return (
+    <section className={`ui-card stack ${rec.proposal.propose ? 'light-card' : ''}`} aria-label="Stagnation" style={{ marginTop: 10 }}>
+      <p className="eyebrow" style={{ margin: 0 }}>Coach · 1. constat</p>
+      <ul className="cq-rules">
+        {stuck.map((t) => (
+          <li key={t.variantId}>{t.name} : {t.reason}</li>
         ))}
-        <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>≈ 40 % de séries en moins, réserve +1, pas d’échec, puis réévaluation. Seuils = choix de conception, pas une loi.</p>
-        <div className="row" style={{ gap: 6 }}>
-          <button className="btn sm primary" onClick={onAccept}>Valider</button>
-          <button className="btn sm ghost" onClick={onRefuse}>Continuer normalement</button>
-        </div>
-      </section>
-    );
-  }
-  if (stuck.length && rec.proposal.first.length) {
-    return (
-      <section className="ui-card stack" aria-label="Stagnation : d’abord" style={{ marginTop: 10 }}>
-        <p className="eyebrow" style={{ margin: 0 }}>Coach · avant de changer le programme</p>
-        {rec.proposal.first.map((r) => (
-          <p key={r} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>{r}</p>
+      </ul>
+      <p className="eyebrow" style={{ margin: 0 }}>2. causes possibles</p>
+      <ul className="cq-rules">
+        {rec.causes.map((c) => (
+          <li key={c.id}>
+            {c.id} — {c.status} : {c.evidence}
+          </li>
         ))}
-      </section>
-    );
-  }
-  return null;
+      </ul>
+      <p className="eyebrow" style={{ margin: 0 }}>3. décision</p>
+      {rec.proposal.propose ? (
+        <>
+          <p className="row-title" style={{ margin: 0 }}>Phase allégée de 6 jours · à valider</p>
+          <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>≈ 40 % de séries en moins, réserve +1, pas d’échec, puis réévaluation. Seuils = choix de conception, pas une loi.</p>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn sm primary" onClick={onAccept}>Valider</button>
+            <button className="btn sm ghost" onClick={onRefuse}>Continuer normalement</button>
+          </div>
+        </>
+      ) : (
+        rec.proposal.first.map((r) => (
+          <p key={r} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Pas d’allègement. {r}</p>
+        ))
+      )}
+    </section>
+  );
 }

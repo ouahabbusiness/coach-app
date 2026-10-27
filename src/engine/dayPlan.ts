@@ -87,8 +87,10 @@ export interface PlanEntry {
   waterMl?: number;
   /** Aliments du repas en grammes (pour la liste de courses). */
   parts?: { foodId: string; grams: number }[];
-  /** Repas remplacé par un imprévu (valeurs estimées). */
+  /** Repas remplacé par ce qui a été réellement mangé. */
   unplanned?: boolean;
+  /** Documentation des valeurs d'un repas réellement mangé (voir `UNCERTAINTY`). */
+  source?: Documentation | 'détaillé' | 'estimé';
   /** Repas recalculé après un imprévu. */
   adjusted?: 'allégé' | 'renforcé';
 }
@@ -113,7 +115,31 @@ export interface EatenMeal {
   label: string;
   kcal: number;
   protein: number;
+  /** Absent (anciennes saisies) = estimation, par prudence. 'détaillé'/'estimé' = anciennes valeurs. */
+  source?: Documentation | 'détaillé' | 'estimé';
 }
+
+/**
+ * Comment un apport est documenté. Le classement suit la PREUVE, pas le type de repas :
+ * un resto détaillé aliment par aliment vaut mieux qu'un repas du plan simplement coché.
+ */
+export type Documentation = 'sauté' | 'plan confirmé' | 'portions déclarées' | 'estimation' | 'coché';
+
+/**
+ * Incertitude relative retenue (choix de conception, pas une mesure) : null = inconnue.
+ * Seuls les apports à ±20 % ou mieux entrent dans le bilan calorique.
+ */
+export const UNCERTAINTY: Record<Documentation, number | null> = {
+  sauté: 0,
+  'plan confirmé': 0.15,
+  'portions déclarées': 0.2,
+  estimation: 0.4,
+  coché: null,
+};
+export const MAX_COUNTED_UNCERTAINTY = 0.2;
+
+/** Anciennes saisies : 'détaillé' → portions déclarées, 'estimé' ou absent → estimation. */
+export const docOf = (s: EatenMeal['source']): Documentation => (s === 'détaillé' ? 'portions déclarées' : s === 'estimé' || !s ? 'estimation' : s);
 
 export type UnplannedKind = 'maison' | 'resto' | 'fastfood' | 'sandwich' | 'saute';
 export type UnplannedSize = 'petite' | 'normale' | 'grosse';
@@ -130,7 +156,8 @@ const UNPLANNED: Record<UnplannedKind, { label: string; kcal: [number, number, n
 export function estimateUnplanned(kind: UnplannedKind, size: UnplannedSize): EatenMeal {
   const u = UNPLANNED[kind];
   const k = size === 'petite' ? 0 : size === 'normale' ? 1 : 2;
-  return { label: kind === 'saute' ? u.label : `${u.label} · portion ${size} (≈)`, kcal: u.kcal[k], protein: u.protein[k] };
+  // Repas sauté : 0 kcal est connu avec certitude ; le reste est un ordre de grandeur.
+  return { label: kind === 'saute' ? u.label : `${u.label} · portion ${size} (≈)`, kcal: u.kcal[k], protein: u.protein[k], source: kind === 'saute' ? 'sauté' : 'estimation' };
 }
 
 export const UNPLANNED_LABELS = Object.fromEntries(Object.entries(UNPLANNED).map(([k, v]) => [k, v.label])) as Record<UnplannedKind, string>;
@@ -315,11 +342,63 @@ export function buildDayPlan(i: DayPlanInput): PlanEntry[] {
   const scale = Object.fromEntries(adjustable.map((e) => [e.id, { k, p }]));
   return rawPlan(i, scale).map((e) =>
     ids.includes(e.id)
-      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, parts: undefined }
+      ? { ...e, items: [eaten[e.id]!.label], kcal: eaten[e.id]!.kcal, protein: eaten[e.id]!.protein, unplanned: true, source: docOf(eaten[e.id]!.source), parts: undefined }
       : adjustable.some((x) => x.id === e.id) && Math.abs(k - 1) > 0.05
         ? { ...e, adjusted: k < 1 ? 'allégé' : 'renforcé' }
         : e,
   );
+}
+
+export interface MealDoc {
+  id: string;
+  title: string;
+  doc: Documentation | 'non noté';
+  kcal?: number;
+  /** Incertitude relative (null = inconnue). */
+  uncertainty: number | null;
+  counted: boolean;
+}
+
+export interface KnownIntake {
+  /** Somme des apports comptés (documentés à ±20 % ou mieux) + compléments cochés (dose déclarée). */
+  kcal: number;
+  protein: number;
+  /** Marge d'incertitude absolue sur `kcal` (somme des incertitudes de chaque repas compté). */
+  marginKcal: number;
+  meals: MealDoc[];
+  known: number;
+  /** Repas notés mais trop peu documentés pour compter (titres). */
+  unknown: string[];
+  /** Tous les repas de la journée sont comptés : seul ce cas entre dans le bilan calorique. */
+  complete: boolean;
+}
+
+/**
+ * Apport du jour classé par DOCUMENTATION et INCERTITUDE. Un repas coché sans confirmation n'a pas d'apport
+ * connu ; une estimation par type et taille (±40 %) est affichée mais pas comptée ; « exactement le plan »
+ * (±15 %), des portions déclarées (±20 %) et un repas sauté (0) comptent.
+ */
+export function knownIntake(plan: PlanEntry[], done: string[], confirmed: string[]): KnownIntake | undefined {
+  const mealsPlan = plan.filter((e) => e.kind === 'repas');
+  const supps = plan.filter((e) => e.kind === 'complement' && e.kcal && done.includes(e.id));
+  const meals: MealDoc[] = mealsPlan.map((e) => {
+    const doc: MealDoc['doc'] = e.unplanned ? docOf(e.source) : confirmed.includes(e.id) ? 'plan confirmé' : done.includes(e.id) ? 'coché' : 'non noté';
+    const uncertainty = doc === 'non noté' ? null : UNCERTAINTY[doc];
+    return { id: e.id, title: e.title, doc, kcal: e.kcal, uncertainty, counted: uncertainty !== null && uncertainty <= MAX_COUNTED_UNCERTAINTY };
+  });
+  if (!meals.some((m) => m.doc !== 'non noté') && !supps.length) return undefined;
+  const counted = meals.filter((m) => m.counted);
+  const byId = new Map(mealsPlan.map((e) => [e.id, e]));
+  const sum = (k: 'kcal' | 'protein') => counted.reduce((t, m) => t + (byId.get(m.id)![k] ?? 0), 0) + supps.reduce((t, e) => t + (e[k] ?? 0), 0);
+  return {
+    kcal: sum('kcal'),
+    protein: sum('protein'),
+    marginKcal: Math.round(counted.reduce((t, m) => t + (m.kcal ?? 0) * (m.uncertainty ?? 0), 0)),
+    meals,
+    known: counted.length,
+    unknown: meals.filter((m) => m.doc !== 'non noté' && !m.counted).map((m) => m.title),
+    complete: meals.length > 0 && meals.every((m) => m.counted),
+  };
 }
 
 /** Totaux du plan (pour comparer à la cible). */

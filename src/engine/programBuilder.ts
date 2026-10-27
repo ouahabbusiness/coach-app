@@ -192,7 +192,15 @@ export function estimateLineMinutes(lines: GenLine[]): number {
 }
 
 /** Construit le programme à partir des réponses validées. `loads` = charges de lest réalisables. */
-export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: number[] = [6, 12]): Program {
+/** Charge de travail réellement observée (ex. EMOM noté), pas un maximum. */
+export interface KnownLoad {
+  variantId: string;
+  loadKg: number;
+  reps: number;
+  source: string;
+}
+
+export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: number[] = [6, 12], known: KnownLoad[] = []): Program {
   const s = scheme(a.priority);
   const intensity = a.intensity ?? recIntensity(a).value;
   const rir = RIR[intensity];
@@ -213,8 +221,19 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   // Tirage : niveau d'après le max de tractions strictes.
   const pull = a.maxPullups;
   let pullLine: GenLine;
-  if (pull === null || pull === undefined) {
-    pullLine = main('pullup-strict', { cue: 'Semaine 1 : 1re série = test max' });
+  // Charge lestée DÉCLARÉE dans un autre format (EMOM : 6 rép. par minute, récupération entre chaque minute).
+  // Référence propre à ce format, pas une validation pour des séries continues : point de départ à calibrer, pas un max.
+  const kp = known.filter((k) => k.variantId === 'pullup-weighted' && k.loadKg > 0).sort((x, y) => y.loadKg - x.loadKg)[0];
+  if (kp && !pain.has('coudes') && !pain.has('epaules')) {
+    pullLine = main('pullup-weighted', {
+      loadKg: Math.max(0, ...loads.filter((l) => l > 0 && l <= kp.loadKg)) || kp.loadKg,
+      cue: `Référence déclarée en EMOM (${kp.loadKg} kg) : calibration, garde 3 rép. en réserve ; la charge peut baisser`,
+    });
+    notes.push(
+      `Tractions lestées : ${kp.loadKg} kg vient de ton EMOM déclaré (${kp.source}). Référence propre à ce format (séries de ${kp.reps} rép. avec récupération chaque minute), pas un max ni une validation en séries continues : la 1re séance calibre, arrêt à 3 rép. de réserve.`,
+    );
+  } else if (pull === null || pull === undefined) {
+    pullLine = main('pullup-strict', { cue: 'Calibration sous-maximale : arrête chaque série avec 3 rép. en réserve (pas de max)' });
     notes.push('Tractions : max inconnu → test à la 1re séance, l’app ajuste ensuite.');
   } else if (pull < 3) pullLine = main('pullup-negative', { targetReps: 4, cue: 'Descente 4–5 s' });
   else if (pull < 8) pullLine = main('pullup-strict', { targetReps: Math.max(2, Math.min(s.main.range[0], Math.floor(pull * 0.6))) });
@@ -231,7 +250,11 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   if (pain.has('epaules')) {
     pushLine = main('pushup-standard', { targetReps: Math.max(6, Math.floor((a.maxPushups ?? 15) * 0.5)) });
     notes.push('Épaules : pas de dips ni de pompes piquées. Pompes à la place.');
-  } else if (dips === null || dips === undefined) pushLine = main('dips-bars', { cue: 'Semaine 1 : 1re série = test max' });
+  } else if (dips === null || dips === undefined) {
+    // Pas de test maximal : calibration sous-maximale (épaules exposées en bas du mouvement).
+    pushLine = main('dips-bars', { cue: 'Calibration sous-maximale : arrête chaque série avec 3 rép. en réserve, amplitude confortable (pas de max)' });
+    notes.push('Dips : niveau inconnu → calibration sous-maximale (3 rép. en réserve), jamais de test maximal.');
+  }
   else if (dips < 4) pushLine = main('dips-bars', { targetReps: 3, cue: 'Descente contrôlée' });
   else if (dips < 12) pushLine = main('dips-bars', { targetReps: Math.max(3, Math.min(s.main.range[0] + 2, Math.floor(dips * 0.6))) });
   else {
@@ -272,7 +295,8 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     key: 'C',
     title: 'Volume et épaules',
     lines: [
-      main(pull !== null && pull !== undefined && pull >= 5 ? 'chinup-strict' : pullLine.variantId, { targetReps: pullLine.targetReps, loadKg: undefined, cue: undefined }),
+      // Séance volume : sans lest (une variante lestée sans charge n'aurait pas de sens).
+      main(pull !== null && pull !== undefined && pull >= 5 ? 'chinup-strict' : pullLine.variantId === 'pullup-weighted' ? 'pullup-strict' : pullLine.variantId, { targetReps: pullLine.variantId === 'pullup-weighted' ? undefined : pullLine.targetReps, loadKg: undefined, cue: undefined }),
       pushAcc,
       ...(pain.has('epaules') ? [] : [acc('kb-press-1arm', { loadKg: kbs[0] ?? 6, cue: 'Par bras' })]),
       acc('knee-raise-hanging', { targetReps: 12 }),
@@ -337,7 +361,7 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
     title: 'Re-test des maxima',
     lines: [
       { variantId: 'pullup-strict', kind: 'reps', role: 'test', sets: 1, restSeconds: 240, cue: 'Max strict, une seule série' },
-      { variantId: pain.has('epaules') ? 'pushup-standard' : 'dips-bars', kind: 'reps', role: 'test', sets: 1, restSeconds: 240, cue: 'Max propre' },
+      { variantId: pain.has('epaules') ? 'pushup-standard' : 'dips-bars', kind: 'reps', role: 'test', sets: 1, restSeconds: 240, cue: pain.has('epaules') ? 'Max propre' : 'Sous-maximal : arrête avec 2 rép. en réserve et note-la (pas de max aux dips)' },
       { variantId: 'pushup-standard', kind: 'reps', role: 'test', sets: 1, restSeconds: 180, cue: 'Max, poitrine au sol' },
     ],
   };

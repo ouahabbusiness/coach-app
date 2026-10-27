@@ -10,7 +10,7 @@ import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
 import { saveProof } from './Habits';
 import { addWater, dailyKey, type DailyMetrics } from '../engine/daily';
-import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
+import { buildDayPlan, shoppingList, estimateUnplanned, FOODS, planTotals, UNPLANNED_LABELS, type DeclaredSupplement, type EatenMeal, knownIntake, type FoodGroup, type NutritionAnswers, type PlanEntry, type UnplannedKind, type UnplannedSize } from '../engine/dayPlan';
 import { localDay } from '../engine/derive';
 import { toMin } from '../engine/planning';
 import type { Repository } from '../storage/db';
@@ -24,6 +24,7 @@ import type { Route } from './App';
 const KEY = 'nutrition.answers';
 const doneKey = (day: string) => `dayplan.done.${day}`;
 const eatenKey = (day: string) => `dayplan.eaten.${day}`;
+const confirmedKey = (day: string) => `dayplan.confirmed.${day}`;
 
 /** Compléments déclarés par Hmidou le 26/10/2026 : pré-remplis, dose et valeurs à recopier de l'emballage. */
 const DECLARED: DeclaredSupplement[] = [
@@ -246,6 +247,7 @@ export function useDayPlan(repo: Repository) {
   const [workout, setWorkout] = useState<{ start: string; durationMin: number; title: string } | undefined>();
   const [done, setDone] = useState<string[]>([]);
   const [eaten, setEatenState] = useState<Record<string, EatenMeal>>({});
+  const [confirmed, setConfirmed] = useState<string[]>([]);
   const targets = useTargets(repo, weight.days, workout?.durationMin ?? 0);
   const { settings: prayer } = usePrayer(repo);
   const prayers = prayer?.enabled ? { times: timesFor(today, prayer), wakeAtFajr: prayer.wakeAtFajr } : undefined;
@@ -255,6 +257,7 @@ export function useDayPlan(repo: Repository) {
       setAnswers((await loadNutrition(repo)) ?? null);
       setDone((await repo.getKv<string[]>(doneKey(today))) ?? []);
       setEatenState((await repo.getKv<Record<string, EatenMeal>>(eatenKey(today))) ?? {});
+      setConfirmed((await repo.getKv<string[]>(confirmedKey(today))) ?? []);
       const day = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
       const monday = new Date(Date.parse(`${today}T12:00:00Z`) - day * 86_400_000).toISOString().slice(0, 10);
       const item = (await loadPlanning(repo)).filter((i) => i.weekStart === monday && i.day === day && (i.kind === 'seance' || i.kind === 'course') && (!i.adjustment || i.adjustment.decision === 'adaptée')).sort((x, y) => toMin(x.start) - toMin(y.start))[0];
@@ -268,13 +271,21 @@ export function useDayPlan(repo: Repository) {
     return buildDayPlan({ answers, kcal: targets.calories.value.kcal, proteinG: targets.calories.value.proteinG, waterMl: targets.water.value, workout, dayIndex, eaten, prayers });
   }, [answers, targets.calories.value, targets.water.value, workout, today, eaten, prayer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Apport RÉELLEMENT noté (repas cochés ou déclarés) : base du bilan calorique, distinct du plan.
+  // Apport CONNU (détaillé ou « exactement le plan ») : seule base du bilan calorique. Coché ou estimé ≠ connu.
+  const intake = useMemo(() => (plan ? knownIntake(plan, done, confirmed) : undefined), [plan, done, confirmed]);
   useEffect(() => {
-    if (!plan) return;
-    const eatenMeals = plan.filter((e) => (e.kind === 'repas' && (e.unplanned || done.includes(e.id))) || (e.kind === 'complement' && done.includes(e.id) && e.kcal));
-    if (!eatenMeals.length) return;
-    repo.setKv(`intake.${today}`, { kcal: eatenMeals.reduce((t, e) => t + (e.kcal ?? 0), 0), protein: eatenMeals.reduce((t, e) => t + (e.protein ?? 0), 0), meals: eatenMeals.filter((e) => e.kind === 'repas').length });
-  }, [plan, done, repo, today]);
+    if (intake) repo.setKv(`intake.${today}`, intake);
+  }, [intake, repo, today]);
+
+  /** « Exactement le plan » : composition et portions du plan confirmées pour ce repas. */
+  const confirmPlan = useCallback(
+    async (id: string, on: boolean) => {
+      const next = on ? [...new Set([...confirmed, id])] : confirmed.filter((x) => x !== id);
+      await repo.setKv(confirmedKey(today), next);
+      setConfirmed(next);
+    },
+    [confirmed, repo, today],
+  );
 
   /** Imprévu : un repas remplacé par autre chose (estimation), les suivants sont recalculés. */
   const setEaten = useCallback(
@@ -284,8 +295,9 @@ export function useDayPlan(repo: Repository) {
       else delete next[id];
       await repo.setKv(eatenKey(today), next);
       setEatenState(next);
+      if (confirmed.includes(id)) await confirmPlan(id, false);
     },
-    [eaten, repo, today],
+    [eaten, repo, today, confirmed, confirmPlan],
   );
 
   // Cocher une prise d'eau (ou un complément pris avec de l'eau) l'ajoute au compteur du jour.
@@ -313,11 +325,11 @@ export function useDayPlan(repo: Repository) {
     return Array.from({ length: 7 }, (_, k) => buildDayPlan({ answers, kcal: targets.calories.value!.kcal, proteinG: targets.calories.value!.proteinG, waterMl: targets.water.value!, dayIndex: (d0 + k) % 7 }));
   }, [answers, targets.calories.value, targets.water.value, today]);
 
-  return { answers, plan, done, toggle, targets, next, setEaten, week, today };
+  return { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake };
 }
 
 export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
-  const { answers, plan, done, toggle, targets, next, setEaten, week, today } = useDayPlan(repo);
+  const { answers, plan, done, toggle, targets, next, setEaten, week, today, confirmed, confirmPlan, intake } = useDayPlan(repo);
   const kitchen = useKitchen(repo);
   const [ate, setAte] = useState<PlanEntry | null>(null);
   const [text, setText] = useState('');
@@ -407,7 +419,22 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       {e.kcal && showKcal ? <span className="num tl-kcal">{e.kcal} kcal · {e.protein} g P</span> : null}
                     </p>
                     <p className="tl-items">{e.items.join(' · ')}</p>
-                    {e.unplanned && <span className="pill">imprévu · estimation</span>}
+                    {(() => {
+                      const m = intake?.meals.find((x) => x.id === e.id);
+                      if (!m || m.doc === 'non noté' || m.doc === 'plan confirmé') return null;
+                      const u = m.uncertainty === null ? 'apport inconnu' : `±${Math.round(m.uncertainty * 100)} %`;
+                      return <span className="pill">{m.doc} · {u} · {m.counted ? 'compté' : 'non compté'}</span>;
+                    })()}
+                    {e.kind === 'repas' && !e.unplanned && confirmed.includes(e.id) && (
+                      <button className="pill" onClick={() => confirmPlan(e.id, false)}>
+                        plan confirmé · ±15 % · compté ✕
+                      </button>
+                    )}
+                    {e.kind === 'repas' && !e.unplanned && isDone && !confirmed.includes(e.id) && (
+                      <button className="tl-alt" onClick={() => confirmPlan(e.id, true)}>
+                        <Check size={12} aria-hidden="true" /> Exactement le plan (portions comprises)
+                      </button>
+                    )}
                     {e.adjusted && <span className="pill">{e.adjusted} après imprévu</span>}
                     {e.kind === 'repas' && !e.unplanned && (
                       <button
@@ -436,6 +463,13 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
               );
             })}
           </ol>
+          {intake && (
+            <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.78rem' }}>
+              {intake.complete ? 'Journée connue : comptée dans le bilan.' : 'Journée incomplète : pas comptée dans le bilan.'}
+              {showKcal ? ` Apport compté ≈ ${intake.kcal} ± ${intake.marginKcal} kcal · ${intake.protein} g P.` : ''}
+              {intake.unknown.length ? ` Trop peu documentés (non comptés) : ${intake.unknown.join(', ')}.` : ''}
+            </p>
+          )}
           <Modal open={!!ate} onClose={() => setAte(null)} title={`J’ai mangé · ${ate?.title ?? ''}`}>
             {ate &&
               (() => {
@@ -480,7 +514,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       disabled={!r.items.length || r.unknown.length > 0}
                       onClick={async () => {
                         if (shot) await saveProof(repo, today, `repas-${ate.id}`, shot);
-                        await setEaten(ate.id, { label: r.items.map((i) => i.label).join(', '), kcal: t.kcal, protein: t.protein });
+                        await setEaten(ate.id, { label: r.items.map((i) => i.label).join(', '), kcal: t.kcal, protein: t.protein, source: 'portions déclarées' });
                         setAte(null);
                       }}
                     >

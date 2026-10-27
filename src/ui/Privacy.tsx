@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Download, ShieldCheck, Trash2 } from 'lucide-react';
-import { CONSENTS, FLOWS, INFO_FLOWS, isGranted, withConsent, type ConsentKey, type Consents, type Flow } from '../engine/privacy';
+import { CONSENTS, FLOWS, INFO_FLOWS, LIMITS, isGranted, withConsent, type ConsentKey, type Consents, type Flow } from '../engine/privacy';
 import type { Repository } from '../storage/db';
 import { Modal, Notice } from './common';
 
@@ -207,6 +207,19 @@ export function PrivacyCard({ repo }: { repo: Repository }) {
             <span className="badge">info</span>
           </summary>
           <FlowText f={f} />
+        </details>
+      ))}
+      {LIMITS.map((l) => (
+        <details key={l.title} className="privacy-flow">
+          <summary>
+            <span>{l.title}</span>
+            <span className="badge">limites</span>
+          </summary>
+          <ul className="mini-list">
+            {l.items.map((i) => (
+              <li key={i}>• {i}</li>
+            ))}
+          </ul>
         </details>
       ))}
       <DataActions repo={repo} />

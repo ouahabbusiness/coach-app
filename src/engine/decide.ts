@@ -103,7 +103,26 @@ export function decide(variantId: string, rx: Rx, samples: Sample[], loads: numb
   if (load !== undefined && lo !== undefined && load > lo) {
     const test = last.results.filter((r) => r.loadKg === load);
     const ok = test.every((r) => (r.reps ?? 0) >= rx.lo && (r.rir === undefined ? false : r.rir >= Math.max(1, rx.rir - 1)));
-    if (ok) return { ...base, action: 'augmenter', after: { loadKg: load, target: rx.lo }, done: true, targetReached: true, progressionAllowed: true, observations: [...obs, `essai à ${fmt(load)} kg réussi`], rule: 'transition confirmée', missing: [], reason: `Essai à ${fmt(load)} kg confirmé (${test.map((r) => r.reps).join(' / ')} rép.) : toutes les séries passent à ${fmt(load)} kg.`, reevaluate: 'prochaine séance' };
+    // Bascule progressive : un seul essai réussi ne suffit pas. Étape suivante = la moitié des séries à la nouvelle
+    // charge ; toutes les séries n'y passent que lorsque au moins la moitié l'a tenue dans une même séance.
+    const half = Math.ceil(last.planned / 2);
+    if (ok && test.length < half) {
+      return {
+        ...base,
+        action: 'transition',
+        after: { loadKg: lo, target: rx.hi },
+        transition: { loadKg: load, sets: half, target: rx.lo },
+        done: true,
+        targetReached: false,
+        progressionAllowed: false,
+        observations: [...obs, `essai à ${fmt(load)} kg réussi (${test.length} série)`],
+        rule: 'transition : étape suivante',
+        missing: [],
+        reason: `Essai à ${fmt(load)} kg réussi (${test.map((r) => r.reps).join(' / ')} rép.) : un seul essai ne valide pas la charge. Prochaine séance : ${half} série(s) à ${fmt(load)} kg, les autres à ${fmt(lo)} kg.`,
+        reevaluate: 'après ces séries',
+      };
+    }
+    if (ok) return { ...base, action: 'augmenter', after: { loadKg: load, target: rx.lo }, done: true, targetReached: true, progressionAllowed: true, observations: [...obs, `${test.length} séries à ${fmt(load)} kg réussies`], rule: 'transition confirmée', missing: [], reason: `${test.length} séries tenues à ${fmt(load)} kg (${test.map((r) => r.reps).join(' / ')} rép.) : toutes les séries passent à ${fmt(load)} kg.`, reevaluate: 'prochaine séance' };
     return keep({ done: true, observations: [...obs, `essai à ${fmt(load)} kg non confirmé`], after: { loadKg: lo, target: rx.hi }, rule: 'transition non confirmée', reason: `L’essai à ${fmt(load)} kg n’est pas encore solide (réserve inconnue ou sous ${rx.lo} rép.) : retour à ${fmt(lo)} kg, nouvel essai plus tard.`, missing: test.some((r) => r.rir === undefined) ? ['réserve de la série d’essai'] : [] });
   }
 
