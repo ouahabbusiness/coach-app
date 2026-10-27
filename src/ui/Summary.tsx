@@ -12,7 +12,7 @@ import { project } from '../engine/session';
 import { FEEL_LABELS, INITIATION_SESSIONS, initiationRank, sessionReport, type FeelLevel, type SessionFeel } from '../engine/sessionReport';
 import type { SessionState, SetResult } from '../engine/types';
 import type { Repository } from '../storage/db';
-import { Modal, Notice, OutcomeBadge } from './common';
+import { Help, Modal, Notice, OutcomeBadge } from './common';
 import { useChallengeEntries } from './Challenge';
 import { fmtDateTime, fmtDuration } from './support';
 import { useSession } from './useSession';
@@ -147,7 +147,9 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
       {initiation && (
         <div className="stack" style={{ marginBottom: 12 }}>
           <span className="pill" style={{ alignSelf: 'center' }}>Séance d’initiation {initiation}/{INITIATION_SESSIONS}</span>
-          <p className="muted" style={{ margin: 0, textAlign: 'center', fontSize: '0.8rem' }}>Les premières séances servent à calibrer charges et répétitions : pas de conclusion sur ta progression.</p>
+          <div style={{ alignSelf: 'center' }}>
+            <Help>Les premières séances servent à calibrer charges et répétitions : pas de conclusion sur ta progression.</Help>
+          </div>
         </div>
       )}
 
@@ -176,7 +178,7 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
             if (feel) saveFeel(feel.level, e.target.value);
           }}
         />
-        <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Noté dans le rapport. Il ne change pas tes charges tout seul.</p>
+        <Help>Noté dans le rapport. Il ne change pas tes charges tout seul.</Help>
       </section>
 
       <PostFeedback repo={repo} st={st} />
@@ -322,7 +324,7 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
       <Modal open={fixing !== null} onClose={() => setFixing(null)} title={fixing ? `Saisir · ${fixing.name}` : 'Saisir'}>
         {fixing && (
           <div className="stack">
-            <p className="muted" style={{ margin: 0 }}>Cette série est notée faite, mais ses répétitions n’ont pas été enregistrées. Rien n’est supposé : saisis ce que tu as vraiment fait.</p>
+            <p className="muted" style={{ margin: 0 }}>Série faite, répétitions non enregistrées : saisis ce que tu as vraiment fait.</p>
             <label className="field">
               Répétitions faites
               <input type="text" inputMode="numeric" value={fixReps} onChange={(e) => setFixReps(e.target.value)} />

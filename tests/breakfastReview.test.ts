@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { reviewBreakfast, breakfastTarget } from '../src/engine/breakfastReview';
-import { buildDayPlan, coffeeExtras, eggBasis, eggUnit, fatExtras, usualBreakfast, type CustomFood, type NutritionAnswers } from '../src/engine/dayPlan';
+import { buildDayPlan, shoppingList, coffeeExtras, eggBasis, eggUnit, fatExtras, usualBreakfast, type CustomFood, type NutritionAnswers } from '../src/engine/dayPlan';
 
 const base: NutritionAnswers = {
   wake: '07:00', bedtime: '23:00', meals: 4, proteins: ['oeuf', 'poulet', 'skyr'], carbs: ['avoine', 'riz'], fats: ['amandes', 'huile_olive'], fruits: ['banane'], exclude: [], supplements: [],
@@ -118,11 +118,22 @@ describe('avis : recommandation motivée et composition', () => {
     expect(r.options[0]!.dKcal).toBe(0);
     expect(r.recommendedWhy.length).toBeGreaterThan(10);
   });
-  it('garde ta version quand elle colle déjà au repère', () => {
-    const a: NutritionAnswers = { ...base, usualBreakfast: [{ foodId: 'oeuf', grams: 3 * 60 }, { foodId: 'avoine', grams: 60 }, { foodId: 'banane', grams: 120 }] };
+  it('garde ta version quand elle colle vraiment au repère (calories ET protéines à ± 15 %)', () => {
+    const a: NutritionAnswers = { ...base, usualBreakfast: [{ foodId: 'oeuf', grams: 4 * 60 }, { foodId: 'avoine', grams: 80 }, { foodId: 'banane', grams: 120 }] };
     const r = reviewBreakfast(a, 2600, 140)!;
+    const h = r.options[0]!;
+    expect(Math.abs(h.kcal - r.target.kcal) / r.target.kcal).toBeLessThanOrEqual(0.15);
+    expect(Math.abs(h.protein - r.target.protein) / r.target.protein).toBeLessThanOrEqual(0.15);
     expect(r.recommendedId).toBe('habituel');
     expect(r.recommendedWhy).toMatch(/rien à changer/);
+  });
+  it('ne dit jamais « rien à changer » quand ta version est loin du repère et qu’aucune variante ne fait mieux', () => {
+    const a: NutritionAnswers = { ...base, usualBreakfast: [{ foodId: 'avoine', grams: 40 }, { foodId: 'banane', grams: 120 }] };
+    const r = reviewBreakfast(a, 2600, 140)!;
+    expect(r.options.map((o) => o.id)).toEqual(['habituel']);
+    expect(r.recommendedId).toBe('habituel');
+    expect(r.recommendedWhy).not.toMatch(/rien à changer|colle déjà/);
+    expect(r.recommendedWhy).toMatch(/Aucune variante ne te rapproche davantage/);
   });
   it('trois œufs ou plus : rappel choisi par l’app, jamais présenté comme frontière scientifique', () => {
     const r = reviewBreakfast(base, 2600, 140)!;
@@ -191,5 +202,68 @@ describe('frigo : un aliment manque à la maison', () => {
     expect(r.missingNames).toEqual(['Cottage cheese', 'Œufs', 'Cracottes']);
     const v = r.options.find((o) => o.id === 'sans-manquant')!;
     expect(v.parts.every((p) => ['skyr', 'avoine'].includes(p.foodId))).toBe(true);
+  });
+});
+
+describe('frigo déclaré : cohérence des variantes', () => {
+  const eggs: NutritionAnswers = { ...base, breakfastCoffee: false, usualBreakfast: [{ foodId: 'oeuf', grams: 4 * 60 }, { foodId: 'avoine', grams: 60 }] };
+
+  it('une variante n’utilise que ce qui est au frigo : pas de blancs, de cottage ni de banane si absents', () => {
+    const r = reviewBreakfast({ ...eggs, pantry: ['oeuf', 'avoine', 'skyr'] }, 2600, 140)!;
+    const ids = r.options.map((o) => o.id);
+    expect(ids).not.toContain('moins-jaunes'); // pas de blancs d'œuf au frigo
+    expect(ids).not.toContain('fruit'); // aucun fruit au frigo
+    const alt = r.options.find((o) => o.id === 'alterner')!;
+    expect(alt.parts.some((p) => p.foodId === 'skyr')).toBe(true);
+    expect(alt.parts.some((p) => p.foodId === 'cottage')).toBe(false);
+  });
+
+  it('frigo non déclaré : variantes inchangées', () => {
+    expect(reviewBreakfast(eggs, 2600, 140)!.options.map((o) => o.id)).toEqual(['habituel', 'moins-jaunes', 'alterner', 'fruit']);
+  });
+
+  it('un aliment manque : les variantes qui le contiendraient ne sont pas proposées', () => {
+    const r = reviewBreakfast({ ...eggs, usualBreakfast: [...eggs.usualBreakfast!, { foodId: 'cottage', grams: 100 }], pantry: ['oeuf', 'avoine', 'skyr', 'blanc_oeuf', 'banane'] }, 2600, 140)!;
+    expect(r.options.map((o) => o.id)).toEqual(['habituel', 'sans-manquant']);
+  });
+
+  it('remplacement partiel : la version est étiquetée « incomplet », dit ce qui est retiré et n’est pas recommandée aveuglément', () => {
+    const habit: NutritionAnswers = { ...eggs, usualBreakfast: [{ foodId: 'cottage', grams: 150 }, { foodId: 'avoine', grams: 60 }], pantry: ['skyr', 'poulet'] };
+    const r = reviewBreakfast(habit, 2600, 140)!;
+    expect(r.missingNames).toEqual(['Cottage cheese', 'Flocons d’avoine']);
+    expect(r.noSubstitute).toEqual(['Flocons d’avoine']);
+    const v = r.options.find((o) => o.id === 'sans-manquant')!;
+    expect(v.label).toMatch(/incomplet/);
+    expect(v.why).toMatch(/Flocons d’avoine retiré : rien au frigo pour le remplacer/);
+    expect(r.recommendedWhy).not.toMatch(/gardent tes/);
+  });
+
+  it('rien à remplacer du tout : on le dit et on propose les courses', () => {
+    const r = reviewBreakfast({ ...eggs, usualBreakfast: [{ foodId: 'cottage', grams: 150 }], pantry: ['poulet'] }, 2600, 140)!;
+    expect(r.recommendedId).toBe('habituel');
+    expect(r.recommendedWhy).toMatch(/rien au frigo ne peut le remplacer/);
+  });
+
+  it('critères affichés : complets', () => {
+    const t = reviewBreakfast(eggs, 2600, 140)!.criteria;
+    expect(t).toMatch(/calories ET les protéines/);
+    expect(t).toMatch(/2 points près/);
+    expect(t).toMatch(/Avec ce que tu as/);
+  });
+});
+
+describe('courses : les œufs se comptent en œufs, pas en grammes', () => {
+  it('4 œufs de calibre L par jour sur 7 jours : 28 œufs, soit 30 (5 boîtes de 6)', () => {
+    const a: NutritionAnswers = { ...base, breakfastCoffee: false, usualBreakfast: [{ foodId: 'oeuf', grams: 4 * 60 }], breakfastDetails: { eggCalibre: 'L' } };
+    const week = Array.from({ length: 7 }, (_, d) => buildDayPlan({ answers: a, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: d }));
+    const line = shoppingList(week).find((l) => l.foodId === 'oeuf')!;
+    expect(line.buy).toBe('30 œufs (5 boîtes de 6)');
+  });
+  it('même nombre d’œufs en calibre S ou XL', () => {
+    for (const eggCalibre of ['S', 'XL'] as const) {
+      const a: NutritionAnswers = { ...base, breakfastCoffee: false, usualBreakfast: [{ foodId: 'oeuf', grams: 4 * 60 }], breakfastDetails: { eggCalibre } };
+      const week = Array.from({ length: 7 }, (_, d) => buildDayPlan({ answers: a, kcal: 2600, proteinG: 140, waterMl: 3000, dayIndex: d }));
+      expect(shoppingList(week).find((l) => l.foodId === 'oeuf')!.buy).toMatch(/^30 œufs/);
+    }
   });
 });

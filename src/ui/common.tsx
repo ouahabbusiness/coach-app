@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { CircleAlert, Info, TriangleAlert, X } from 'lucide-react';
+import { CircleAlert, CircleHelp, Info, TriangleAlert, X } from 'lucide-react';
 import type { SessionOutcome } from '../engine/types';
 import type { Route } from './App';
 import { OUTCOME_LABEL } from './support';
@@ -93,5 +93,17 @@ export function ProgramTabs({ current, go }: { current: 'planning' | 'program'; 
         Mes séances
       </button>
     </div>
+  );
+}
+
+/** Explication repliée derrière un « ? » : l'écran reste fait de chiffres, de badges et d'icônes. */
+export function Help({ children }: { children: ReactNode }) {
+  return (
+    <details className="help">
+      <summary aria-label="Explication">
+        <CircleHelp size={16} aria-hidden="true" />
+      </summary>
+      <div className="muted">{children}</div>
+    </details>
   );
 }

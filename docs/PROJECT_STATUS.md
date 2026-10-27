@@ -1,4 +1,4 @@
-# État du projet — 26/10/2026 (soir)
+# État du projet — 27/10/2026 (soir)
 
 En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publication automatique à chaque envoi sur `main`, tests obligatoires).
 
@@ -62,6 +62,16 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Page Winter Arc (montagne, sentier de 30 jours, série, semaines tenues).
 - Poids (pesées, moyenne, tendance), mensurations (taille, hanches, cuisse), lecture (Atomic Habits, pages, journal avec photo).
 - Onboarding 13 étapes (zone sombre) ; formule de calcul dans le profil ; objectifs versionnés ; export/import complet.
+
+**Ajouts du 27/10/2026** (essai sur iPhone en cours : on corrige ce qui est constaté avant d'élargir le conseiller)
+- Barre : onglet **Entraînement** (Mes séances, carte Course déplacée depuis l'accueil). Accueil : « Séance accomplie », carte plus grande.
+- Agenda : **pause de midi** (le travail est coupé en deux, le trou reste libre), jours de **tapis de marche** (accueil : « + tapis » en bleu).
+- Séance : « faites » compte les séries faites ; séries faites sans répétitions → « Faite · saisir » après coup ; **ressenti** de fin de séance, **séances d'initiation** (3 premières), **rapport** copiable. Une série jamais démarrée ne se remplit pas après coup.
+- Fenêtres : fermables en touchant le fond ou avec la croix ; le « ? » replie les explications.
+- Nutrition : étape et onglet **Frigo** (coche = à la maison), aliment manquant signalé sur le petit-déjeuner, cottage cheese / cracottes / blancs d'œuf au catalogue, **EAN saisi à la main** (chiffre de contrôle vérifié).
+- Petit-déjeuner habituel : œufs par calibre (poids AVEC coquille → part comestible ≈ 88 %, estimation sourcée USDA) ou contenu pesé ; café et cuisson en quantités (inconnu ≠ 0) ; produit scanné utilisable ; repère de repas ajustable (Léger / Normal / Copieux) qui conserve le total du jour.
+- **Avis** sur le petit-déjeuner : variantes calculées (moins d'œufs entiers, alterner la source, fruit, « avec ce que tu as »), critères affichés. Trois gestes séparés : *Utiliser aujourd'hui* (expire le lendemain), *Enregistrer comme habitude* (confirmation), *Confirmer ce que j'ai mangé* (estimation). Repas confirmés figés.
+- Limites connues : le total du jour n'est conservé que si le petit-déjeuner reste sous ≈ 62 % de la cible ; un produit personnel n'a pas de ligne dans la liste de courses ; le conseiller ne juge pas la qualité du repas (fibres, graisses, satiété) ; règles non relues par un professionnel.
 
 ## Testé
 - 173 tests automatisés (`npm test`) : moteur, stockage, défi, Winter Arc, preuves, lecture, cibles, lest, programme, imprévus, plan du jour, disponibilités, séjours.

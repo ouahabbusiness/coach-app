@@ -323,7 +323,8 @@ export function usualBreakfast(list: UsualItem[], coffee: boolean, details?: Bre
     const n = unit ? Math.max(1, Math.round(u.grams / (isEgg ? EGG_COUNT_G : unit))) : 0;
     const g = unit ? n * unit : r5(u.grams);
     items.push(unit ? `${n} ${f.unitName ?? 'portion'}${n > 1 ? 's' : ''}${custom.some((c) => c.id === f.id) ? ' · ' + f.name : ''}` : `${g} g ${f.name.toLowerCase()}`);
-    parts.push({ foodId: f.id, grams: g });
+    // Pour la liste de courses, un œuf compte pour un œuf quel que soit son calibre (le calcul nutritionnel garde le vrai poids).
+    parts.push({ foodId: f.id, grams: isEgg ? n * (f.unitG ?? unit!) : g });
     k += (f.kcal * g) / 100;
     pr += (f.protein * g) / 100;
   }

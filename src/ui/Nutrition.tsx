@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bed, Moon, Sunset, Camera, ChefHat, Check, ChevronLeft, ChevronRight, Droplet, Dumbbell, Minus, Plus, Pill, Refrigerator, Scale, ShoppingCart, Shuffle, Utensils } from 'lucide-react';
-import { Modal } from './common';
+import { Help, Modal } from './common';
 import { parseMeal, totalOf } from '../engine/kitchen';
 import { useKitchen } from './Kitchen';
 import { useTracking } from './trackingPrefs';
@@ -772,8 +772,10 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
               );
               return (
                 <div className="stack">
-                  <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Coche ce que tu as à la maison. Décoche ce que tu n’as plus : tes plats et ton petit-déjeuner le savent.</p>
-                  {!answers.pantry?.length && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>Pré-coché avec ce que tu manges d’habitude. Ton premier geste l’enregistre.</p>}
+                  <Help>
+                    Coche ce que tu as à la maison. Décoche ce que tu n’as plus : tes plats et ton petit-déjeuner le savent.
+                    {!answers.pantry?.length ? ' Pré-coché avec ce que tu manges d’habitude : ton premier geste l’enregistre.' : ''}
+                  </Help>
                   {groups.map(({ g, label }) => (
                     <div key={g} className="stack">
                       <p className="eyebrow" style={{ margin: '4px 0 0' }}>{label}</p>
@@ -804,7 +806,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                 <div className="stack">
                   <div>
                     <p className="num" style={{ margin: 0, fontWeight: 700 }}>Repère ≈ {r.target.kcal} kcal · {r.target.protein} g P</p>
-                    <p className="muted" style={{ margin: '2px 0 6px', fontSize: '0.78rem' }}>{r.target.how}</p>
+                    <Help>{r.target.how} Si tu es en dessous ou au-dessus, les autres repas s’ajustent : tu ne manges pas sans faim pour atteindre un chiffre.</Help>
                     <div className="chips" role="group" aria-label="Appétit le matin">
                       {BREAKFAST_SHARES.map((s) => (
                         <button key={s.pct} className="chip" aria-pressed={r.target.sharePct === s.pct} onClick={() => saveAnswers({ ...answers, breakfastShare: s.pct })}>
@@ -812,7 +814,6 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                         </button>
                       ))}
                     </div>
-                    <p className="muted" style={{ margin: '6px 0 0', fontSize: '0.78rem' }}>Si tu es en dessous ou au-dessus, les autres repas s’ajustent : tu ne manges pas sans faim pour atteindre un chiffre.</p>
                   </div>
                   {r.missingNames.length > 0 && (
                     <span className="pill" style={{ height: 'auto', padding: '4px 8px', whiteSpace: 'normal' }}>Manque à la maison : {r.missingNames.join(', ')}</span>
@@ -833,7 +834,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                     <p className="eyebrow" style={{ margin: 0 }}>Recommandé</p>
                     <p className="row-title" style={{ margin: 0, whiteSpace: 'normal' }}>{r.options.find((o) => o.id === r.recommendedId)?.label}</p>
                     <p className="muted" style={{ margin: 0, fontSize: '0.82rem' }}>{r.recommendedWhy}</p>
-                    <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>{r.criteria}</p>
+                    <Help>{r.criteria}</Help>
                   </div>
                   {r.options.map((o) => (
                     <section key={o.id} className="ui-card" style={{ margin: 0 }} aria-label={o.label}>
@@ -853,7 +854,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                           ))}
                         </ul>
                       )}
-                      <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{o.why}</p>
+                      <Help>{o.why}</Help>
                       <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                         {o.id !== 'habituel' && (
                           <button
@@ -891,7 +892,12 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                       </div>
                     </section>
                   ))}
-                  {r.eggAssumption && <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{r.eggAssumption} {r.eggSource}</p>}
+                  {r.eggAssumption && (
+                    <>
+                      <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{r.eggAssumption}</p>
+                      <Help>{r.eggSource}</Help>
+                    </>
+                  )}
                   {r.generic.length > 0 && (
                     <p className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>
                       Calcul avec des valeurs génériques (moyennes) : {r.generic.join(', ')}. Scanne ton produit dans Ma cuisine, puis ajoute-le dans « Mes produits » de l’entretien, pour utiliser ses valeurs.
@@ -900,7 +906,7 @@ export function NutritionPage({ repo, go }: { repo: Repository; go: (r: Route) =
                   {r.notes.map((n) => (
                     <p key={n} className="muted" style={{ margin: 0, fontSize: '0.78rem' }}>{n}</p>
                   ))}
-                  <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Comparaison chiffrée avec un repère ajustable, pas un avis médical. Choisir une version ne veut pas dire que tu l’as mangée.</p>
+                  <p className="muted" style={{ margin: 0, fontSize: '0.75rem' }}>Pas un avis médical. Choisir une version ≠ l’avoir mangée.</p>
                 </div>
               );
             })()}

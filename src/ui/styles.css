@@ -1336,3 +1336,10 @@ body:has(.run-live.full) { background-image: none; }
 .today-hero .eyebrow { font-size: 0.78rem; }
 .today-hero .icon-btn.primary { width: 48px; height: 48px; }
 .today-hero.accomplie .icon-chip { background: var(--accent); color: #fff; }
+
+/* « ? » : explication repliée */
+.help { align-self: flex-start; }
+.help summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); background: var(--surface); }
+.help summary::-webkit-details-marker { display: none; }
+.help[open] summary { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.help > div { margin-top: 6px; font-size: 0.82rem; line-height: 1.4; }
