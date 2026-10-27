@@ -358,8 +358,17 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
                     <CloudLightning size={16} aria-hidden="true" /> Imprévu
                   </button>
                 )}
-                {st === 'prévu' && (
-                  <button className="btn block" onClick={() => { close(); setDraft({ id: menu.id, kind: menu.kind, templateId: menu.templateId, day: menu.day, start: menu.start, durationMin: menu.durationMin }); }}>
+                {(st === 'prévu' || st === 'non confirmé') && (
+                  <button
+                    className="btn block"
+                    onClick={() => {
+                      close();
+                      // Séance manquée de cette semaine : le déplacement propose d'abord aujourd'hui.
+                      const todayDay = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7;
+                      const day = st === 'non confirmé' && week === mondayOf(today) ? todayDay : menu.day;
+                      setDraft({ id: menu.id, kind: menu.kind, templateId: menu.templateId, day, start: menu.start, durationMin: menu.durationMin });
+                    }}
+                  >
                     Déplacer
                   </button>
                 )}
