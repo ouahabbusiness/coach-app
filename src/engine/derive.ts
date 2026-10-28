@@ -54,7 +54,9 @@ export function timings(st: SessionState, now: EpochMs): Timings {
 export function sessionOutcome(st: SessionState): SessionOutcome {
   if (st.safetyStop) return 'stopped_for_safety';
   if (st.phase !== 'ended') return 'in_progress';
-  return st.sets.every((s) => s.status === 'done') ? 'completed' : 'partial';
+  // Un mouvement passé volontairement (« Passé : tolérance inconnue ») n'est ni fait ni compté comme manquant : pas de pénalité.
+  const counted = st.sets.filter((s) => !(s.status === 'skipped' && /passé : tolérance inconnue/i.test(s.skipReason ?? '')));
+  return counted.length > 0 && counted.every((s) => s.status === 'done') ? 'completed' : 'partial';
 }
 
 /** Jour calendaire (AAAA-MM-JJ) d'un instant dans un fuseau donné. */

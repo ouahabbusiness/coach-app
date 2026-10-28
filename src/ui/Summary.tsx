@@ -13,6 +13,7 @@ import { FEEL_LABELS, INITIATION_SESSIONS, initiationRank, sessionReport, type F
 import type { SessionState, SetResult } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { Help, Modal, Notice, OutcomeBadge } from './common';
+import { SessionJointFeedback } from './JointFeedback';
 import { useChallengeEntries } from './Challenge';
 import { fmtDateTime, fmtDuration } from './support';
 import { useSession } from './useSession';
@@ -180,6 +181,8 @@ export function Summary({ repo, sessionId, onBack, onHome }: { repo: Repository;
         />
         <Help>Noté dans le rapport. Il ne change pas tes charges tout seul.</Help>
       </section>
+
+      <SessionJointFeedback repo={repo} st={st} />
 
       <PostFeedback repo={repo} st={st} />
 

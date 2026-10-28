@@ -13,6 +13,7 @@ import { HabitsSheet, useDayHabits } from './Habits';
 import { WhyModal, useTargets } from './Targets';
 import { ComplementModal } from './Complement';
 import { ActivityDayModal } from './ActivityDay';
+import { NextDayJointCheck } from './JointFeedback';
 import { NextStepCard } from './Nutrition';
 import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
@@ -374,6 +375,8 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
       </section>
 
       <NextStepCard repo={repo} go={go} />
+
+      <NextDayJointCheck repo={repo} today={today} tz={tz} />
 
       <div className="kpi-grid">
         <Kpi icon={<Moon size={16} aria-hidden="true" />} label="Sommeil" onClick={() => openEditor('sleepH')} value={daily?.sleepH !== undefined ? fmtHours(daily.sleepH) : '—'}>

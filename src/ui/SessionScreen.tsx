@@ -20,6 +20,8 @@ import { fmtDuration, useNow, useWakeLock } from './support';
 import { useSession, type SendResult } from './useSession';
 
 const SKIP_REASONS = ['Manque de temps', 'Fatigue', 'Matériel indisponible', 'Autre'];
+/** Passer un mouvement dont tu n'es pas sûr : ni séance partielle, ni échec, ni rattrapage, ni compté comme réalisé. */
+const SKIP_SAFE = 'Passé : tolérance inconnue';
 const INTERRUPT_REASONS = ['Appel', 'Pause imprévue', 'Matériel occupé', 'Autre'];
 
 function describeTarget(set: SetState): string {
@@ -393,6 +395,17 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
 
       <Modal open={dialog === 'skip'} onClose={() => setDialog(null)} title="Passer cette série">
         <p className="muted">→ non réalisée · séance partielle</p>
+        <button
+          className="btn block"
+          onClick={async () => {
+            if (focus) await act({ type: 'skip_set', plannedSetId: focus.planned.id, reason: SKIP_SAFE }, 'Série passée sans pénalité');
+            setFocusId(null);
+            setDialog(null);
+          }}
+        >
+          {SKIP_SAFE}
+        </button>
+        <p className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>Cette option : sans pénalité, sans rattrapage, jamais comptée comme réalisée.</p>
         <div className="stack">
           {SKIP_REASONS.map((r) => (
             <button

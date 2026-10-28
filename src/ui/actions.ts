@@ -6,7 +6,7 @@ import { decide as decideProgression, JOINT_LOADED, type Decision, type Sample }
 import { findVariant } from '../catalog/exercises';
 import { appendJournal } from './journal';
 import { adaptSets, hasJointDeclared } from '../engine/joints';
-import { isUpperLoaded, toleranceOf, toleratedVariants } from '../engine/tolerance';
+import { isUpperLoaded, toleranceHistory, toleranceOf, type JointFeedback } from '../engine/tolerance';
 import { JOINT_ADAPT, loadComplement, type JointAdapt } from './profileComplement';
 import { loadEquipment, loadsFor } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
@@ -54,7 +54,7 @@ function lastWork(states: SessionState[], variantId: string): SetResult[] | unde
 }
 
 /** Raisons de séries retirées par le coach : elles ne comptent ni comme demandées ni comme ratées. */
-export const COACH_REMOVED = /contrôle avant séance|version courte|allégée|retirée par le coach/;
+export const COACH_REMOVED = /contrôle avant séance|version courte|allégée|retirée par le coach|passé : tolérance inconnue/i;
 
 /**
  * Échantillons comparables pour une variante (plus récent d'abord) : séries de travail faites, séries demandées
@@ -161,8 +161,11 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
   // Adaptation à la gêne acceptée : elle modifie la prescription réelle de la séance (marge, séries, consigne).
   if (!adapt || !(adapt.patterns.length || adapt.tests?.length)) return out;
   // Tolérance inconnue (mouvement sollicitant épaule ou coudes, jamais déclaré gênant, pas fait récemment sans douleur signalée) : même prudence au départ.
-  const ctx = { triggerPatterns: adapt.patterns, tolerated: toleratedVariants(states, Date.now()) };
-  const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) === 'inconnue').map((x) => '^' + x.variantId + '$'))];
+  const feedback: Record<string, JointFeedback | undefined> = {};
+  for (const s of states) feedback[s.sessionId] = await repo.getKv<JointFeedback>(`joint.feedback.${s.sessionId}`);
+  const ctx = { triggerPatterns: adapt.patterns, ...toleranceHistory(states, feedback, Date.now(), (at, tz) => localDay(at, tz ?? 'UTC')) };
+  // « Toléré » = réponses explicites ; tout le reste (inconnue, gêne signalée) garde la prudence de départ.
+  const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
   return { ...out, sets: adaptSets(out.sets, [...adapt.patterns, ...unknown], adapt.tests ?? adapt.patterns) };
 }
 

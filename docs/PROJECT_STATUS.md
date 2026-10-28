@@ -134,3 +134,10 @@ Préférence esthétique déclarée par l'utilisateur : haut du corps dense (pec
 ### Feuille de route : séjours (non démarrée, après stabilisation)
 - **Alternative « salle »** : séance activable le jour même si l'accès est confirmé (matériel de salle à confirmer sur place, jamais supposé), sans travail ajouté au-dessus de la séance prévue.
 - **Lieux d'entraînement à proximité** : la recherche OpenStreetMap existante (street workout, pistes, parcs, depuis la position réelle, avec distance) ne couvre PAS encore : adresse ou zone saisie, rayon / temps de trajet maximal demandé, temps à pied, matériel signalé (barre de traction, barres parallèles), accès et horaires, source et niveau de confiance, confirmation sur place avant toute adaptation. Aucune adaptation automatique à un équipement seulement repéré sur une carte ; une barre accessible n'autorise pas les tractions (symptômes et tolérance d'abord).
+
+### Tolérance : réponses explicites (28/10/2026, soir)
+- « Aucune gêne » répondu n'est pas une information manquante. Un mouvement n'est « toléré » que si tu réponds **« aucune gêne » après la séance ET « rien » le lendemain**. Sinon il reste « tolérance inconnue », avec la mention « réalisé le JJ/MM sans gêne déclarée · retour à compléter » : la prudence de départ (marge de 3, une série de moins) continue.
+- Gêne marquée, gêne qui dure le lendemain ou douleur signalée en séance : « gêne signalée », traitée comme un déclencheur (jamais choisi comme remplaçant).
+- Retours : après la séance (écran de fin de séance) et le lendemain (écran du jour). Aucune réponse n'est supposée.
+- **Passer un mouvement sans pénalité** : raison « Passé : tolérance inconnue » dans la fenêtre « Passer cette série » : ni séance partielle, ni échec, ni rattrapage, jamais comptée comme réalisée.
+- Matériel garanti en voyage : tapis et banc uniquement. Salle et parc = possibilités supplémentaires à confirmer (feuille de route).

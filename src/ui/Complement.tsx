@@ -45,7 +45,7 @@ import { programStrategy } from './Targets';
 import { deviceTimeZone } from './support';
 import { localDay } from '../engine/derive';
 import { project } from '../engine/session';
-import { TOLERANCE_LABELS, toleranceOf, type Tolerance } from '../engine/tolerance';
+import { TOLERANCE_LABELS, toleranceDetail, toleranceOf, type Tolerance, type ToleranceContext } from '../engine/tolerance';
 import { loadTolerance } from './toleranceContext';
 
 const PLAN_KEY = 'planning.items';
@@ -64,8 +64,8 @@ interface Inputs {
   sessionDays: string[];
   /** Variantes du programme (pour montrer ce que l'adaptation à la gêne touche). */
   variants: string[];
-  /** Variantes faites récemment dans une séance sans douleur signalée. */
-  tolerated: ReadonlySet<string>;
+  /** Historique de tolérance (réponses explicites, séances récentes). */
+  toleranceCtx: ToleranceContext;
   /** Variantes des tests maximaux du programme. */
   testVariants: string[];
   /** Les réponses d'avant la version 2 sur les pas sont à refaire. */
@@ -196,7 +196,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       tired: rlog.some((x) => x.tired && recent.has(x.day)),
       sessionDays,
       variants: [...new Set(lines.filter((l) => l.role !== 'test').map((l) => l.variantId))],
-      tolerated: (await loadTolerance(repo)).ctx.tolerated,
+      toleranceCtx: (await loadTolerance(repo)).ctx,
       testVariants: [...new Set(lines.filter((l) => l.role === 'test').map((l) => l.variantId))],
       legacySteps,
     });
@@ -239,9 +239,9 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const retests = useMemo(() => (inp && tests.length ? inp.items.filter((x) => x.templateId === 'prog-T' && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp, tests]);
   // Tolérance de chaque mouvement du haut du corps : déclencheur connu / fait récemment sans douleur signalée / tolérance inconnue.
   const tolerance = useMemo(() => {
-    if (!inp || !joints.length) return [] as { id: string; t: Tolerance }[];
-    const ctx = { triggerPatterns: patterns, tolerated: inp.tolerated };
-    return inp.variants.map((id) => ({ id, t: toleranceOf(id, ctx) })).filter((x): x is { id: string; t: Tolerance } => !!x.t);
+    if (!inp || !joints.length) return [] as { id: string; t: Tolerance; detail: string }[];
+    const ctx = { ...inp.toleranceCtx, triggerPatterns: patterns };
+    return inp.variants.map((id) => ({ id, t: toleranceOf(id, ctx), detail: toleranceDetail(id, ctx) })).filter((x): x is { id: string; t: Tolerance; detail: string } => !!x.t && !!x.detail);
   }, [inp, patterns, joints.length]);
   const kcal = useMemo(() => {
     if (!inp) return undefined;
@@ -575,12 +575,19 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
                 ? `Test maximal remplacé par une série sous-maximale sur : ${testsTouched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}${retests.length ? ` (séance du ${retests.map((x) => dm(dateOf(x.weekStart, x.day))).join(', ')})` : ''}. Report ou annulation possibles selon l’évolution.`
                 : 'Aucun test maximal sur un mouvement symptomatique.'}
             </p>
-            {(['declencheur', 'toleree', 'inconnue'] as Tolerance[]).map((t) => {
-              const ids = tolerance.filter((x) => x.t === t).map((x) => findVariant(x.id)?.variant.name ?? x.id);
-              return ids.length ? (
-                <p key={t} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-                  {TOLERANCE_LABELS[t][0]!.toUpperCase() + TOLERANCE_LABELS[t].slice(1)} : {ids.join(', ')}.{t === 'inconnue' ? ' Prudence au départ : marge de 3 répétitions, une série de moins, stop si gêne.' : ''}
-                </p>
+            {(['declencheur', 'signalee', 'toleree', 'inconnue'] as Tolerance[]).map((t) => {
+              const rows = tolerance.filter((x) => x.t === t);
+              return rows.length ? (
+                <div key={t} className="stack" style={{ gap: 2 }}>
+                  <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                    {TOLERANCE_LABELS[t][0]!.toUpperCase() + TOLERANCE_LABELS[t].slice(1)}{t === 'inconnue' ? ' · prudence au départ : marge de 3 répétitions, une série de moins, stop si gêne, possibilité de passer sans pénalité' : ''}
+                  </p>
+                  {rows.map((x) => (
+                    <p key={x.id} className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>
+                      · {findVariant(x.id)?.variant.name ?? x.id}{x.detail !== TOLERANCE_LABELS[t] ? ` — ${x.detail}` : ''}
+                    </p>
+                  ))}
+                </div>
               ) : null;
             })}
             {advice.clarify.length > 0 && (
