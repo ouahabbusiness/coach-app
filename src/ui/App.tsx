@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { applyRedistribution } from './programMigration';
 import { CalendarDays, ChartLine, Dumbbell, House, MessageSquare, Settings as SettingsIcon, Utensils } from 'lucide-react';
 import { CoachDb, Repository, type SessionSummaryRow } from '../storage/db';
 import { OutcomeBadge } from './common';
@@ -95,6 +96,8 @@ export function App() {
   // Au lancement : une séance restée ouverte est reprise ; sinon, l'onboarding non terminé s'ouvre.
   useEffect(() => {
     (async () => {
+      // Répartition A/B/C confirmée : appliquée une seule fois aux séances à venir (jamais à l'historique).
+      await applyRedistribution(repo).catch(() => 0);
       const open = await repo.openSession();
       if (open) return setRoute({ name: 'session', id: open.id });
       const ob = await loadOnboarding(repo);

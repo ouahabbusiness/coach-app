@@ -272,9 +272,10 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   const kbs = [...kettlebells].sort((x, y) => x - y);
   const kb = kbs[kbs.length - 1] ?? 12; // la plus lourde pour les jambes et le tirage
   if (!legsOk) notes.push('Genoux : pas de squat bulgare ni de fentes.');
-  const lowerFocus = [...(a.fatZones ?? []), ...(a.muscleZones ?? [])].some((z) => LOWER.includes(z));
+  // Priorité fessiers : seulement si tu la demandes comme zone MUSCULAIRE. Une zone de gras ne fixe jamais le volume musculaire.
+  const lowerFocus = (a.muscleZones ?? []).includes('fessiers');
   if ((a.fatZones ?? []).length) notes.push('Gras localisé : la perte se fait partout (déficit + pas + course), jamais sur une seule zone. Mesure le tour de la zone chaque semaine.');
-  if (lowerFocus) notes.push('Bas du corps prioritaire : pont fessier et swings ajoutés à la séance Jambes.');
+  if (lowerFocus) notes.push('Fessiers demandés comme priorité musculaire : pont fessier et swings ajoutés à la séance Jambes.');
   if (!backOk) notes.push('Dos : pas de swing ni de soulevé de terre.');
 
   const A: GenTemplate = {

@@ -85,14 +85,17 @@ describe('programme', () => {
     expect(p.templates.some((t) => t.key === 'T')).toBe(true);
   });
 
-  it('gras sur cuisses/fessiers : sèche conseillée sans promettre de perte localisée, bas du corps renforcé', () => {
+  it('gras sur cuisses/fessiers : sèche conseillée sans promettre de perte localisée ; une zone de gras ne fixe PAS le volume musculaire', () => {
     const a = { ...base, fatZones: ['cuisses' as const, 'fessiers' as const] };
     expect(recPriority(a)).toMatchObject({ value: 'seche' });
     expect(recPriority(a)!.why).toContain('ne fond pas');
     const p = buildProgram({ ...a, priority: 'seche', minutes: 75 }, loads);
     const b = p.templates.find((t) => t.key === 'B')!;
-    expect(b.lines.some((l) => l.variantId === 'glute-bridge-kb')).toBe(true);
+    expect(b.lines.some((l) => l.variantId === 'glute-bridge-kb')).toBe(false);
     expect(p.notes.join(' ')).toContain('jamais sur une seule zone');
+    // priorité fessiers demandée comme zone MUSCULAIRE : alors seulement, le travail est ajouté
+    const wanted = buildProgram({ ...base, muscleZones: ['fessiers' as const], priority: 'seche', minutes: 75 }, loads);
+    expect(wanted.templates.find((t) => t.key === 'B')!.lines.some((l) => l.variantId === 'glute-bridge-kb')).toBe(true);
   });
   it('échec : jamais par défaut ; si accepté, seulement assistance au poids du corps, jamais avec lest ni sur les principaux', () => {
     const lines = (failureOk?: boolean) => buildProgram({ ...base, priority: 'muscle', intensity: 'tres_exigeant', failureOk }, loads).templates.flatMap((t) => t.lines);

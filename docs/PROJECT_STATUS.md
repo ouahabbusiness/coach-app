@@ -116,3 +116,9 @@ Adaptation au contexte du jour et de la saison, sans mode « hiver » automatiqu
 - **Tapis** : jours plus courts comptés tels quels (pas de lissage), vitesse affichée ou estimée, jamais modifiée pour retrouver 10 000 pas.
 - **Chrono du 16/11** : remplacé, à la validation, par une évaluation facile (durée courue confortablement, difficulté, récupération).
 - **Bilan d'activité du jour** (Écran du jour → Pas → « Bilan ») : deux modes, jamais mélangés (pas séparés / total du jour avec ce qu'il comprend), mesuré ou estimé, journée partielle ou terminée, incohérences signalées sans remplacer les données. Il ne modifie jamais la cible alimentaire. Import Apple Santé : plus tard, avec autorisation et vérification des doublons.
+
+### Répartition A/B/C et course (28/10/2026, soir)
+- **Orientation confirmée** : physique athlétique et équilibré, haut du corps plus développé, abdos visibles, jambes fortes et proportionnées, sans priorité fessiers fondée sur les zones de gras (une zone de gras ne fixe plus le volume musculaire ; seule une zone MUSCULAIRE « fessiers » ajoute du travail).
+- **Répartition** (appliquée une seule fois à l'ouverture, séances à venir seulement, tracée dans le journal) : A = tractions, dips, soulevé de terre jambes semi-tendues, relevés de jambes (46 min) ; B = goblet squat, rowing, swings ×3, hollow (36 min) ; C = tractions supination, pompes diamant, développé, fentes arrière (ou squat bulgare), relevés de genoux (45 min). Pont fessier retiré. Fessiers 17 → 13 séries (A, B, C), quadriceps 7 (B, C), ischios 6 (A, B). Aucune séance ajoutée.
+- **Rowing** : 15–20 répétitions à 2 en réserve avec séance de calibration (tu as fait environ 22 répétitions à 2–4 en réserve à 12 kg) ; recommandation ensuite selon tes résultats, matériel et tolérance.
+- **Course** : la sortie prévue fixe la distance ; plus de hausse automatique de 10 %.
