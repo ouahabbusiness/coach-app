@@ -182,34 +182,37 @@ export interface RunEntry {
   at: number;
 }
 
-export type RunMove = 'départ' | 'hausse' | 'maintien' | 'reprise';
+export type RunMove = 'départ' | 'hausse' | 'maintien' | 'reprise' | 'prévu';
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
 const roundHalf = (n: number) => Math.round(n * 2) / 2;
 
 /**
- * Prochaine course : +10 % sur la plus longue course récente si l'effort était raisonnable,
- * maintien si la dernière était très dure, baisse après une longue pause.
+ * Distance de la prochaine course. La sortie PRÉVUE au planning fixe la distance (une prescription par sortie, courte ou longue) ;
+ * il n'y a plus de hausse automatique de 10 % sur la plus longue sortie récente.
+ *  - effort 9/10 ou plus à la dernière sortie : on consolide (jamais plus que la dernière, ni que le prévu) ;
+ *  - plus de 14 jours sans courir : reprise à 80 % de la dernière, plafonnée au prévu ;
+ *  - sinon : le prévu, sans hausse obligatoire parce qu'une sortie a été terminée.
+ * Sans sortie prévue : on garde la dernière distance (jamais de hausse automatique) ; sans historique, départ à 3 km.
  */
-export function runTarget(runs: RunEntry[], today: string): Computed<{ km: number; move: RunMove }> {
+export function runTarget(runs: RunEntry[], today: string, planned?: number): Computed<{ km: number; move: RunMove }> {
   const past = runs.filter((r) => r.day <= today).sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.at - b.at));
   const last = past[past.length - 1];
-  if (!last) return { value: { km: 3, move: 'départ' }, why: ['aucune course enregistrée', 'départ 3 km'], missing: [] };
-
+  if (!last) {
+    if (planned !== undefined) return { value: { km: planned, move: 'départ' }, why: ['aucune course enregistrée', `sortie prévue : ${fmt(planned)} km`, 'pas de hausse automatique'], missing: [] };
+    return { value: { km: 3, move: 'départ' }, why: ['aucune course enregistrée', 'départ 3 km'], missing: [] };
+  }
+  const cap = (km: number) => (planned !== undefined ? Math.min(km, planned) : km);
   const gap = daysBetween(last.day, today);
   if (gap > 14) {
-    const km = Math.max(2, roundHalf(last.km * 0.8));
-    return { value: { km, move: 'reprise' }, why: [`dernière course il y a ${gap} j`, `${fmt(last.km)} km × 0,8`], missing: [] };
+    const km = cap(Math.max(1, roundHalf(last.km * 0.8)));
+    return { value: { km, move: 'reprise' }, why: [`dernière course il y a ${gap} j`, `${fmt(last.km)} km × 0,8`, ...(planned !== undefined ? [`plafonné au prévu (${fmt(planned)} km)`] : [])], missing: [] };
   }
   if (last.effort !== undefined && last.effort >= 9) {
-    return { value: { km: last.km, move: 'maintien' }, why: [`dernière ${fmt(last.km)} km`, `effort ${last.effort}/10 : on consolide`], missing: [] };
+    return { value: { km: cap(last.km), move: 'maintien' }, why: [`dernière ${fmt(last.km)} km`, `effort ${last.effort}/10 : on consolide`], missing: [] };
   }
-  const recent = past.filter((r) => daysBetween(r.day, today) <= 14);
-  const best = Math.max(...recent.map((r) => r.km));
-  const km = Math.max(roundHalf(best * 1.1), best + 0.5);
-  return {
-    value: { km, move: 'hausse' },
-    why: [`plus longue sur 14 j : ${fmt(best)} km`, last.effort !== undefined ? `effort ${last.effort}/10` : 'effort non noté', '+10 %'],
-    missing: [],
-  };
+  if (planned !== undefined) {
+    return { value: { km: planned, move: 'prévu' }, why: [`sortie prévue : ${fmt(planned)} km`, last.effort !== undefined ? `dernier effort ${last.effort}/10` : 'effort non noté', 'pas de hausse automatique'], missing: [] };
+  }
+  return { value: { km: last.km, move: 'maintien' }, why: [`dernière ${fmt(last.km)} km`, 'aucune sortie prévue', 'pas de hausse automatique'], missing: [] };
 }

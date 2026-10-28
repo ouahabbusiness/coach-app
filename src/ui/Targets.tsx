@@ -9,6 +9,7 @@ import type { Repository } from '../storage/db';
 import { Modal } from './common';
 import { saveProof } from './Habits';
 import { COMPLEMENT_EVENT, loadComplement, loadTraining } from './profileComplement';
+import { plannedRunKm } from './runPlan';
 import { usableActivity, type ActivityAnswers, type Training } from '../engine/activity';
 import { loadGoals, loadOnboarding, patchAnswers } from './profileStore';
 import { deviceTimeZone, newId } from './support';
@@ -35,6 +36,7 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   const [runs, setRuns] = useState<RunEntry[]>([]);
   const [profile, setProfile] = useState<{ age?: number; heightCm?: number; weightKg?: number; spw?: number; goal?: Parameters<typeof calorieTarget>[0]['goal']; strategy?: Strategy }>({});
   const [adjustments, setAdjustments] = useState<CalorieAdjust[]>([]);
+  const [plannedKm, setPlannedKm] = useState<number | undefined>();
   const [review, setReview] = useState<{ reason: string; uncertain: boolean } | null>(null);
   const [energy, setEnergy] = useState<{ activity?: ActivityAnswers; training?: Training }>({});
 
@@ -44,6 +46,7 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
       const a0 = (await loadOnboarding(repo)).answers;
       setSexState(a0.body.formulaSex ?? (await repo.getKv<FormulaSex>(SEX)));
       setRuns((await repo.getKv<RunEntry[]>(RUNS)) ?? []);
+      setPlannedKm(await plannedRunKm(repo, today));
       const a = (await loadOnboarding(repo)).answers;
       const goals = await loadGoals(repo);
       setProfile({
@@ -122,7 +125,7 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
       reviewLock = null;
     });
   }, [calories.value?.strategy, weights.length, today]); // eslint-disable-line react-hooks/exhaustive-deps
-  const run = runTarget(runs, today);
+  const run = runTarget(runs, today, plannedKm);
   const ranToday = runs.some((r) => r.day === today);
   if (weightStatus && calories.value) calories.why.unshift(`poids ${weightKg} kg · donnée ${weightStatus}`);
   if (weightStatus && water.value) water.why.push(`poids : donnée ${weightStatus}`);

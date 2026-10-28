@@ -42,16 +42,22 @@ describe('calories', () => {
 });
 
 describe('course', () => {
-  it('départ à 3 km sans historique', () => {
+  it('départ : la sortie prévue fixe la distance, 3 km seulement sans plan', () => {
     expect(runTarget([], '2026-11-03').value).toEqual({ km: 3, move: 'départ' });
+    expect(runTarget([], '2026-11-03', 1.5).value).toEqual({ km: 1.5, move: 'départ' });
   });
-  it('+10 % sur la plus longue récente (min +0,5 km)', () => {
-    expect(runTarget([run('2026-11-01', 4.5, 6)], '2026-11-03').value).toEqual({ km: 5, move: 'hausse' });
-    expect(runTarget([run('2026-10-28', 8, 6), run('2026-11-01', 5, 6)], '2026-11-03').value?.km).toBe(9);
+  it('plus de hausse automatique de 10 % : le prévu, ni plus ni moins', () => {
+    expect(runTarget([run('2026-11-01', 4.5, 6)], '2026-11-03', 2).value).toEqual({ km: 2, move: 'prévu' });
+    // une sortie longue passée ne rallonge pas une sortie courte prévue
+    expect(runTarget([run('2026-10-28', 8, 6), run('2026-11-01', 5, 6)], '2026-11-03', 2).value?.km).toBe(2);
+    // sans sortie prévue : on garde la dernière distance
+    expect(runTarget([run('2026-11-01', 4.5, 6)], '2026-11-03').value).toEqual({ km: 4.5, move: 'maintien' });
   });
-  it('effort 9/10 : on garde ; pause > 14 j : on redescend', () => {
+  it('effort 9/10 : on consolide ; pause > 14 j : reprise à 80 %, plafonnée au prévu', () => {
     expect(runTarget([run('2026-11-01', 5, 9)], '2026-11-03').value).toEqual({ km: 5, move: 'maintien' });
+    expect(runTarget([run('2026-11-01', 5, 9)], '2026-11-03', 2).value).toEqual({ km: 2, move: 'maintien' });
     expect(runTarget([run('2026-10-01', 5, 6)], '2026-11-03').value).toEqual({ km: 4, move: 'reprise' });
+    expect(runTarget([run('2026-10-01', 5, 6)], '2026-11-03', 2).value).toEqual({ km: 2, move: 'reprise' });
   });
 });
 

@@ -303,3 +303,15 @@ describe('adaptation acceptée : elle apparaît dans la séance lancée et ne to
     expect(plain.sets.filter((s) => s.planned.variantId === 'pullup-strict')).toHaveLength(4);
   });
 });
+
+describe('sortie de course prévue', () => {
+  it('la prochaine course du planning fixe la distance ; annulée ou remplacée : ignorée', async () => {
+    const { plannedRunKm } = await import('../src/ui/runPlan');
+    const mk = (id: string, day: number, km: number, extra: Partial<PlannedItem> = {}): PlannedItem => ({ id, weekStart: '2026-11-02', day, start: '12:30', durationMin: 14, kind: 'course', title: 'c', km, moves: [], ...extra });
+    const items = [mk('a', 1, 2), mk('b', 3, 2), mk('c', 6, 2.5, { adjustment: { reason: 'deplacement', decision: 'remplacée', at: 1 } })];
+    const repo = { getKv: async () => items } as never;
+    expect(await plannedRunKm(repo, '2026-11-03')).toBe(2); // mardi
+    expect(await plannedRunKm(repo, '2026-11-04')).toBe(2); // jeudi à venir
+    expect(await plannedRunKm(repo, '2026-11-06')).toBeUndefined(); // dimanche remplacé
+  });
+});

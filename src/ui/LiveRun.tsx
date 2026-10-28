@@ -11,6 +11,7 @@ import { toMin, type PlannedItem } from '../engine/planning';
 import { proofKey, type ProofDay } from '../engine/proof';
 import { addPoint, cue, fmtPace, stats, type GpsPoint, type Segment } from '../engine/runTrack';
 import { runTarget, type RunEntry } from '../engine/targets';
+import { plannedRunKm } from './runPlan';
 import { weekStart } from '../engine/challenge';
 import type { Repository } from '../storage/db';
 import { useChallengeEntries } from './Challenge';
@@ -75,7 +76,7 @@ export function LiveRun({ repo, go }: { repo: Repository; go: (r: Route) => void
     (async () => {
       const r = (await repo.getKv<RunEntry[]>('run.log')) ?? [];
       setRuns(r);
-      const t = runTarget(r, today).value;
+      const t = runTarget(r, today, await plannedRunKm(repo, today)).value;
       if (t) setKm(String(t.km).replace('.', ','));
       // Première course dans l'app : initiation proposée par défaut.
       if (!r.some((x) => (x as RunEntry & { kind?: string }).kind === 'initiation')) return setMode('initiation');
