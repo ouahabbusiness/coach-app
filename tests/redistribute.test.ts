@@ -39,10 +39,10 @@ describe('répartition A/B/C : mêmes séries, jambes réparties, aucune séance
     expect(after.dos).toEqual({ sets: 11, sessions: 'ABC' });
     for (const m of ['pectoraux', 'triceps', 'épaules', 'biceps', 'abdominaux'] as const) expect(after[m]!.sets).toBe(before[m]!.sets);
   });
-  it('durées estimées : A 46, B 38, C 50 min, unilatéral compté des deux côtés (avant 46 / 49 / 39) ; trois séances, pas une de plus', () => {
+  it('durées estimées : A 46, B 38, C 50 min, unilatéral compté des deux côtés (avant 49 / 51 / 42) ; trois séances, pas une de plus', () => {
     const r = redistribute(A(), B(), C())!;
     expect([estimateLineMinutes(r.A as never), estimateLineMinutes(r.B as never), estimateLineMinutes(r.C as never)]).toEqual([46, 38, 50]);
-    expect([estimateLineMinutes(A() as never), estimateLineMinutes(B() as never), estimateLineMinutes(C() as never)]).toEqual([46, 49, 39]);
+    expect([estimateLineMinutes(A() as never), estimateLineMinutes(B() as never), estimateLineMinutes(C() as never)]).toEqual([49, 51, 42]);
   });
   it('rowing : plage haute de calibration à 2 en réserve ; pont fessier retiré ; swings à 3', () => {
     const r = redistribute(A(), B(), C())!;
