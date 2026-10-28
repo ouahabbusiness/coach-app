@@ -171,7 +171,7 @@ export async function withProgression(repo: Repository, plan: SessionPlan, opts:
         if (d.transition) return { ...set, loadKg: d.after.loadKg ?? set.loadKg, targetReps: d.after.target, progression: d.reason };
         // Proposition non validée : on garde la prescription actuelle.
         const after = d.proposal ? d.before : d.after;
-        const changed = after.loadKg !== d.before.loadKg || after.target !== d.before.target;
+        const changed = after.loadKg !== d.before.loadKg || after.target !== d.before.target || after.loadKg !== set.loadKg;
         return { ...set, loadKg: after.loadKg ?? set.loadKg, targetReps: after.target, progression: changed || d.action !== 'maintenir' ? d.reason : undefined };
       }
       const a = legacy.get(set.blockId);

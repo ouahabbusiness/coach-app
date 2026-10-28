@@ -71,10 +71,11 @@ export interface DecideOpts {
 }
 
 function decideCore(variantId: string, rx: Rx, samples: Sample[], loads: number[], opts: DecideOpts = {}): Decision {
-  const base = { variantId, before: { loadKg: rx.loadKg, target: rx.target } };
   const last = samples[0];
   // Charge réellement faite à la dernière séance (ex. +12 kg) : c'est elle qui est maintenue, pas la charge de départ du modèle (ex. +5 kg).
   const held = last ? maxLoad(last.results) : undefined;
+  // « Avant » = ce que tu faisais réellement ; une proposition en attente de validation retombe sur cette charge, jamais sur celle du modèle.
+  const base = { variantId, before: { loadKg: held ?? rx.loadKg, target: rx.target } };
   const keep = (extra: Partial<Decision> & Pick<Decision, 'rule' | 'reason'>): Decision => {
     const d: Decision = {
       ...base,
@@ -92,7 +93,7 @@ function decideCore(variantId: string, rx: Rx, samples: Sample[], loads: number[
   };
 
   if (!last || last.results.length === 0) return keep({ action: 'observer', rule: 'aucune donnée', reason: 'Pas encore de séance comparable : on calibre.', missing: ['résultats de la première séance'] });
-  if (opts.pain) return keep({ done: true, rule: 'sécurité', reason: 'Douleur signalée : aucune progression, le mouvement est réévalué.', observations: ['douleur signalée'] });
+  if (opts.pain) return keep({ done: true, rule: 'sécurité', reason: held !== undefined ? `Douleur signalée à ${fmt(held)} kg : pas de hausse, charge plafonnée à ${fmt(held)} kg ; allège si la gêne revient. Le mouvement est réévalué.` : 'Douleur signalée : aucune progression, le mouvement est réévalué.', observations: ['douleur signalée'], after: { loadKg: held ?? rx.loadKg, target: rx.target } });
   if (!last.comparable) return keep({ action: 'observer', done: true, rule: 'séance non comparable', reason: `Séance non comparable (${last.why ?? 'conditions différentes'}) : elle ne compte ni comme progrès ni comme échec.` });
 
   const reps = last.results.map((r) => r.reps);

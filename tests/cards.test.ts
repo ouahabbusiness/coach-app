@@ -78,3 +78,39 @@ describe('fiche = prescription au lancement', () => {
     expect((await repo.allSessionEvents()).size).toBe(events);
   });
 });
+
+describe('charge connue + gêne/proposition : décision du coach explicite, jamais l’ancienne charge présentée comme à faire', () => {
+  const declare = async (repo: Repository) => {
+    await repo.setKv('profile.complement', { joints: [{ zone: 'epaule', triggers: ['dips'], alerts: [] }] });
+    await repo.setKv('joint.adapt', { patterns: ['dips'], tests: ['dips'], at: 1 });
+  };
+  it('douleur signalée sur la dernière séance à 12 kg : pas de hausse, plafond 12 kg écrit, fiche = lancement', async () => {
+    const repo = new Repository(new CoachDb('cards-pain'));
+    const s0 = await startSessionFromTemplate(repo, tpl(12));
+    await perform(repo, s0, 'dips-weighted', 8, 2); // haut de plage : sans douleur, une hausse serait permise
+    const first = project(await repo.sessionEvents(s0))!.sets[0]!.planned.id;
+    await run(repo, s0, { type: 'report_pain', plannedSetId: first, location: 'épaule', intensity: 4, stop: false });
+    await run(repo, s0, { type: 'end_session' });
+    await declare(repo);
+    const preview = await previewTemplate(repo, tpl(5));
+    const launched = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tpl(5))))!.sets.map((s) => s.planned);
+    expect(sig(preview.sets)).toEqual(sig(launched));
+    expect(Math.max(...launched.map((s) => s.loadKg ?? 0))).toBeLessThanOrEqual(12);
+    expect(launched[0]!.progression).toMatch(/Douleur signalée à 12 kg.*plafonnée.*allège/);
+  });
+  it('proposition de baisse en attente : prescription inchangée (12 kg, pas 5 kg), marquée « à valider » ; validée : appliquée', async () => {
+    const repo = new Repository(new CoachDb('cards-proposal'));
+    for (let i = 0; i < 2; i++) {
+      const s = await startSessionFromTemplate(repo, tpl(12));
+      await perform(repo, s, 'dips-weighted', 3, 2); // sous la plage 5–8, deux séances comparables
+      await run(repo, s, { type: 'end_session' });
+    }
+    const pending = await previewTemplate(repo, tpl(5));
+    expect(pending.sets.filter((s) => s.role === 'work').every((s) => s.loadKg === 12)).toBe(true);
+    expect(pending.sets[0]!.progression).toMatch(/à valider/);
+    await repo.setKv('progression.overrides', { 'dips-weighted': { loadKg: 10 } });
+    const accepted = await previewTemplate(repo, tpl(5));
+    expect(accepted.sets.every((s) => s.loadKg === 10)).toBe(true);
+    expect(accepted.sets[0]!.progression).toMatch(/Baisse validée par toi : 10 kg/);
+  });
+});

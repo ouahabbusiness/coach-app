@@ -183,3 +183,5 @@ Défauts connus corrigés, testés sur base fictive (tests/arbitrage.test.ts, pa
 - Lignes de test : « sous-max · 3 en réserve » au lieu de « 1×? ».
 - Charge reprise = référence, pas obligation : baisse validée, transition, séance partielle et adaptation plus récente priment ; la raison est affichée au lancement.
 - Durée : exercices unilatéraux = temps de travail des deux côtés (×2), repos inchangé (A 46, B 38, C 50 min, échauffement compris) ; estimation, à comparer à la durée réelle.
+- Charge connue + douleur/proposition : douleur signalée = pas de hausse, charge plafonnée à celle de la dernière séance, texte explicite ; proposition de baisse en attente = prescription inchangée (charge réellement faite), marquée « à valider », jamais traitée comme acceptée ; baisse validée = appliquée. Tests : tests/cards.test.ts.
+- Durées : la fiche et la séance du planning utilisent la même estimation (A 46, B 38, C 50) ; une séance déjà planifiée garde sa durée stockée jusqu'au recalcul.
