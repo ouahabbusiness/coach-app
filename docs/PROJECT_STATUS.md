@@ -96,3 +96,17 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - **Gêne** : déclencheur → adaptation de la prescription (marge de 3 répétitions, une série de moins, consigne), tracée dans le journal ; orientation « avis » ou « évaluation rapide » selon les signaux, jamais selon le seul score de douleur. Pas de diagnostic.
 - **Courses** : jamais deux jours de suite. Jour libre → déplacement (à midi) ; sinon on garde la plus longue (la plus courte si fatigue) et l'autre devient une marche facile, sans rattrapage.
 - Une seule validation applique la synthèse ; modifier une réponse l'annule. Clés : `profile.complement`, `joint.adapt`.
+
+### Corrections du 28/10/2026 (suite)
+- **Activité v2** : les pas sont ceux de la vie quotidienne, hors tapis et hors course. Le tapis (jours réels, minutes, vitesse, inclinaison) est calculé à part par l'équation de marche ; la musculation et la course sont ajoutées une fois. Les réponses d'avant (total de pas ambigu) sont à refaire et ne servent plus au calcul. Détail du calcul visible, estimation ≠ mesure.
+- **Gêne** : symptômes distincts (moins de force, dérobement, douleur limitante, fatigue en fin de série), côté, geste. Évaluation rapide : bras bloqué, choc, déformation, douleur très forte, fourmillements persistants ou signal soudain. Avis médical/kiné : ce qui s'installe, limite ou empire, sans attendre une baisse de performance. Jamais de diagnostic, jamais de seuil de douleur seul.
+- **Tests maximaux** : jamais maintenus automatiquement sur un mouvement symptomatique (série sous-maximale à 3 répétitions en réserve ; haut du corps entier si le geste est inconnu).
+- **Journal du planning** : une justification fausse reste visible, une correction datée s'ajoute.
+
+### Feuille de route (non démarrée, après stabilisation)
+Adaptation au contexte du jour et de la saison, sans mode « hiver » automatique :
+- Intérieur / extérieur par séance ; pour l'extérieur : lieu choisi, créneau, météo, alertes officielles, luminosité, état du terrain confirmé par l'utilisateur ; données manquantes = incertitude affichée.
+- Échauffement (montée en température, mouvements dynamiques, séries spécifiques) ≠ étirements statiques ; gêne épaule/coudes prioritaire, jamais « échauffe-toi plus » pour maintenir un exercice symptomatique.
+- Une recommandation principale + une alternative réaliste (dehors, dedans, séance adaptée, report) ; un remplacement n'est pas un échec et ne déclenche aucun rattrapage.
+- Nutrition : pas de changement de calories à cause du froid ; examiner d'abord apports réels, activité, sommeil, récupération. Vitamine D : recommandations locales, compléments déjà pris vérifiés, aucun diagnostic ni prescription automatique ; fatigue durable inexpliquée → avis médical.
+- Contrôle quotidien très court (3 questions), changements journalisés avec leur raison ; scénario inverse vérifié (beau temps et bonne forme = aucune modification).

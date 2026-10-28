@@ -1,11 +1,29 @@
 // « Compléter mon profil » : activité de la journée et gêne articulaire. Questions courtes, préremplies, conditionnelles.
-// Tu valides UNE synthèse (cible provisoire, semaine adaptée, adaptation à la gêne) : rien n'est appliqué avant.
+// Tu valides UNE synthèse (cible provisoire, semaine, adaptation à la gêne, évaluations) : rien n'est appliqué avant.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
-import { SIT_LABELS, type ActivityAnswers, type SitBand, type Training } from '../engine/activity';
+import { SIT_LABELS, usableActivity, type ActivityAnswers, type SitBand, type Training, type TreadmillUse } from '../engine/activity';
 import type { Decision } from '../engine/decide';
-import { ALERT_LABELS, TREND_LABELS, TRIGGER_LABELS, ZONE_LABELS, adaptationPatterns, jointAdvice, type JointAlert, type JointAnswer, type JointTrend, type JointTrigger, type JointZone } from '../engine/joints';
+import {
+  ALERT_LABELS,
+  SIDE_LABELS,
+  SYMPTOM_LABELS,
+  TREND_LABELS,
+  TRIGGER_LABELS,
+  ZONE_LABELS,
+  adaptationPatterns,
+  jointAdvice,
+  normalizeJoint,
+  testPatterns,
+  type JointAlert,
+  type JointAnswer,
+  type JointSide,
+  type JointSymptom,
+  type JointTrend,
+  type JointTrigger,
+  type JointZone,
+} from '../engine/joints';
 import { DAY_NAMES, conflicts, dateOf, type FixedEvent, type PlannedItem } from '../engine/planning';
 import { adviseRuns, spaceRuns } from '../engine/runSchedule';
 import { calorieTarget, type Strategy } from '../engine/targets';
@@ -39,6 +57,10 @@ interface Inputs {
   sessionDays: string[];
   /** Variantes du programme (pour montrer ce que l'adaptation à la gêne touche). */
   variants: string[];
+  /** Variantes des tests maximaux du programme. */
+  testVariants: string[];
+  /** Les réponses d'avant la version 2 sur les pas sont à refaire. */
+  legacySteps: boolean;
 }
 
 const dm = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
@@ -91,6 +113,26 @@ export function planRuns(items: PlannedItem[], fixed: FixedEvent[], today: strin
   return { changes, advice };
 }
 
+const WRONG_REASON = 'aucune séance de force encore faite cette semaine';
+
+/**
+ * Une justification enregistrée peut avoir été fausse (séance lancée hors planning, donc non comptée) : l'entrée d'origine reste,
+ * une correction datée s'ajoute. Rien n'est réécrit en silence.
+ */
+export function correctReasons(items: PlannedItem[], sessionDays: string[], now: number, today: string): { items: PlannedItem[]; corrected: number } {
+  let corrected = 0;
+  const out = items.map((x) => {
+    const adj = x.adjustment;
+    if (!adj?.note?.includes(WRONG_REASON) || adj.corrections?.length) return x;
+    const done = sessionDays.filter((d) => d >= x.weekStart && d <= dateOf(x.weekStart, 6)).sort();
+    if (!done.length) return x;
+    corrected++;
+    const text = `Correction du ${dm(today)} : ${done.length === 1 ? `la séance de force du ${dm(done[0]!)} était bien comptée` : `${done.length} séances de force (${done.map(dm).join(', ')}) étaient bien comptées`}. La décision (marche à la place, sans rattrapage) reste inchangée.`;
+    return { ...x, adjustment: { ...adj, corrections: [...(adj.corrections ?? []), { at: now, text }] } };
+  });
+  return { items: out, corrected };
+}
+
 async function doneSessionDays(repo: Repository): Promise<string[]> {
   const days: string[] = [];
   for (const evs of (await repo.allSessionEvents()).values()) {
@@ -110,30 +152,44 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
 
   const load = async () => {
     const ob = await loadOnboarding(repo);
-    const prog = await repo.getKv<{ answers?: { pains?: string[]; priority?: string }; program?: { templates?: { lines: { variantId: string }[] }[] } }>(PROGRAM_KEY);
+    const prog = await repo.getKv<{ answers?: { pains?: string[]; priority?: string }; program?: { templates?: { lines: { variantId: string; role?: string }[] }[] } }>(PROGRAM_KEY);
     const comp = await loadComplement(repo);
     // Zones déjà déclarées : proposées cochées, à confirmer.
     if (!comp.joints) {
       const z = declaredZones(prog?.answers?.pains, ob.answers.safety.pains);
       if (z.length) comp.joints = z.map((zone) => ({ zone, triggers: [], alerts: [] }));
     }
+    comp.joints = comp.joints?.map((j) => {
+      const n = normalizeJoint(j);
+      return { ...j, symptoms: n.symptoms, alerts: n.alerts };
+    });
+    // Réponses d'avant la version 2 : le total de pas était ambigu, il est à refaire. Les heures assises sont conservées.
+    const legacySteps = !!comp.activity && comp.activity.v !== 2 && (comp.activity as { steps?: number }).steps !== undefined;
+    if (comp.activity && comp.activity.v !== 2) comp.activity = { v: 2, sitHours: comp.activity.sitHours, at: comp.activity.at };
     setC(comp);
     const weights = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];
     const last = [...weights].sort((a, b) => (a.day < b.day ? -1 : 1)).pop();
     const today = localDay(Date.now(), deviceTimeZone());
     const rlog = (await repo.getKv<{ day: string; tired: boolean }[]>('readiness.log')) ?? [];
     const recent = new Set([0, 1, 2].map((k) => new Date(Date.parse(`${today}T12:00:00Z`) - k * 864e5).toISOString().slice(0, 10)));
+    const sessionDays = await doneSessionDays(repo);
+    // Correction datée d'une justification fausse (l'entrée d'origine est conservée).
+    const fixed = correctReasons(await loadPlanning(repo), sessionDays, Date.now(), today);
+    if (fixed.corrected) await repo.setKv(PLAN_KEY, fixed.items);
+    const lines = (prog?.program?.templates ?? []).flatMap((t) => t.lines);
     setInp({
       a: ob.answers,
       weightKg: last?.kg ?? ob.answers.body.weightKg.value,
       strategy: programStrategy(prog ? { answers: prog.answers ?? {} } : undefined),
       training: await loadTraining(repo),
-      items: await loadPlanning(repo),
+      items: fixed.items,
       fixed: await loadAllFixed(repo),
       today,
       tired: rlog.some((x) => x.tired && recent.has(x.day)),
-      sessionDays: await doneSessionDays(repo),
-      variants: [...new Set((prog?.program?.templates ?? []).flatMap((t) => t.lines.map((l) => l.variantId)))],
+      sessionDays,
+      variants: [...new Set(lines.filter((l) => l.role !== 'test').map((l) => l.variantId))],
+      testVariants: [...new Set(lines.filter((l) => l.role === 'test').map((l) => l.variantId))],
+      legacySteps,
     });
   };
   useEffect(() => {
@@ -152,24 +208,29 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
     setApplied(null);
     void saveComplement(repo, next);
   };
-  const act = c.activity ?? {};
-  const setAct = (patch: Partial<ActivityAnswers>) => update((x) => ({ ...x, activity: { ...x.activity, ...patch, at: Date.now() } }));
+  const act: ActivityAnswers = c.activity ?? { v: 2 };
+  const setAct = (patch: Partial<ActivityAnswers>) => update((x) => ({ ...x, activity: { ...(x.activity ?? {}), v: 2, ...patch, at: Date.now() } }));
+  const tread: TreadmillUse = act.treadmill ?? {};
+  const setTread = (patch: Partial<TreadmillUse>) => setAct({ treadmill: { ...tread, ...patch } });
   const joints = c.joints ?? [];
   const setJoint = (zone: JointZone, patch: Partial<JointAnswer>) => update((x) => ({ ...x, joints: (x.joints ?? []).map((j) => (j.zone === zone ? { ...j, ...patch } : j)) }));
   const toggleZone = (zone: JointZone) =>
     update((x) => ({ ...x, joints: (x.joints ?? []).some((j) => j.zone === zone) ? (x.joints ?? []).filter((j) => j.zone !== zone) : [...(x.joints ?? []), { zone, triggers: [], alerts: [] }] }));
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-  const includes = act.stepsIncludes ?? [];
 
   const advice = useMemo(() => jointAdvice(joints), [joints]);
   const patterns = useMemo(() => adaptationPatterns(joints), [joints]);
-  const touched = useMemo(() => (inp ? inp.variants.filter((v) => patterns.some((p) => new RegExp(p).test(v))) : []), [inp, patterns]);
+  const tests = useMemo(() => testPatterns(joints), [joints]);
+  const match = (list: string[], v: string) => list.some((p) => new RegExp(p).test(v));
+  const touched = useMemo(() => (inp ? inp.variants.filter((v) => match(patterns, v)) : []), [inp, patterns]);
+  const testsTouched = useMemo(() => (inp ? inp.testVariants.filter((v) => match(tests, v)) : []), [inp, tests]);
+  const retests = useMemo(() => (inp && tests.length ? inp.items.filter((x) => x.templateId === 'prog-T' && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp, tests]);
   const kcal = useMemo(() => {
     if (!inp) return undefined;
     const base = { sex: inp.a.body.formulaSex, age: inp.a.body.age.value, heightCm: inp.a.body.heightCm.value, weightKg: inp.weightKg, strategy: inp.strategy, goal: inp.a.goal.main };
     return {
       before: calorieTarget({ ...base, sessionsPerWeek: inp.a.sleep.sessionsPerWeek }),
-      after: calorieTarget({ ...base, sessionsPerWeek: inp.a.sleep.sessionsPerWeek, activity: c.activity, training: inp.training, treadmillDaysPerWeek: inp.a.schedule.treadmillDays?.length ?? 0, workDaysPerWeek: inp.a.schedule.workDays.length }),
+      after: calorieTarget({ ...base, sessionsPerWeek: inp.a.sleep.sessionsPerWeek, activity: usableActivity(c.activity), training: inp.training }),
     };
   }, [inp, c.activity]);
   const runs = useMemo(() => (inp ? planRuns(inp.items, inp.fixed, inp.today, { tired: inp.tired, sessionDays: inp.sessionDays }) : null), [inp]);
@@ -187,13 +248,14 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
     };
   }, [inp, runs]);
 
-  /** Une seule validation applique la synthèse : semaine, adaptation à la gêne, cible. */
+  /** Une seule validation applique la synthèse : semaine, adaptation, évaluations, cible. */
   const validate = async () => {
     if (!inp || !runs) return;
     const done: string[] = [];
     const byId = new Map(runs.changes.map((x) => [x.id, x]));
     const replace = new Map(runs.advice.map((x) => [x.replace.id, x]));
-    if (runs.changes.length || runs.advice.length) {
+    const retestIds = new Set(retests.map((x) => x.id));
+    if (runs.changes.length || runs.advice.length || retestIds.size) {
       const items = (await loadPlanning(repo)).map((x) => {
         const m = byId.get(x.id);
         if (m) return { ...x, day: m.toDay, start: m.start, moves: [...x.moves, { at: Date.now(), fromDay: x.day, fromStart: x.start }] };
@@ -211,6 +273,9 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             adjustment: { reason: 'deplacement' as const, decision: 'remplacée' as const, at: Date.now(), note: `remplace « ${x.title} » : courses consécutives. ${r.reason}` },
           };
         }
+        if (retestIds.has(x.id) && !x.adjustment) {
+          return { ...x, adjustment: { reason: 'douleur' as const, decision: 'adaptée' as const, at: Date.now(), note: 'Test maximal remplacé par une série sous-maximale sur les mouvements concernés (gêne déclarée). À réévaluer avant la date : report ou annulation possibles selon l’évolution.' } };
+        }
         return x;
       });
       await repo.setKv(PLAN_KEY, items);
@@ -221,12 +286,14 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       }
       if (runs.changes.length) done.push(`${runs.changes.length} course${runs.changes.length > 1 ? 's' : ''} déplacée${runs.changes.length > 1 ? 's' : ''}`);
       if (runs.advice.length) done.push(`${runs.advice.length} course${runs.advice.length > 1 ? 's' : ''} remplacée${runs.advice.length > 1 ? 's' : ''} par une marche`);
+      if (retestIds.size) done.push('test maximal remplacé par une série sous-maximale');
     }
     // Adaptation à la gêne : elle modifie la prescription de chaque séance et laisse une trace dans le journal.
-    if (patterns.length) {
-      const adapt: JointAdapt = { patterns, at: Date.now() };
+    if (patterns.length || tests.length) {
+      const adapt: JointAdapt = { patterns, tests, at: Date.now() };
       await repo.setKv(JOINT_ADAPT, adapt);
-      const decisions: Decision[] = touched.map((variantId) => ({
+      const reason = (kind: string) => `${kind} Proposition à vérifier pendant la séance et le lendemain, pas une garantie.`;
+      const mk = (variantId: string, rule: string, text: string): Decision => ({
         variantId,
         before: { target: 0 },
         after: { target: 0 },
@@ -234,18 +301,22 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
         done: true,
         targetReached: false,
         progressionAllowed: false,
-        observations: [`gêne déclarée : ${joints.map((j) => ZONE_LABELS[j.zone].toLowerCase()).join(', ')}`],
-        rule: 'gêne : adaptation acceptée',
+        observations: [`gêne déclarée : ${joints.map((j) => `${ZONE_LABELS[j.zone].toLowerCase()}${j.side ? ` ${SIDE_LABELS[j.side]}` : ''}`).join(', ')}`],
+        rule,
         missing: [],
-        reason: 'Marge de 3 répétitions, une série de moins, amplitude confortable, charge gelée. À vérifier pendant la séance et le lendemain.',
+        reason: reason(text),
         reevaluate: 'après 2 séances, selon ta réaction pendant et le lendemain',
-      }));
+      });
+      const decisions: Decision[] = [
+        ...touched.map((v) => mk(v, 'gêne : adaptation acceptée', 'Marge de 3 répétitions, une série de moins, amplitude confortable, charge gelée.')),
+        ...testsTouched.map((v) => mk(`${v}:test`, 'gêne : test maximal remplacé', 'Test maximal remplacé par une série sous-maximale (3 répétitions en réserve).')),
+      ];
       if (decisions.length) await appendJournal(repo, decisions, 'gêne · adaptation acceptée', `gene-${inp.today}`);
-      done.push(`${touched.length} exercice${touched.length > 1 ? 's' : ''} adapté${touched.length > 1 ? 's' : ''}`);
+      if (touched.length) done.push(`${touched.length} exercice${touched.length > 1 ? 's' : ''} adapté${touched.length > 1 ? 's' : ''}`);
     } else if (await repo.getKv(JOINT_ADAPT)) {
-      await repo.setKv(JOINT_ADAPT, { patterns: [], at: Date.now() });
+      await repo.setKv(JOINT_ADAPT, { patterns: [], tests: [], at: Date.now() });
     }
-    if (c.activity) done.push(`cible ${kcal?.after.value?.kcal ?? '—'} kcal`);
+    if (hasActivityNow) done.push(`cible ${kcal?.after.value?.kcal ?? '—'} kcal`);
     const next = { ...c, validated: Date.now() };
     setC(next);
     await saveComplement(repo, next);
@@ -253,19 +324,20 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
     setInp({ ...inp, items: await loadPlanning(repo) });
   };
 
-  const treadmill = (inp?.a.schedule.treadmillDays?.length ?? 0) > 0;
   const bands: SitBand[] = ['<6', '6-9', '9-12', '>12'];
   const triggers: JointTrigger[] = ['tractions', 'dips', 'pompes', 'developpe', 'rowing', 'inconnu'];
-  const alerts: JointAlert[] = ['faiblesse', 'engourdissement', 'blocage', 'soudain', 'nuit'];
-  const num = (v: string) => (v === '' ? undefined : Math.max(0, Math.floor(Number(v) || 0)));
-  const stepsOn = act.steps !== undefined;
-  const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !c.activity;
+  const symptoms: JointSymptom[] = ['perte_force', 'derobement', 'douleur_limitante', 'fatigue_fin'];
+  const alerts: JointAlert[] = ['engourdissement', 'blocage', 'deformation', 'tres_forte', 'soudain', 'nuit'];
+  const num = (v: string) => (v === '' ? undefined : Math.max(0, Number(v.replace(',', '.')) || 0));
+  const hasActivityNow = act.steps !== undefined || act.sitHours !== undefined;
+  const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !tests.length && !hasActivityNow;
 
   return (
     <Modal open={open} onClose={onClose} title="Compléter mon profil">
       <div className="stack">
         <h3 style={{ margin: 0 }}>Activité</h3>
-        <Help>Hors séances. Sert à estimer tes calories : ne coche que ce que tu sais.</Help>
+        <Help>Trois choses séparées : ta vie quotidienne, ta marche volontaire sur tapis, et tes séances. Chacune est comptée une seule fois.</Help>
+        {inp?.legacySteps && <p className="notice warn" style={{ margin: 0 }}>Tes réponses précédentes sur les pas sont à refaire : le total mélangeait vie quotidienne et tapis.</p>}
         <p className="eyebrow" style={{ margin: 0 }}>Assis par jour</p>
         <div className="chips">
           {bands.map((b) => (
@@ -275,47 +347,39 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
           ))}
         </div>
         <label className="stack" style={{ gap: 4 }}>
-          <span className="eyebrow">Pas par jour (moyenne)</span>
-          <input type="number" inputMode="numeric" min={0} placeholder="je ne sais pas" value={act.steps ?? ''} onChange={(e) => setAct({ steps: num(e.target.value) })} />
+          <span className="eyebrow">Pas par jour, hors tapis et hors course</span>
+          <input type="number" inputMode="numeric" min={0} placeholder="je ne sais pas" value={act.steps ?? ''} onChange={(e) => setAct({ steps: e.target.value === '' ? undefined : Math.floor(num(e.target.value) ?? 0) })} />
         </label>
-        {stepsOn && (
-          <>
-            <p className="eyebrow" style={{ margin: 0 }}>Ce total est</p>
-            <div className="chips">
-              <Chip on={act.stepsMeasured !== false} onClick={() => setAct({ stepsMeasured: true })}>mesuré</Chip>
-              <Chip on={act.stepsMeasured === false} onClick={() => setAct({ stepsMeasured: false })}>estimé</Chip>
-            </div>
-            <p className="eyebrow" style={{ margin: 0 }}>Sur quels jours</p>
-            <div className="chips">
-              <Chip on={act.stepsPeriod !== 'tous'} onClick={() => setAct({ stepsPeriod: 'hors-seances' })}>jours sans séance</Chip>
-              <Chip on={act.stepsPeriod === 'tous'} onClick={() => setAct({ stepsPeriod: 'tous' })}>tous les jours</Chip>
-            </div>
-            <p className="eyebrow" style={{ margin: 0 }}>Il comprend déjà</p>
-            <div className="chips">
-              {(['tapis', 'trajets', 'courses'] as const).map((k) => (
-                <Chip key={k} on={includes.includes(k) || (k === 'courses' && act.stepsPeriod === 'tous')} onClick={() => setAct({ stepsIncludes: toggle(includes, k) })}>
-                  {k === 'tapis' ? 'tapis de marche' : k}
-                </Chip>
-              ))}
-            </div>
-            <Help>Ce que ton total comprend n’est pas compté une seconde fois ; ce qu’il ne comprend pas est ajouté. Sans précision : je suppose qu’il ne comprend ni tapis, ni trajets, ni courses.</Help>
-          </>
+        {act.steps !== undefined && (
+          <div className="chips">
+            <Chip on={act.stepsMeasured !== false} onClick={() => setAct({ stepsMeasured: true })}>mesuré</Chip>
+            <Chip on={act.stepsMeasured === false} onClick={() => setAct({ stepsMeasured: false })}>estimé</Chip>
+          </div>
         )}
-        {treadmill && !includes.includes('tapis') && (
-          <label className="stack" style={{ gap: 4 }}>
-            <span className="eyebrow">Tapis de marche, minutes par jour de télétravail</span>
-            <input type="number" inputMode="numeric" min={0} placeholder="0" value={act.treadmillMin ?? ''} onChange={(e) => setAct({ treadmillMin: num(e.target.value) })} />
+        <Help>Tes déplacements du quotidien : maison, courses, trajets. Pas le tapis ni la course.</Help>
+        <p className="eyebrow" style={{ margin: 0 }}>Tapis de marche : ce que tu fais réellement</p>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <label className="stack" style={{ gap: 4, flex: 1, minWidth: 90 }}>
+            <span className="eyebrow">Jours par semaine</span>
+            <input type="number" inputMode="numeric" min={0} max={7} placeholder="0" value={tread.daysPerWeek ?? ''} onChange={(e) => setTread({ daysPerWeek: num(e.target.value) })} />
           </label>
-        )}
-        {!includes.includes('trajets') && (
-          <label className="stack" style={{ gap: 4 }}>
-            <span className="eyebrow">Trajets à pied ou à vélo, minutes par jour</span>
-            <input type="number" inputMode="numeric" min={0} placeholder="0" value={act.walkCommuteMin ?? ''} onChange={(e) => setAct({ walkCommuteMin: num(e.target.value) })} />
+          <label className="stack" style={{ gap: 4, flex: 1, minWidth: 90 }}>
+            <span className="eyebrow">Minutes par séance</span>
+            <input type="number" inputMode="numeric" min={0} placeholder="0" value={tread.minutes ?? ''} onChange={(e) => setTread({ minutes: num(e.target.value) })} />
           </label>
-        )}
+          <label className="stack" style={{ gap: 4, flex: 1, minWidth: 90 }}>
+            <span className="eyebrow">Vitesse km/h</span>
+            <input type="text" inputMode="decimal" placeholder="4,5" value={tread.speedKmh ?? ''} onChange={(e) => setTread({ speedKmh: num(e.target.value) })} />
+          </label>
+          <label className="stack" style={{ gap: 4, flex: 1, minWidth: 90 }}>
+            <span className="eyebrow">Inclinaison %</span>
+            <input type="text" inputMode="decimal" placeholder="0" value={tread.inclinePct ?? ''} onChange={(e) => setTread({ inclinePct: num(e.target.value) })} />
+          </label>
+        </div>
+        <Help>Ce que tu fais vraiment, pas ton objectif de pas. Vitesse et inclinaison sont facultatives : sans vitesse, 4,5 km/h sont supposés et l’app le dit. Ta musculation et ta course sont déjà dans ton programme.</Help>
 
         <h3 style={{ margin: '8px 0 0' }}>Gêne</h3>
-        <Help>L’app ne pose pas de diagnostic. Tes réponses servent à adapter la séance et à savoir quand consulter. Le score de douleur seul ne décide de rien.</Help>
+        <Help>L’app ne pose pas de diagnostic. Décris ce que tu ressens, pas ce que tu arrives à faire : tes séries en séance n’excluent pas une faiblesse d’un côté, un dérobement ou une gêne sur un geste précis.</Help>
         <div className="chips">
           {(['epaule', 'coudes'] as JointZone[]).map((z) => (
             <Chip key={z} on={joints.some((j) => j.zone === z)} onClick={() => toggleZone(z)}>
@@ -326,6 +390,24 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
         {joints.map((j) => (
           <section key={j.zone} className="card stack" aria-label={ZONE_LABELS[j.zone]}>
             <strong>{ZONE_LABELS[j.zone]}</strong>
+            <p className="eyebrow" style={{ margin: 0 }}>Côté</p>
+            <div className="chips">
+              {(['gauche', 'droite', 'les-deux'] as JointSide[]).map((v) => (
+                <Chip key={v} on={j.side === v} onClick={() => setJoint(j.zone, { side: j.side === v ? undefined : v })}>{SIDE_LABELS[v]}</Chip>
+              ))}
+            </div>
+            <p className="eyebrow" style={{ margin: 0 }}>Ce que tu ressens</p>
+            <div className="chips">
+              {symptoms.map((sy) => (
+                <Chip key={sy} on={(j.symptoms ?? []).includes(sy)} onClick={() => setJoint(j.zone, { symptoms: toggle(j.symptoms ?? [], sy) })}>{SYMPTOM_LABELS[sy]}</Chip>
+              ))}
+            </div>
+            <p className="eyebrow" style={{ margin: 0 }}>Sur quel geste</p>
+            <div className="chips">
+              {triggers.map((t) => (
+                <Chip key={t} on={j.triggers.includes(t)} onClick={() => setJoint(j.zone, { triggers: toggle(j.triggers, t) })}>{TRIGGER_LABELS[t]}</Chip>
+              ))}
+            </div>
             <p className="eyebrow" style={{ margin: 0 }}>Depuis</p>
             <div className="chips">
               {([['<1m', 'moins d’un mois'], ['1-6m', '1 à 6 mois'], ['>6m', 'plus de 6 mois']] as const).map(([v, l]) => (
@@ -336,12 +418,6 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             <div className="chips">
               {([['rare', 'rare'], ['parfois', 'parfois'], ['souvent', 'souvent']] as const).map(([v, l]) => (
                 <Chip key={v} on={j.freq === v} onClick={() => setJoint(j.zone, { freq: j.freq === v ? undefined : v })}>{l}</Chip>
-              ))}
-            </div>
-            <p className="eyebrow" style={{ margin: 0 }}>Quand elle apparaît</p>
-            <div className="chips">
-              {triggers.map((t) => (
-                <Chip key={t} on={j.triggers.includes(t)} onClick={() => setJoint(j.zone, { triggers: toggle(j.triggers, t) })}>{TRIGGER_LABELS[t]}</Chip>
               ))}
             </div>
             <p className="eyebrow" style={{ margin: 0 }}>Douleur maximale /10</p>
@@ -388,7 +464,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             </p>
             <Help>
               <ol style={{ margin: 0, paddingLeft: 18 }}>{kcal.after.why.map((w) => <li key={w}>{w}</li>)}</ol>
-              Stratégie {kcal.after.value.strategy}. La cible n’est corrigée qu’après 2 semaines de pesées et 7 jours de repas notés.
+              Stratégie {kcal.after.value.strategy}. Une estimation, pas une mesure : elle ne baisse pas parce que tu marches sur tapis plutôt que dehors. Elle est corrigée seulement après 2 semaines de pesées et 7 jours de repas notés.
             </Help>
           </section>
         )}
@@ -423,14 +499,19 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
         )}
         {joints.length > 0 && (
           <section className="card stack" aria-label="Adaptation à la gêne">
-            <strong>Gêne</strong>
+            <strong>Programme adapté et évaluations</strong>
             {touched.length > 0 ? (
               <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-                Exercices adaptés : {touched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}. Marge de 3 répétitions, une série de moins, jamais à l’échec, charge gelée.
+                Exercices adaptés : {touched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}. Marge de 3 répétitions, une série de moins, jamais à l’échec, charge gelée. Une proposition à vérifier, pas une garantie.
               </p>
             ) : (
-              <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Aucun mouvement déclencheur connu : les séances ne changent pas, la charge reste gelée.</p>
+              <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>Aucun geste déclencheur connu : les séances de travail ne changent pas, la charge reste gelée.</p>
             )}
+            <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+              {testsTouched.length > 0
+                ? `Test maximal remplacé par une série sous-maximale sur : ${testsTouched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}${retests.length ? ` (séance du ${retests.map((x) => dm(dateOf(x.weekStart, x.day))).join(', ')})` : ''}. Report ou annulation possibles selon l’évolution.`
+                : 'Aucun test maximal sur un mouvement symptomatique.'}
+            </p>
             {advice.items.map((it) => (
               <p key={it.zone + it.text} className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{ZONE_LABELS[it.zone]} · {it.text}</p>
             ))}

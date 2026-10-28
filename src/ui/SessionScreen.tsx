@@ -216,7 +216,7 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
             <h1 className="hud-title">{focusInfo?.variant.name ?? focus.planned.variantId}</h1>
 
             <div className="hud-target num" key={focus.planned.id}>
-              {focus.planned.kind === 'reps' ? focus.planned.targetReps ?? (focus.planned.role === 'test' ? 'MAX' : '?') : focus.planned.targetSeconds ?? '?'}
+              {focus.planned.kind === 'reps' ? focus.planned.targetReps ?? (focus.planned.role === 'test' ? ((focus.planned.targetRir ?? 0) >= 3 ? 'SOUS-MAX' : 'MAX') : '?') : focus.planned.targetSeconds ?? '?'}
               <span>{focus.planned.kind === 'reps' ? 'rép.' : 's'}</span>
             </div>
             {order && (

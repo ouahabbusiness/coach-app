@@ -55,6 +55,8 @@ export function declaredZones(programPains?: string[], onboardingPains?: string)
 export const JOINT_ADAPT = 'joint.adapt';
 export interface JointAdapt {
   patterns: string[];
+  /** Tests maximaux remplacés par une série sous-maximale sur ces mouvements. */
+  tests?: string[];
   at: number;
 }
 

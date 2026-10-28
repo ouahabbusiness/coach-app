@@ -158,7 +158,7 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     }),
   };
   // Adaptation à la gêne acceptée : elle modifie la prescription réelle de la séance (marge, séries, consigne).
-  return adapt?.patterns.length ? { ...out, sets: adaptSets(out.sets, adapt.patterns) } : out;
+  return adapt && (adapt.patterns.length || adapt.tests?.length) ? { ...out, sets: adaptSets(out.sets, adapt.patterns, adapt.tests ?? adapt.patterns) } : out;
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

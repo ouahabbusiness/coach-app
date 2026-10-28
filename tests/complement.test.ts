@@ -3,50 +3,66 @@ import 'fake-indexeddb/auto';
 // @ts-ignore -- module Node disponible pendant les tests (types Node non installés)
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { estimateEnergy, hasActivity } from '../src/engine/activity';
-import { adaptSets, adaptationPatterns, jointAdvice } from '../src/engine/joints';
+import { estimateEnergy, hasActivity, usableActivity, walkKcalPerMin } from '../src/engine/activity';
+import { adaptSets, adaptationPatterns, jointAdvice, normalizeJoint, testPatterns } from '../src/engine/joints';
 import { adviseRuns, spaceRuns } from '../src/engine/runSchedule';
 import { calorieTarget } from '../src/engine/targets';
 import { trainingOfProgram, declaredZones } from '../src/ui/profileComplement';
-import { planRuns } from '../src/ui/Complement';
+import { correctReasons, planRuns } from '../src/ui/Complement';
 import type { PlannedItem } from '../src/engine/planning';
 
 if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
 
 const training = { strengthMinPerWeek: 134, runKmPerWeek: 5.5 };
 
-describe('dépense : activité de la journée + entraînement, sans double comptage', () => {
-  it('sans activité renseignée : aucune estimation inventée', () => {
+describe('dépense : vie quotidienne, tapis, musculation et course, chacun compté une fois', () => {
+  const v2 = (a: object) => ({ v: 2 as const, ...a });
+  it('sans activité renseignée (ou ancien format) : aucune estimation inventée', () => {
     expect(hasActivity({})).toBe(false);
-    expect(estimateEnergy({ bmr: 1800, weightKg: 79, activity: {}, training })).toBeUndefined();
+    expect(hasActivity({ sitHours: '6-9' })).toBe(false); // ancien format sans version
+    expect(usableActivity({ steps: 10500 } as never)).toBeUndefined();
+    expect(estimateEnergy({ bmr: 1800, weightKg: 79, activity: v2({}), training })).toBeUndefined();
     const t = calorieTarget({ sex: 'homme', age: 26, heightCm: 184, weightKg: 79, sessionsPerWeek: 6, training });
     expect(t.value?.basis).toBe('séances');
     expect(t.why.join(' ')).toMatch(/grossier/);
   });
 
-  it('assis longtemps : base basse + entraînement ajouté une fois, bien sous le facteur « 6 séances »', () => {
-    const e = estimateEnergy({ bmr: 1815, weightKg: 79, activity: { sitHours: '9-12' }, training })!;
-    // 1815 × 1,3 + musculation 3×79×(134/60)/7 + course 0,9×79×5,5/7
-    expect(e.maintenance).toBeGreaterThan(2300);
-    expect(e.maintenance).toBeLessThan(2700);
-    expect(e.lines.some((l) => l.includes('musculation'))).toBe(true);
+  it('je bouge peu hors tapis : base basse + tapis réel + musculation + course, détaillés', () => {
+    const e = estimateEnergy({ bmr: 1815, weightKg: 79, activity: v2({ steps: 500, stepsMeasured: false, treadmill: { daysPerWeek: 4, minutes: 100, speedKmh: 5 } }), training })!;
+    const txt = e.lines.join(' | ');
+    expect(txt).toMatch(/500 pas\/jour hors tapis et hors course \(estimés\) → base × 1,2/);
+    expect(txt).toMatch(/tapis : 4 j\/sem\. × 100 min à 5 km\/h/);
+    expect(txt).toMatch(/moyenne sur la semaine, pas par séance/);
+    expect(txt).toMatch(/la course n’est pas dans les pas/);
+    // 1815 × 1,2 = 2178 ; tapis ≈ 188 ; musculation ≈ 76 ; course ≈ 56
+    expect(e.maintenance).toBeGreaterThan(2400);
+    expect(e.maintenance).toBeLessThan(2600);
+    expect(e.notes.join(' ')).toMatch(/estimés/);
+  });
+
+  it('marcher et courir ne sont pas interchangeables : la marche suit la vitesse et l’inclinaison', () => {
+    expect(walkKcalPerMin(79, 6)).toBeGreaterThan(walkKcalPerMin(79, 4));
+    expect(walkKcalPerMin(79, 5, 5)).toBeGreaterThan(walkKcalPerMin(79, 5, 0));
+  });
+
+  it('tapis non renseigné : non compté et dit ; vitesse absente : 4,5 km/h supposés et dits', () => {
+    const none = estimateEnergy({ bmr: 1800, weightKg: 79, activity: v2({ steps: 3000 }), training })!;
+    expect(none.notes.join(' ')).toMatch(/Tapis non renseigné/);
+    const noSpeed = estimateEnergy({ bmr: 1800, weightKg: 79, activity: v2({ steps: 3000, treadmill: { daysPerWeek: 3, minutes: 60 } }), training })!;
+    expect(noSpeed.notes.join(' ')).toMatch(/4,5 km\/h supposés/);
+    expect(noSpeed.maintenance).toBeGreaterThan(none.maintenance);
+  });
+
+  it('assis longtemps sans pas renseignés : base selon les heures assises', () => {
+    const e = estimateEnergy({ bmr: 1815, weightKg: 79, activity: v2({ sitHours: '9-12' }), training })!;
+    expect(e.lines.join(' ')).toMatch(/assis 9 à 12 h/);
     const legacy = calorieTarget({ sex: 'homme', age: 26, heightCm: 184, weightKg: 79, sessionsPerWeek: 6 }).value!.maintenance;
     expect(legacy).toBe(3150);
     expect(e.maintenance).toBeLessThan(legacy - 500);
   });
 
-  it('pas qui comprennent tapis et trajets déclarés : ils ne sont pas ajoutés une seconde fois', () => {
-    const withSteps = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { steps: 8000, stepsIncludes: ['tapis', 'trajets'], treadmillMin: 60, walkCommuteMin: 30 }, training, treadmillDaysPerWeek: 4, workDaysPerWeek: 5 })!;
-    const stepsOnly = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { steps: 8000 }, training })!;
-    expect(withSteps.maintenance).toBe(stepsOnly.maintenance);
-    const noSteps = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { sitHours: '9-12', treadmillMin: 60 }, training, treadmillDaysPerWeek: 4 })!;
-    const noTread = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { sitHours: '9-12' }, training, treadmillDaysPerWeek: 4 })!;
-    expect(noSteps.maintenance).toBeGreaterThan(noTread.maintenance);
-    expect(noTread.notes.join(' ')).toMatch(/Tapis de marche non renseigné/);
-  });
-
   it('la cible utilise l’estimation quand l’activité est connue, et garde les protéines à 1,8 g/kg', () => {
-    const t = calorieTarget({ sex: 'homme', age: 26, heightCm: 184, weightKg: 79, sessionsPerWeek: 6, strategy: 'maintien', activity: { sitHours: '9-12' }, training });
+    const t = calorieTarget({ sex: 'homme', age: 26, heightCm: 184, weightKg: 79, sessionsPerWeek: 6, strategy: 'maintien', activity: v2({ sitHours: '9-12' }), training });
     expect(t.value?.basis).toBe('activité');
     expect(t.value!.kcal).toBeLessThan(3000);
     expect(t.value?.proteinG).toBe(142);
@@ -55,7 +71,7 @@ describe('dépense : activité de la journée + entraînement, sans double compt
 
 describe('gêne articulaire : adaptation selon le déclencheur, orientation sans diagnostic', () => {
   it('aucune réponse inquiétante : pas d’orientation, une adaptation par mouvement déclencheur', () => {
-    const a = jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], maxPain: 3, freq: 'parfois', since: '1-6m', next: 'rien' }]);
+    const a = jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], maxPain: 3, freq: 'rare', since: '1-6m', next: 'rien' }]);
     expect(a.referral).toBeUndefined();
     expect(a.items[0]!.text).toMatch(/Dips/);
     expect(a.items[0]!.text).toMatch(/pas forcément plus doux/);
@@ -64,18 +80,30 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
     const a = jointAdvice([{ zone: 'coudes', triggers: ['inconnu'], alerts: [] }]);
     expect(a.items[0]!.text).toMatch(/inconnu/);
   });
-  it('niveaux d’orientation : blocage, choc ou signal apparu d’un coup = évaluation rapide ; perte de force installée, fourmillements, nuit = avis', () => {
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse'] }]).referral).toMatchObject({ level: 'avis' });
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['engourdissement'] }]).referral).toMatchObject({ level: 'avis' });
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse', 'soudain'] }]).referral).toMatchObject({ level: 'urgent' });
+  it('niveaux d’orientation : blocage, choc, déformation, douleur très forte, fourmillements persistants ou signal soudain = évaluation rapide', () => {
+    for (const al of ['blocage', 'deformation', 'tres_forte', 'engourdissement', 'soudain'] as const) {
+      expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [al] }]).referral).toMatchObject({ level: 'urgent' });
+    }
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['blocage'] }]).referral?.text).toMatch(/sans attendre/);
+  });
+  it('perte de force, dérobement, douleur limitante, nuit, ça empire, gêne qui dure ou revient = avis, sans attendre une baisse de performance', () => {
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['perte_force'] }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['derobement'] }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['douleur_limitante'] }]).referral).toMatchObject({ level: 'avis' });
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['nuit'] }]).referral).toMatchObject({ level: 'avis' });
     expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], trend: 'pire' }]).referral).toMatchObject({ level: 'avis' });
-    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], freq: 'souvent', since: '>6m' }]).referral).toMatchObject({ level: 'avis' });
     expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], next: 'dure' }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], freq: 'parfois', since: '1-6m' }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'epaule', side: 'gauche', triggers: [], alerts: [], symptoms: ['perte_force'] }]).referral?.text).toMatch(/épaule gauche/);
   });
-  it('un score de douleur seul n’est jamais une frontière médicale', () => {
-    expect(jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], maxPain: 9 }]).referral).toBeUndefined();
+  it('simple fatigue en fin de série, gêne rare et ancienne ou score seul : pas d’orientation', () => {
+    expect(jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], symptoms: ['fatigue_fin'], freq: 'rare', since: '1-6m', maxPain: 9 }]).referral).toBeUndefined();
+  });
+  it('anciennes réponses : « perte de force ou instabilité » devient le symptôme à préciser', () => {
+    const n = normalizeJoint({ zone: 'epaule', triggers: [], alerts: ['faiblesse', 'nuit'] });
+    expect(n.symptoms).toEqual(['perte_force']);
+    expect(n.alerts).toEqual(['nuit']);
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse'] }]).referral).toMatchObject({ level: 'avis' });
   });
   it('zones déjà déclarées proposées, jamais inventées', () => {
     expect(declaredZones(['coudes'], 'Légère à l’épaule')).toEqual(['epaule', 'coudes']);
@@ -139,28 +167,20 @@ describe('charge d’entraînement du programme', () => {
   });
 });
 
-describe('pas : ce qu’ils comprennent, sans omission ni doublon', () => {
-  const base = { bmr: 1800, weightKg: 79, training, treadmillDaysPerWeek: 4, workDaysPerWeek: 5 };
-  const withTread = { steps: 6000, treadmillMin: 60 };
-
-  it('total qui exclut le tapis : le tapis est ajouté ; total qui l’inclut : non ajouté', () => {
-    const excl = estimateEnergy({ ...base, activity: withTread })!;
-    const incl = estimateEnergy({ ...base, activity: { ...withTread, stepsIncludes: ['tapis'] } })!;
-    expect(excl.maintenance).toBeGreaterThan(incl.maintenance);
-    expect(excl.lines.join(' ')).toMatch(/de tapis \(non compris dans tes pas\)/);
-    expect(incl.notes.join(' ')).toMatch(/Tapis déjà dans tes pas/);
+describe('correction datée d’une justification fausse', () => {
+  const mk = (note: string, extra = {}): PlannedItem => ({ id: 'x', weekStart: '2026-10-26', day: 5, start: '09:30', durationMin: 30, kind: 'marche', title: 'Marche facile', moves: [], adjustment: { reason: 'deplacement', decision: 'remplacée', at: 1, note }, ...extra });
+  it('séance bien faite dans la semaine : correction ajoutée, note d’origine conservée', () => {
+    const r = correctReasons([mk('remplace « c » : aucune séance de force encore faite cette semaine, x')], ['2026-10-27'], 5, '2026-10-28');
+    expect(r.corrected).toBe(1);
+    const adj = r.items[0]!.adjustment!;
+    expect(adj.note).toMatch(/aucune séance de force encore faite/);
+    expect(adj.corrections![0]!.text).toMatch(/Correction du 28\/10 : la séance de force du 27\/10 était bien comptée/);
+    expect(adj.corrections![0]!.text).toMatch(/décision .* reste inchangée/);
   });
-  it('pas sur tous les jours ou comprenant les courses : la course n’est pas comptée deux fois', () => {
-    const jours = estimateEnergy({ ...base, activity: { steps: 8000 } })!;
-    const tous = estimateEnergy({ ...base, activity: { steps: 8000, stepsPeriod: 'tous' } })!;
-    const courses = estimateEnergy({ ...base, activity: { steps: 8000, stepsIncludes: ['courses'] } })!;
-    expect(tous.maintenance).toBeLessThan(jours.maintenance);
-    expect(courses.maintenance).toBe(tous.maintenance);
-    expect(tous.lines.join(' ')).toMatch(/course : déjà dans tes pas/);
-  });
-  it('sans précision : l’hypothèse est écrite ; pas estimés : marge d’erreur signalée', () => {
-    expect(estimateEnergy({ ...base, activity: { steps: 8000 } })!.notes.join(' ')).toMatch(/Hypothèse/);
-    expect(estimateEnergy({ ...base, activity: { steps: 8000, stepsMeasured: false } })!.notes.join(' ')).toMatch(/estimés/);
+  it('une seule correction, et rien si aucune séance n’a eu lieu', () => {
+    const once = correctReasons([mk('aucune séance de force encore faite cette semaine')], ['2026-10-27'], 5, '2026-10-28').items;
+    expect(correctReasons(once, ['2026-10-27'], 6, '2026-10-29').corrected).toBe(0);
+    expect(correctReasons([mk('aucune séance de force encore faite cette semaine')], [], 5, '2026-10-28').corrected).toBe(0);
   });
 });
 
@@ -180,9 +200,20 @@ describe('adaptation à la gêne : elle modifie la prescription', () => {
     expect(out.find((x) => x.variantId === 'pullup-strict')!.progression).toMatch(/Adaptée à ta gêne/);
     expect(out.find((x) => x.variantId === 'kb-row-1arm')).toMatchObject({ targetRir: 2, lastSetToFailure: true });
   });
+  it('tests maximaux : jamais maintenus sur un mouvement symptomatique, sous-maximaux à 3 en réserve', () => {
+    const t = (variantId: string) => ({ variantId, blockId: variantId, role: 'test', targetRir: undefined as number | undefined, lastSetToFailure: undefined as boolean | undefined, cue: 'Max strict' as string | undefined, progression: undefined as string | undefined });
+    const out = adaptSets([t('pullup-strict'), t('dips-bars'), t('pushup-standard')], [], ['pullup|chinup']);
+    expect(out[0]).toMatchObject({ targetRir: 3, lastSetToFailure: false });
+    expect(out[0]!.cue).toMatch(/Pas de test maximal/);
+    expect(out[1]).toEqual(t('dips-bars'));
+    // geste connu : ses tests ; geste inconnu : tout le haut du corps par prudence ; rien déclaré : rien
+    expect(testPatterns([{ zone: 'epaule', triggers: ['dips'], alerts: [] }])).toEqual(['dips']);
+    expect(testPatterns([{ zone: 'epaule', triggers: ['inconnu'], alerts: [] }])[0]).toMatch(/pullup.*dips.*pushup/);
+    expect(testPatterns([])).toEqual([]);
+  });
   it('jamais sous 2 séries ; aucun motif : rien ne change', () => {
     expect(adaptSets([set('dips-weighted', 'b'), set('dips-weighted', 'b')], ['dips'])).toHaveLength(2);
-    expect(adaptSets(sets, [])).toBe(sets);
+    expect(adaptSets(sets, [], [])).toBe(sets);
   });
 });
 

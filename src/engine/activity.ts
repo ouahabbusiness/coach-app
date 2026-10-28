@@ -1,26 +1,31 @@
-// Dépense énergétique : activité de la journée (hors séances) + entraînement ajouté à part, sans double comptage.
+// Dépense énergétique : activité de la journée, tapis de marche, musculation et course, chacun compté UNE fois.
 // Estimation issue de formules publiques et de choix de conception (marqués), jamais une mesure.
 
 export type SitBand = '<6' | '6-9' | '9-12' | '>12';
 
 export const SIT_LABELS: Record<SitBand, string> = { '<6': 'moins de 6 h', '6-9': '6 à 9 h', '9-12': '9 à 12 h', '>12': 'plus de 12 h' };
 
-/** Activité de la journée, hors séances. Une valeur absente reste inconnue (jamais 0). */
+/** Marche volontaire sur tapis : ce que tu fais réellement, pas ton objectif. */
+export interface TreadmillUse {
+  daysPerWeek?: number;
+  /** Minutes par séance de tapis. */
+  minutes?: number;
+  speedKmh?: number;
+  inclinePct?: number;
+}
+
+/**
+ * Activité de la journée. Une valeur absente reste inconnue (jamais 0).
+ * Version 2 : les pas sont ceux de la vie quotidienne, HORS tapis et HORS course ; le tapis se déclare à part.
+ */
 export interface ActivityAnswers {
-  /** Heures assises par jour (travail, transports, loisirs). */
+  v?: 2;
   sitHours?: SitBand;
-  /** Pas moyens par jour. Ce que ce total couvre est précisé par les trois champs suivants. */
+  /** Pas moyens par jour, hors tapis et hors course. */
   steps?: number;
-  /** Période couverte : les jours sans séance (défaut) ou tous les jours, séances comprises. */
-  stepsPeriod?: 'hors-seances' | 'tous';
-  /** Activités déjà comprises dans ce total : elles ne sont pas ajoutées une seconde fois. */
-  stepsIncludes?: ('tapis' | 'trajets' | 'courses')[];
   /** Total mesuré (montre, iPhone) ou estimé. */
   stepsMeasured?: boolean;
-  /** Tapis de marche : minutes par jour de télétravail (compté sauf s'il est déjà dans tes pas). */
-  treadmillMin?: number;
-  /** Trajets à pied ou à vélo : minutes par jour de travail (compté sauf s'ils sont déjà dans tes pas). */
-  walkCommuteMin?: number;
+  treadmill?: TreadmillUse;
   at?: number;
 }
 
@@ -38,7 +43,7 @@ export interface EnergyEstimate {
 
 const SIT_PAL: Record<SitBand, number> = { '<6': 1.45, '6-9': 1.35, '9-12': 1.3, '>12': 1.25 };
 
-/** Base de la journée selon les pas (hors séances), choix de conception. */
+/** Base de la journée selon les pas du quotidien, sans sport ni tapis (choix de conception). */
 function stepsPal(steps: number): number {
   if (steps >= 10_000) return 1.5;
   if (steps >= 7_500) return 1.4;
@@ -46,63 +51,65 @@ function stepsPal(steps: number): number {
   return 1.2;
 }
 
+const DEFAULT_SPEED_KMH = 4.5;
 const round50 = (n: number) => Math.round(n / 50) * 50;
 const fmt = (n: number) => n.toLocaleString('fr-BE', { maximumFractionDigits: 2 });
 
-/** Une activité est connue dès que les heures assises ou les pas sont renseignés. */
+/** Les réponses d'avant la version 2 décrivaient un total de pas ambigu : elles ne servent plus au calcul. */
+export function usableActivity(a?: ActivityAnswers): ActivityAnswers | undefined {
+  return a && a.v === 2 ? a : undefined;
+}
+
+/** Une activité est connue dès que les heures assises ou les pas du quotidien sont renseignés. */
 export function hasActivity(a?: ActivityAnswers): boolean {
-  return !!a && (a.sitHours !== undefined || a.steps !== undefined);
+  return !!usableActivity(a) && (a!.sitHours !== undefined || a!.steps !== undefined);
+}
+
+/** Dépense nette de la marche (équation de marche ACSM) : kcal par minute au-dessus du repos. */
+export function walkKcalPerMin(weightKg: number, speedKmh: number, inclinePct = 0): number {
+  const speed = (speedKmh * 1000) / 60; // m/min
+  const vo2 = 0.1 * speed + 1.8 * speed * (inclinePct / 100); // ml/kg/min nets
+  return (vo2 * weightKg * 5) / 1000;
 }
 
 /**
- * Maintien = métabolisme de base × base de la journée + marche supplémentaire + entraînement (net du repos).
- * Pas de double comptage : ce que les pas comprennent (tapis, trajets, courses, séances) est déclaré et jamais ajouté une seconde fois ;
- * ce qu'ils ne comprennent pas est ajouté. La musculation est ajoutée une seule fois, en kcal nettes (au-dessus du repos).
- * Choix de conception : musculation 3 MET nets, tapis 1,8 MET net, trajets actifs 2,5 MET nets, course 0,9 kcal/kg/km.
+ * Maintien = métabolisme de base × base de la journée (sans sport ni tapis) + tapis + musculation + course.
+ * Pas de doublon par construction : les pas du quotidien excluent le tapis et la course, qui sont comptés à part.
+ * Marche et course ne sont pas interchangeables : la marche suit l'équation de marche (vitesse, inclinaison), la course
+ * un coût par km. Choix de conception : musculation 3 MET nets, course 0,9 kcal/kg/km.
  */
-export function estimateEnergy(i: { bmr: number; weightKg: number; activity?: ActivityAnswers; training: Training; treadmillDaysPerWeek?: number; workDaysPerWeek?: number }): EnergyEstimate | undefined {
-  const a = i.activity;
-  if (!hasActivity(a)) return undefined;
+export function estimateEnergy(i: { bmr: number; weightKg: number; activity?: ActivityAnswers; training: Training }): EnergyEstimate | undefined {
+  if (!hasActivity(i.activity)) return undefined;
+  const a = i.activity!;
   const w = i.weightKg;
-  const lines: string[] = [`métabolisme de base ${Math.round(i.bmr)} kcal`];
+  const lines: string[] = [`métabolisme de base ${Math.round(i.bmr)} kcal (formule)`];
   const notes: string[] = [];
   let pal: number;
-  let extra = 0;
-  const includes = new Set(a!.stepsIncludes ?? []);
-  const allDays = a!.stepsPeriod === 'tous';
-  if (a!.steps !== undefined) {
-    pal = stepsPal(a!.steps);
-    lines.push(`${a!.steps.toLocaleString('fr-BE')} pas/jour (${a!.stepsMeasured === false ? 'estimés' : 'mesurés'}, ${allDays ? 'tous les jours, séances comprises' : 'jours sans séance'}) → base × ${fmt(pal)}`);
-    if (!includes.size && !allDays) notes.push('Hypothèse : tes pas ne comprennent ni le tapis, ni les trajets, ni les courses. Précise-le si ce n’est pas le cas.');
-    if (a!.stepsMeasured === false) notes.push('Pas estimés : marge d’erreur plus large.');
+  if (a.steps !== undefined) {
+    pal = stepsPal(a.steps);
+    lines.push(`vie quotidienne : ${a.steps.toLocaleString('fr-BE')} pas/jour hors tapis et hors course (${a.stepsMeasured === false ? 'estimés' : 'mesurés'}) → base × ${fmt(pal)}`);
+    if (a.stepsMeasured === false) notes.push('Pas estimés : marge d’erreur plus large.');
   } else {
-    pal = SIT_PAL[a!.sitHours!];
-    lines.push(`assis ${SIT_LABELS[a!.sitHours!]} par jour → base × ${fmt(pal)}`);
+    pal = SIT_PAL[a.sitHours!];
+    lines.push(`assis ${SIT_LABELS[a.sitHours!]} par jour → base × ${fmt(pal)} (estimation)`);
   }
-  // Marche ajoutée seulement si elle n'est pas déjà dans le total de pas (pas d'omission, pas de doublon).
-  const tm = ((a!.treadmillMin ?? 0) * (i.treadmillDaysPerWeek ?? 0)) / 7;
-  const wc = ((a!.walkCommuteMin ?? 0) * (i.workDaysPerWeek ?? 0)) / 7;
-  const tread = includes.has('tapis') ? 0 : (1.8 * w * tm) / 60;
-  const commute = includes.has('trajets') ? 0 : (2.5 * w * wc) / 60;
-  if (tread > 0) {
-    extra += tread;
-    lines.push(`+ ${Math.round(tread)} kcal de tapis${a!.steps !== undefined ? ' (non compris dans tes pas)' : ''}`);
+  let tread = 0;
+  const t = a.treadmill;
+  if (t?.daysPerWeek && t.minutes) {
+    const speed = t.speedKmh ?? DEFAULT_SPEED_KMH;
+    const perMin = walkKcalPerMin(w, speed, t.inclinePct ?? 0);
+    tread = (perMin * t.minutes * t.daysPerWeek) / 7;
+    lines.push(`tapis : ${t.daysPerWeek} j/sem. × ${t.minutes} min à ${fmt(speed)} km/h${t.inclinePct ? `, ${fmt(t.inclinePct)} %` : ''} → +${Math.round(tread)} kcal/jour (moyenne sur la semaine)`);
+    if (t.speedKmh === undefined) notes.push(`Vitesse du tapis non renseignée : ${fmt(DEFAULT_SPEED_KMH)} km/h supposés.`);
+  } else {
+    notes.push('Tapis non renseigné (jours et durée réels) : non compté.');
   }
-  if (commute > 0) {
-    extra += commute;
-    lines.push(`+ ${Math.round(commute)} kcal de trajets actifs${a!.steps !== undefined ? ' (non compris dans tes pas)' : ''}`);
-  }
-  if (includes.has('tapis') && a!.steps !== undefined) notes.push('Tapis déjà dans tes pas : non ajouté.');
-  if (a!.steps === undefined && a!.treadmillMin === undefined && (i.treadmillDaysPerWeek ?? 0) > 0) notes.push('Tapis de marche non renseigné : non compté.');
-  // Les courses ne sont pas comptées deux fois si les pas les contiennent.
-  const runInSteps = allDays || includes.has('courses');
   const strength = (3 * w * (i.training.strengthMinPerWeek / 60)) / 7;
-  const run = runInSteps && a!.steps !== undefined ? 0 : (0.9 * w * i.training.runKmPerWeek) / 7;
-  if (strength > 0) lines.push(`+ ${Math.round(strength)} kcal de musculation (${Math.round(i.training.strengthMinPerWeek)} min/sem.)`);
-  if (run > 0) lines.push(`+ ${Math.round(run)} kcal de course (${fmt(i.training.runKmPerWeek)} km/sem.)`);
-  else if (runInSteps && a!.steps !== undefined && i.training.runKmPerWeek > 0) lines.push('course : déjà dans tes pas, non ajoutée');
-  const maintenance = round50(i.bmr * pal + extra + strength + run);
-  lines.push(`= maintien estimé ${maintenance} kcal`);
-  notes.push('Estimation : l’écart réel peut être important. Elle se corrige avec ton poids et ton alimentation réellement notée.');
+  const run = (0.9 * w * i.training.runKmPerWeek) / 7;
+  if (strength > 0) lines.push(`musculation : ${Math.round(i.training.strengthMinPerWeek)} min/sem. → +${Math.round(strength)} kcal/jour (moyenne sur la semaine, pas par séance)`);
+  if (run > 0) lines.push(`course : ${fmt(i.training.runKmPerWeek)} km/sem. → +${Math.round(run)} kcal/jour (comptée à part : la course n’est pas dans les pas)`);
+  const maintenance = round50(i.bmr * pal + tread + strength + run);
+  lines.push(`= maintien estimé ${maintenance} kcal (arrondi à 50 : estimation, pas mesure)`);
+  notes.push('Marche et course sont comptées différemment et jamais deux fois. L’écart réel peut être important : la cible se corrige avec ton poids et ton alimentation réellement notée.');
   return { maintenance, lines, notes };
 }

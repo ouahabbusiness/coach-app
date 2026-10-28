@@ -43,8 +43,6 @@ export interface CalorieInput {
   /** Activité de la journée (hors séances) : si elle est connue, elle remplace le facteur par nombre de séances. */
   activity?: ActivityAnswers;
   training?: Training;
-  treadmillDaysPerWeek?: number;
-  workDaysPerWeek?: number;
 }
 
 export interface CalorieTarget {
@@ -96,7 +94,7 @@ export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   if (missing.length) return { why: [], missing };
   const bmr = 10 * i.weightKg! + 6.25 * i.heightCm! - 5 * i.age! + (i.sex === 'homme' ? 5 : -161);
   const strategy = strategyOf(i);
-  const energy = i.training ? estimateEnergy({ bmr, weightKg: i.weightKg!, activity: i.activity, training: i.training, treadmillDaysPerWeek: i.treadmillDaysPerWeek, workDaysPerWeek: i.workDaysPerWeek }) : undefined;
+  const energy = i.training ? estimateEnergy({ bmr, weightKg: i.weightKg!, activity: i.activity, training: i.training }) : undefined;
   const factor = activityFactor(i.sessionsPerWeek);
   const maintenance = energy ? energy.maintenance : bmr * factor;
   const why = energy

@@ -48,6 +48,8 @@ export interface Adjustment {
   decision: 'adaptée' | 'annulée' | 'suspendue' | 'remplacée';
   at: number;
   note?: string;
+  /** Corrections datées : la note d'origine reste lisible, jamais réécrite en silence. */
+  corrections?: { at: number; text: string }[];
 }
 
 export const DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];

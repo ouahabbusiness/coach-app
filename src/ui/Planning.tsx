@@ -340,6 +340,8 @@ export function Planning({ repo, go }: { repo: Repository; go: (r: Route) => voi
                 {menu.adjustment && (
                   <ul className="mini-list">
                     <li><Zap size={12} aria-hidden="true" /> {REASON_LABELS[menu.adjustment.reason]} → {menu.adjustment.decision === 'adaptée' ? 'version adaptée' : menu.adjustment.decision}</li>
+                    {menu.adjustment.note && <li className="muted">{menu.adjustment.note}</li>}
+                    {menu.adjustment.corrections?.map((c) => <li key={c.at} className="muted">{c.text}</li>)}
                     {menu.adapted?.removed.map((r) => <li key={r}>− {r}</li>)}
                   </ul>
                 )}
