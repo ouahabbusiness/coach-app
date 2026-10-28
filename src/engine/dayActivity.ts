@@ -76,13 +76,14 @@ export function dayActivityReport(i: DayActivityInput): DayActivityReport {
       const k = dist * perKm;
       kcal += k;
       lines.push(
-        `${i.treadmillSteps.toLocaleString('fr-BE')} pas de tapis (${tag}) ≈ ${fmt(dist)} km (pas de ${STRIDE_M.toLocaleString('fr-BE')} m supposé) → ≈ ${Math.round(k)} kcal${speed ? ` à ${fmt(speed)} km/h${t?.speedShown === false ? ' (estimés)' : ''}` : ' (vitesse inconnue : coût moyen de marche)'}`,
+        `${i.treadmillSteps.toLocaleString('fr-BE')} pas de tapis (${tag}) ≈ ${fmt(dist)} km (estimation : longueur de pas supposée de ${STRIDE_M.toLocaleString('fr-BE')} m, non mesurée chez toi) → ≈ ${Math.round(k)} kcal${speed ? ` à ${fmt(speed)} km/h${t?.speedShown === false ? ' (estimés)' : ''}` : ' (vitesse inconnue : coût moyen de marche)'}`,
       );
+      // Écart entre deux estimations (durée × vitesse, et pas × longueur de pas) : signalé, jamais tranché, jamais corrigé.
       if (t?.minutes && speed && i.final) {
-        const expected = (t.minutes * speed * 1000) / 60 / STRIDE_M;
-        if (Math.abs(i.treadmillSteps - expected) / expected > 0.3) {
+        const byTime = (t.minutes * speed) / 60;
+        if (Math.abs(dist - byTime) / byTime > 0.3) {
           issues.push(
-            `Tes pas de tapis (${i.treadmillSteps.toLocaleString('fr-BE')}) s’écartent de ce que donnent ${t.minutes} min à ${fmt(speed)} km/h (≈ ${Math.round(expected).toLocaleString('fr-BE')} pas, longueur de pas supposée). Rien n’est modifié : vérifie la durée, la vitesse ou le compteur.`,
+            `La distance calculée à partir de la durée et de la vitesse (≈ ${fmt(byTime)} km) diffère de celle estimée à partir des pas (≈ ${fmt(dist)} km). La longueur de pas et la précision des appareils étant incertaines, vérifie les valeurs si possible. Aucune donnée n’a été remplacée.`,
           );
         }
       }

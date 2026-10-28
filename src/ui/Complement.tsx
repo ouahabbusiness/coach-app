@@ -8,6 +8,7 @@ import type { Decision } from '../engine/decide';
 import {
   ALERT_LABELS,
   CURRENT_LABELS,
+  JOINT_ALERT_CHOICES,
   ONSET_LABELS,
   SIDE_LABELS,
   SYMPTOM_LABELS,
@@ -339,7 +340,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const bands: SitBand[] = ['<6', '6-9', '9-12', '>12'];
   const triggers: JointTrigger[] = ['tractions', 'dips', 'pompes', 'developpe', 'rowing', 'inconnu'];
   const symptoms: JointSymptom[] = ['perte_force', 'derobement', 'douleur_limitante', 'fatigue_fin', 'inconnu'];
-  const alerts: JointAlert[] = ['engourdissement', 'blocage', 'deformation', 'tres_forte', 'nuit'];
+  const alerts: JointAlert[] = JOINT_ALERT_CHOICES;
   const num = (v: string) => (v === '' ? undefined : Math.max(0, Number(v.replace(',', '.')) || 0));
   const hasActivityNow = act.steps !== undefined || act.sitHours !== undefined;
   const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !tests.length && !chronos.length && !hasActivityNow;

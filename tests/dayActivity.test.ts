@@ -51,7 +51,7 @@ describe('bilan d’activité du jour', () => {
   it('séparé : pas hors tapis, tapis (vitesse connue) et course comptés à part', () => {
     const r = dayActivityReport({ ...base, steps: 700, treadmillSteps: 9300, mode: 'separe', treadmill: { speedKmh: 5 }, runKm: 1.5, final: true });
     expect(r.lines.join(' | ')).toMatch(/700 pas hors tapis \(déclarés\)/);
-    expect(r.lines.join(' | ')).toMatch(/9\s300 pas de tapis .* ≈ 7 km .* à 5 km\/h/);
+    expect(r.lines.join(' | ')).toMatch(/9\s300 pas de tapis .* ≈ 7 km \(estimation : longueur de pas supposée de 0,75 m, non mesurée chez toi\) .* à 5 km\/h/);
     expect(r.lines.join(' | ')).toMatch(/course : 1,5 km .*comptée à part/);
     expect(r.kcal).toBeGreaterThan(300);
   });
@@ -67,8 +67,11 @@ describe('bilan d’activité du jour', () => {
     const early = dayActivityReport({ ...base, treadmillSteps: 3000, mode: 'separe', treadmill: t });
     expect(early.issues).toEqual([]);
     const late = dayActivityReport({ ...base, treadmillSteps: 3000, mode: 'separe', treadmill: t, final: true });
-    expect(late.issues.join(' ')).toMatch(/s’écartent de ce que donnent 130 min à 5 km\/h/);
-    expect(late.issues.join(' ')).toMatch(/Rien n’est modifié/);
+    expect(late.issues.join(' ')).toMatch(/distance calculée à partir de la durée et de la vitesse \(≈ 10,8 km\) diffère de celle estimée à partir des pas/);
+    expect(late.issues.join(' ')).toMatch(/longueur de pas et la précision des appareils étant incertaines/);
+    expect(late.issues.join(' ')).toMatch(/Aucune donnée n’a été remplacée/);
+    // aucune des deux sources n'est déclarée fausse
+    expect(late.issues.join(' ')).not.toMatch(/faux|erreur|incohérent/i);
     // cohérent : rien à signaler
     expect(dayActivityReport({ ...base, treadmillSteps: 14000, mode: 'separe', treadmill: t, final: true }).issues).toEqual([]);
   });

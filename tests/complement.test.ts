@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto';
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { estimateEnergy, hasActivity, usableActivity, walkKcalPerMin } from '../src/engine/activity';
-import { adaptSets, adaptationPatterns, jointAdvice, normalizeJoint, testPatterns, toggleSymptom } from '../src/engine/joints';
+import { adaptSets, adaptationPatterns, jointAdvice, normalizeJoint, testPatterns, toggleSymptom, JOINT_ALERT_CHOICES } from '../src/engine/joints';
 import { adviseRuns, spaceRuns } from '../src/engine/runSchedule';
 import { calorieTarget } from '../src/engine/targets';
 import { trainingOfProgram, declaredZones } from '../src/ui/profileComplement';
@@ -111,6 +111,13 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
   });
   it('douleur ancienne qui s’améliore : ne permet pas à elle seule d’écarter un problème de force', () => {
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], onset: 'progressif', current: 'ancien', trend: 'mieux', symptoms: ['perte_force'] }]).referral).toMatchObject({ level: 'avis' });
+  });
+  it('le début n’a supprimé aucun autre critère d’alerte : chacun reste proposé et garde son niveau', () => {
+    expect(JOINT_ALERT_CHOICES).toEqual(['engourdissement', 'blocage', 'deformation', 'tres_forte', 'nuit']);
+    for (const al of JOINT_ALERT_CHOICES) {
+      const lvl = jointAdvice([{ zone: 'epaule', triggers: [], alerts: [al] }]).referral?.level;
+      expect(lvl).toBe(al === 'nuit' ? 'avis' : 'urgent');
+    }
   });
   it('simple fatigue en fin de série, gêne rare et ancienne ou score seul : pas d’orientation', () => {
     expect(jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], symptoms: ['fatigue_fin'], freq: 'rare', since: '1-6m', maxPain: 9 }]).referral).toBeUndefined();

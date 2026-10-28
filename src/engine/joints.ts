@@ -41,6 +41,8 @@ export const ALERT_LABELS: Record<JointAlert, string> = {
   soudain: 'Apparu d’un coup',
   nuit: 'Douleur la nuit',
 };
+/** Signaux proposés dans le questionnaire (« apparu d'un coup » est remplacé par le début et la situation actuelle). */
+export const JOINT_ALERT_CHOICES: JointAlert[] = ['engourdissement', 'blocage', 'deformation', 'tres_forte', 'nuit'];
 export const TREND_LABELS: Record<JointTrend, string> = { mieux: 'ça s’améliore', pareil: 'pareil', pire: 'ça empire' };
 export const ONSET_LABELS: Record<JointOnset, string> = { evenement: 'lors d’un événement précis', progressif: 'progressivement', inconnu: 'je ne me souviens pas' };
 export const CURRENT_LABELS: Record<JointCurrent, string> = { present: 'encore présents', ancien: 'seulement anciens' };
