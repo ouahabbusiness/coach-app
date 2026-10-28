@@ -7,6 +7,8 @@ import { SIT_LABELS, usableActivity, type ActivityAnswers, type SitBand, type Tr
 import type { Decision } from '../engine/decide';
 import {
   ALERT_LABELS,
+  CURRENT_LABELS,
+  ONSET_LABELS,
   SIDE_LABELS,
   SYMPTOM_LABELS,
   TREND_LABELS,
@@ -18,6 +20,8 @@ import {
   toggleSymptom,
   type JointAlert,
   type JointAnswer,
+  type JointCurrent,
+  type JointOnset,
   type JointSide,
   type JointSymptom,
   type JointTrend,
@@ -112,6 +116,9 @@ export function planRuns(items: PlannedItem[], fixed: FixedEvent[], today: strin
   }
   return { changes, advice };
 }
+
+/** Évaluation de course facile et reproductible, plutôt qu'un maximum : durée courue confortablement, difficulté ressentie, récupération. */
+const EASY_EVAL = { title: 'Course · évaluation facile', km: undefined as number | undefined, detail: 'Allure facile : note la durée courue confortablement, la difficulté ressentie et ta récupération. Pas de maximum.' };
 
 const WRONG_REASON = 'aucune séance de force encore faite cette semaine';
 
@@ -211,7 +218,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const joints = c.joints ?? [];
   // Dès que tu précises ce que tu ressens, l'ancienne réponse combinée disparaît : seule ta nouvelle réponse est conservée.
   const setJoint = (zone: JointZone, patch: Partial<JointAnswer>) =>
-    update((x) => ({ ...x, joints: (x.joints ?? []).map((j) => (j.zone === zone ? { ...j, ...patch, ...(patch.symptoms?.length ? { alerts: j.alerts.filter((a) => a !== 'faiblesse') } : {}) } : j)) }));
+    update((x) => ({ ...x, joints: (x.joints ?? []).map((j) => (j.zone === zone ? { ...j, ...patch, ...(patch.symptoms?.length ? { alerts: j.alerts.filter((a) => a !== 'faiblesse') } : {}), ...(patch.onset || patch.current ? { alerts: (patch.symptoms?.length ? j.alerts.filter((a) => a !== 'faiblesse') : j.alerts).filter((a) => !(a === 'soudain' && (patch.onset ?? j.onset) && (patch.current ?? j.current))) } : {}) } : j)) }));
   const toggleZone = (zone: JointZone) =>
     update((x) => ({ ...x, joints: (x.joints ?? []).some((j) => j.zone === zone) ? (x.joints ?? []).filter((j) => j.zone !== zone) : [...(x.joints ?? []), { zone, triggers: [], alerts: [] }] }));
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -222,6 +229,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const match = (list: string[], v: string) => list.some((p) => new RegExp(p).test(v));
   const touched = useMemo(() => (inp ? inp.variants.filter((v) => match(patterns, v)) : []), [inp, patterns]);
   const testsTouched = useMemo(() => (inp ? inp.testVariants.filter((v) => match(tests, v)) : []), [inp, tests]);
+  const chronos = useMemo(() => (inp ? inp.items.filter((x) => x.kind === 'course' && /chrono/i.test(x.title) && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp]);
   const retests = useMemo(() => (inp && tests.length ? inp.items.filter((x) => x.templateId === 'prog-T' && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp, tests]);
   const kcal = useMemo(() => {
     if (!inp) return undefined;
@@ -253,7 +261,8 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
     const byId = new Map(runs.changes.map((x) => [x.id, x]));
     const replace = new Map(runs.advice.map((x) => [x.replace.id, x]));
     const retestIds = new Set(retests.map((x) => x.id));
-    if (runs.changes.length || runs.advice.length || retestIds.size) {
+    const chronoIds = new Set(chronos.map((x) => x.id));
+    if (runs.changes.length || runs.advice.length || retestIds.size || chronoIds.size) {
       const items = (await loadPlanning(repo)).map((x) => {
         const m = byId.get(x.id);
         if (m) return { ...x, day: m.toDay, start: m.start, moves: [...x.moves, { at: Date.now(), fromDay: x.day, fromStart: x.start }] };
@@ -271,6 +280,9 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             adjustment: { reason: 'deplacement' as const, decision: 'remplacée' as const, at: Date.now(), note: `remplace « ${x.title} » : courses consécutives. ${r.reason}` },
           };
         }
+        if (chronoIds.has(x.id)) {
+          return { ...x, ...EASY_EVAL, adjustment: { reason: 'deplacement' as const, decision: 'adaptée' as const, at: Date.now(), note: 'Chrono maximal remplacé par une évaluation facile : reprise après une longue pause, objectif courir 10 km sans marcher.' } };
+        }
         if (retestIds.has(x.id) && !x.adjustment) {
           return { ...x, adjustment: { reason: 'douleur' as const, decision: 'adaptée' as const, at: Date.now(), note: 'Test maximal remplacé par une série sous-maximale sur les mouvements concernés (gêne déclarée). À réévaluer avant la date : report ou annulation possibles selon l’évolution.' } };
         }
@@ -278,10 +290,12 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       });
       await repo.setKv(PLAN_KEY, items);
       const prog = await repo.getKv<{ program: { week: { day: number; start: string; durationMin: number; kind: string }[]; weekly?: { day: number; start: string; durationMin: number; kind: string }[][] } }>(PROGRAM_KEY);
-      if (prog?.program && runs.changes.length) {
-        const fix = <T extends { day: number; start: string; durationMin: number; kind: string }>(w: T[]) => spaceRuns(w, { start: '12:30' }).items;
-        await repo.setKv(PROGRAM_KEY, { ...prog, program: { ...prog.program, week: fix(prog.program.week), weekly: prog.program.weekly?.map(fix) } });
+      if (prog?.program && (runs.changes.length || chronoIds.size)) {
+        type W = { day: number; start: string; durationMin: number; kind: string; title?: string };
+        const fix = (w: W[]) => spaceRuns(w, { start: '12:30' }).items.map((x) => (chronoIds.size && x.kind === 'course' && /chrono/i.test(x.title ?? '') ? { ...x, ...EASY_EVAL } : x));
+        await repo.setKv(PROGRAM_KEY, { ...prog, program: { ...prog.program, week: fix(prog.program.week as W[]), weekly: prog.program.weekly?.map((w) => fix(w as W[])) } });
       }
+      if (chronoIds.size) done.push('chrono maximal remplacé par une évaluation facile');
       if (runs.changes.length) done.push(`${runs.changes.length} course${runs.changes.length > 1 ? 's' : ''} déplacée${runs.changes.length > 1 ? 's' : ''}`);
       if (runs.advice.length) done.push(`${runs.advice.length} course${runs.advice.length > 1 ? 's' : ''} remplacée${runs.advice.length > 1 ? 's' : ''} par une marche`);
       if (retestIds.size) done.push('test maximal remplacé par une série sous-maximale');
@@ -325,10 +339,10 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const bands: SitBand[] = ['<6', '6-9', '9-12', '>12'];
   const triggers: JointTrigger[] = ['tractions', 'dips', 'pompes', 'developpe', 'rowing', 'inconnu'];
   const symptoms: JointSymptom[] = ['perte_force', 'derobement', 'douleur_limitante', 'fatigue_fin', 'inconnu'];
-  const alerts: JointAlert[] = ['engourdissement', 'blocage', 'deformation', 'tres_forte', 'soudain', 'nuit'];
+  const alerts: JointAlert[] = ['engourdissement', 'blocage', 'deformation', 'tres_forte', 'nuit'];
   const num = (v: string) => (v === '' ? undefined : Math.max(0, Number(v.replace(',', '.')) || 0));
   const hasActivityNow = act.steps !== undefined || act.sitHours !== undefined;
-  const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !tests.length && !hasActivityNow;
+  const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !tests.length && !chronos.length && !hasActivityNow;
 
   return (
     <Modal open={open} onClose={onClose} title="Compléter mon profil">
@@ -374,7 +388,23 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             <input type="text" inputMode="decimal" placeholder="0" value={tread.inclinePct ?? ''} onChange={(e) => setTread({ inclinePct: num(e.target.value) })} />
           </label>
         </div>
-        <Help>Ce que tu fais vraiment, pas ton objectif de pas. Vitesse et inclinaison sont facultatives : sans vitesse, 4,5 km/h sont supposés et l’app le dit. Ta musculation et ta course sont déjà dans ton programme.</Help>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <label className="stack" style={{ gap: 4, flex: 1, minWidth: 120 }}>
+            <span className="eyebrow">Dont jours plus courts</span>
+            <input type="number" inputMode="numeric" min={0} max={7} placeholder="0" value={tread.shortDays ?? ''} onChange={(e) => setTread({ shortDays: num(e.target.value) })} />
+          </label>
+          <label className="stack" style={{ gap: 4, flex: 1, minWidth: 120 }}>
+            <span className="eyebrow">Minutes ces jours-là</span>
+            <input type="number" inputMode="numeric" min={0} placeholder="0" value={tread.shortMinutes ?? ''} onChange={(e) => setTread({ shortMinutes: num(e.target.value) })} />
+          </label>
+        </div>
+        {tread.speedKmh !== undefined && (
+          <div className="chips">
+            <Chip on={tread.speedShown !== false} onClick={() => setTread({ speedShown: true })}>vitesse affichée par le tapis</Chip>
+            <Chip on={tread.speedShown === false} onClick={() => setTread({ speedShown: false })}>vitesse estimée</Chip>
+          </div>
+        )}
+        <Help>Ce que tu fais vraiment, pas ton objectif de pas. Si tu fais parfois 60 minutes et parfois 130, indique les jours plus courts plutôt que de lisser. Vitesse et inclinaison sont facultatives : sans vitesse, 4,5 km/h sont supposés et l’app le dit. Ne modifie pas une vitesse affichée pour retrouver 10 000 pas : la conversion pas–distance n’est qu’une estimation. Ta musculation et ta course sont déjà dans ton programme.</Help>
 
         <h3 style={{ margin: '8px 0 0' }}>Gêne</h3>
         <Help>L’app ne pose pas de diagnostic. Décris ce que tu ressens, pas ce que tu arrives à faire : tes séries en séance n’excluent pas une faiblesse d’un côté, un dérobement ou une gêne sur un geste précis.</Help>
@@ -398,6 +428,18 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             <div className="chips">
               {symptoms.map((sy) => (
                 <Chip key={sy} on={(j.symptoms ?? []).includes(sy)} onClick={() => setJoint(j.zone, { symptoms: toggleSymptom(j.symptoms ?? [], sy) })}>{SYMPTOM_LABELS[sy]}</Chip>
+              ))}
+            </div>
+            <p className="eyebrow" style={{ margin: 0 }}>Comment ça a commencé</p>
+            <div className="chips">
+              {(['evenement', 'progressif', 'inconnu'] as JointOnset[]).map((v) => (
+                <Chip key={v} on={j.onset === v} onClick={() => setJoint(j.zone, { onset: j.onset === v ? undefined : v })}>{ONSET_LABELS[v]}</Chip>
+              ))}
+            </div>
+            <p className="eyebrow" style={{ margin: 0 }}>Aujourd’hui, les symptômes sont</p>
+            <div className="chips">
+              {(['present', 'ancien'] as JointCurrent[]).map((v) => (
+                <Chip key={v} on={j.current === v} onClick={() => setJoint(j.zone, { current: j.current === v ? undefined : v })}>{CURRENT_LABELS[v]}</Chip>
               ))}
             </div>
             <p className="eyebrow" style={{ margin: 0 }}>Sur quel geste</p>
@@ -449,6 +491,12 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             Ton ancienne réponse « perte de force ou instabilité » ({advice.clarify.map((z) => ZONE_LABELS[z].toLowerCase()).join(', ')}) est à clarifier : coche ce que tu ressens vraiment, ou « Je ne sais pas distinguer ». Elle n’est pas reprise comme « moins de force ».
           </p>
         )}
+        {advice.clarifyOnset.length > 0 && (
+          <p role="status" className="notice" style={{ margin: 0 }}>
+            « Apparu d’un coup » ({advice.clarifyOnset.map((z) => ZONE_LABELS[z].toLowerCase()).join(', ')}) est à préciser : comment ça a commencé, et si les symptômes sont encore présents. Ni urgence affirmée, ni « tout va bien ».
+          </p>
+        )}
+        {advice.hold && <p className="notice" style={{ margin: 0 }}>{advice.hold}</p>}
         {advice.referral && (
           <p role="alert" className="notice warn" style={{ margin: 0, fontWeight: advice.referral.level === 'urgent' ? 700 : 400 }}>
             {advice.referral.text}
@@ -523,6 +571,14 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             {advice.items.map((it) => (
               <p key={it.zone + it.text} className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{ZONE_LABELS[it.zone]} · {it.text}</p>
             ))}
+          </section>
+        )}
+        {chronos.length > 0 && (
+          <section className="card stack" aria-label="Évaluation de course">
+            <strong>Évaluation de course</strong>
+            <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+              Le chrono maximal du {chronos.map((x) => dm(dateOf(x.weekStart, x.day))).join(', ')} est remplacé par une évaluation facile : durée courue confortablement, difficulté ressentie, récupération. Ton objectif est de courir 10 km sans marcher après une longue pause : un maximum n’est pas nécessaire pour ça.
+            </p>
           </section>
         )}
         {c.validated ? (

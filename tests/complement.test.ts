@@ -31,7 +31,7 @@ describe('dépense : vie quotidienne, tapis, musculation et course, chacun compt
     const e = estimateEnergy({ bmr: 1815, weightKg: 79, activity: v2({ steps: 500, stepsMeasured: false, treadmill: { daysPerWeek: 4, minutes: 100, speedKmh: 5 } }), training })!;
     const txt = e.lines.join(' | ');
     expect(txt).toMatch(/500 pas\/jour hors tapis et hors course \(estimés\) → base × 1,2/);
-    expect(txt).toMatch(/tapis : 4 j\/sem\. × 100 min à 5 km\/h/);
+    expect(txt).toMatch(/tapis : 4 j × 100 min par semaine à 5 km\/h/);
     expect(txt).toMatch(/moyenne sur la semaine, pas par séance/);
     expect(txt).toMatch(/la course n’est pas dans les pas/);
     // 1815 × 1,2 = 2178 ; tapis ≈ 188 ; musculation ≈ 76 ; course ≈ 56
@@ -80,11 +80,24 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
     const a = jointAdvice([{ zone: 'coudes', triggers: ['inconnu'], alerts: [] }]);
     expect(a.items[0]!.text).toMatch(/inconnu/);
   });
-  it('niveaux d’orientation : blocage, choc, déformation, douleur très forte, fourmillements persistants ou signal soudain = évaluation rapide', () => {
-    for (const al of ['blocage', 'deformation', 'tres_forte', 'engourdissement', 'soudain'] as const) {
+  it('évaluation rapide : bras bloqué, déformation, douleur très forte, fourmillements persistants, ou début brutal récent encore présent', () => {
+    for (const al of ['blocage', 'deformation', 'tres_forte', 'engourdissement'] as const) {
       expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [al] }]).referral).toMatchObject({ level: 'urgent' });
     }
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['blocage'] }]).referral?.text).toMatch(/sans attendre/);
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], onset: 'evenement', current: 'present', since: '<1m' }]).referral).toMatchObject({ level: 'urgent' });
+  });
+  it('« apparu d’un coup » : un début brutal ancien n’est pas un symptôme nouveau ; non précisé = à clarifier, ni urgence affirmée ni tout va bien', () => {
+    const old = jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], onset: 'evenement', current: 'present', since: '1-6m' }]);
+    expect(old.referral).toMatchObject({ level: 'avis' });
+    const legacy = jointAdvice([{ zone: 'epaule', triggers: ['tractions'], alerts: ['soudain'] }]);
+    expect(legacy.clarifyOnset).toEqual(['epaule']);
+    expect(legacy.referral).toMatchObject({ level: 'avis' });
+    expect(legacy.hold).toMatch(/ne vérifie pas ta force avec une série lourde ni un test maximal/);
+    // précisé : plus rien à clarifier
+    const done = jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['soudain'], onset: 'progressif', current: 'ancien' }]);
+    expect(done.clarifyOnset).toEqual([]);
+    expect(normalizeJoint({ zone: 'epaule', triggers: [], alerts: ['soudain'] }).alerts).toEqual([]);
   });
   it('perte de force, dérobement, douleur limitante, nuit, ça empire, gêne qui dure ou revient = avis, sans attendre une baisse de performance', () => {
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['perte_force'] }]).referral).toMatchObject({ level: 'avis' });
@@ -95,6 +108,9 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
     expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], next: 'dure' }]).referral).toMatchObject({ level: 'avis' });
     expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], freq: 'parfois', since: '1-6m' }]).referral).toMatchObject({ level: 'avis' });
     expect(jointAdvice([{ zone: 'epaule', side: 'gauche', triggers: [], alerts: [], symptoms: ['perte_force'] }]).referral?.text).toMatch(/épaule gauche/);
+  });
+  it('douleur ancienne qui s’améliore : ne permet pas à elle seule d’écarter un problème de force', () => {
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], onset: 'progressif', current: 'ancien', trend: 'mieux', symptoms: ['perte_force'] }]).referral).toMatchObject({ level: 'avis' });
   });
   it('simple fatigue en fin de série, gêne rare et ancienne ou score seul : pas d’orientation', () => {
     expect(jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], symptoms: ['fatigue_fin'], freq: 'rare', since: '1-6m', maxPain: 9 }]).referral).toBeUndefined();

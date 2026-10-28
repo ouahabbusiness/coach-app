@@ -10,6 +10,10 @@ export type JointSymptom = 'perte_force' | 'derobement' | 'douleur_limitante' | 
 /** Signaux qui appellent une évaluation rapide, ou un avis lorsqu'ils s'installent. */
 export type JointAlert = 'engourdissement' | 'blocage' | 'deformation' | 'tres_forte' | 'soudain' | 'nuit';
 export type JointTrend = 'mieux' | 'pareil' | 'pire';
+/** Comment ça a commencé : lors d'un événement précis (choc, geste brutal), progressivement, ou tu ne te souviens pas. */
+export type JointOnset = 'evenement' | 'progressif' | 'inconnu';
+/** Situation actuelle : les symptômes sont encore là, ou seulement anciens. */
+export type JointCurrent = 'present' | 'ancien';
 
 export const ZONE_LABELS: Record<JointZone, string> = { epaule: 'Épaule', coudes: 'Coudes' };
 export const SIDE_LABELS: Record<JointSide, string> = { gauche: 'gauche', droite: 'droite', 'les-deux': 'les deux' };
@@ -38,6 +42,8 @@ export const ALERT_LABELS: Record<JointAlert, string> = {
   nuit: 'Douleur la nuit',
 };
 export const TREND_LABELS: Record<JointTrend, string> = { mieux: 'ça s’améliore', pareil: 'pareil', pire: 'ça empire' };
+export const ONSET_LABELS: Record<JointOnset, string> = { evenement: 'lors d’un événement précis', progressif: 'progressivement', inconnu: 'je ne me souviens pas' };
+export const CURRENT_LABELS: Record<JointCurrent, string> = { present: 'encore présents', ancien: 'seulement anciens' };
 
 export interface JointAnswer {
   zone: JointZone;
@@ -52,6 +58,10 @@ export interface JointAnswer {
   /** Le lendemain d'une séance. */
   next?: 'rien' | 'legere' | 'dure';
   trend?: JointTrend;
+  /** Début et situation actuelle : « apparu d'un coup » il y a des mois n'est pas « nouveau aujourd'hui ». */
+  onset?: JointOnset;
+  current?: JointCurrent;
+  /** Anciennes réponses : « faiblesse » (perte de force ou instabilité) et « soudain » (apparu d'un coup) sont à clarifier. */
   alerts: (JointAlert | 'faiblesse')[];
 }
 
@@ -59,8 +69,15 @@ export interface JointAnswer {
  * Ancienne réponse « perte de force ou instabilité » : elle mélangeait perte de force, dérobement et douleur. Elle n'est PAS
  * convertie en « moins de force » : elle reste une information à clarifier (`clarify`), jamais un symptôme précoché.
  */
-export function normalizeJoint(a: JointAnswer): JointAnswer & { symptoms: JointSymptom[]; alerts: JointAlert[]; clarify: boolean } {
-  return { ...a, symptoms: a.symptoms ?? [], alerts: a.alerts.filter((x): x is JointAlert => x !== 'faiblesse'), clarify: a.alerts.includes('faiblesse') && !(a.symptoms ?? []).length };
+export function normalizeJoint(a: JointAnswer): JointAnswer & { symptoms: JointSymptom[]; alerts: JointAlert[]; clarify: boolean; clarifyOnset: boolean } {
+  return {
+    ...a,
+    symptoms: a.symptoms ?? [],
+    alerts: a.alerts.filter((x): x is JointAlert => x !== 'faiblesse' && x !== 'soudain'),
+    clarify: a.alerts.includes('faiblesse') && !(a.symptoms ?? []).length,
+    // « Apparu d'un coup » sans début ni situation actuelle précisés : à clarifier, ni urgence affirmée ni « tout va bien ».
+    clarifyOnset: a.alerts.includes('soudain') && (!a.onset || !a.current),
+  };
 }
 
 /**
@@ -83,6 +100,10 @@ export interface JointAdvice {
   referral?: JointReferral;
   /** Zones dont l'ancienne réponse combinée reste à préciser. */
   clarify: JointZone[];
+  /** Zones où « apparu d'un coup » reste à préciser (quand, comment, ce qui persiste). */
+  clarifyOnset: JointZone[];
+  /** Tant que des symptômes de force ou de tenue sont à clarifier : pas de série lourde ni de test maximal pour « vérifier ». */
+  hold?: string;
   /** Adaptation par mouvement déclencheur : une proposition à vérifier pendant la séance et le lendemain, pas une garantie. */
   items: { zone: JointZone; text: string }[];
 }
@@ -109,6 +130,7 @@ const FOR: Partial<Record<JointTrigger, string>> = {
 export function jointAdvice(raw: JointAnswer[]): JointAdvice {
   const answers = raw.map(normalizeJoint);
   const clarify = answers.filter((a) => a.clarify).map((a) => a.zone);
+  const clarifyOnset = answers.filter((a) => a.clarifyOnset).map((a) => a.zone);
   const items: JointAdvice['items'] = [];
   const urgent: string[] = [];
   const avis: string[] = [];
@@ -123,7 +145,10 @@ export function jointAdvice(raw: JointAnswer[]): JointAdvice {
     }
     // Évaluation rapide, quel que soit le score de douleur.
     for (const al of a.alerts) if (al === 'blocage' || al === 'deformation' || al === 'tres_forte' || al === 'engourdissement') urgent.push(`${z} : ${ALERT_LABELS[al].toLowerCase()}`);
-    if (a.alerts.includes('soudain')) urgent.push(`${z} : apparu d’un coup`);
+    // Début lors d'un événement précis ET symptômes encore présents : récent = évaluation rapide ; plus ancien = avis.
+    if (a.onset === 'evenement' && a.current === 'present') (a.since === '<1m' ? urgent : avis).push(`${z} : début lors d’un événement précis, symptômes encore présents`);
+    else if (a.onset === 'evenement') avis.push(`${z} : début lors d’un événement précis`);
+    if (a.clarifyOnset) avis.push(`${z} : « apparu d’un coup » à préciser`);
     // Avis médical ou d'un kiné : ce qui s'installe, limite ou empire.
     if (a.symptoms.includes('perte_force')) avis.push(`${z} : moins de force qu’avant`);
     if (a.symptoms.includes('derobement')) avis.push(`${z} : ça se dérobe`);
@@ -140,7 +165,9 @@ export function jointAdvice(raw: JointAnswer[]): JointAdvice {
   } else if (avis.length) {
     referral = { level: 'avis', text: `Un avis médical ou d’un kiné est recommandé sans attendre une baisse de performance (${[...new Set(avis)].join(' ; ')}). L’app ne pose pas de diagnostic.` };
   }
-  return { referral, items: uniq, clarify };
+  const unsure = answers.some((a) => a.clarify || a.clarifyOnset || a.symptoms.some((x) => x === 'perte_force' || x === 'derobement' || x === 'inconnu'));
+  const hold = unsure ? 'En attendant d’y voir clair : ne vérifie pas ta force avec une série lourde ni un test maximal.' : undefined;
+  return { referral, items: uniq, clarify, clarifyOnset, hold };
 }
 
 /** Une gêne déclarée gèle la montée de charge des mouvements concernés. */

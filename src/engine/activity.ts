@@ -7,10 +7,16 @@ export const SIT_LABELS: Record<SitBand, string> = { '<6': 'moins de 6 h', '6-9'
 
 /** Marche volontaire sur tapis : ce que tu fais réellement, pas ton objectif. */
 export interface TreadmillUse {
+  /** Jours réellement faits dans une semaine habituelle. */
   daysPerWeek?: number;
-  /** Minutes par séance de tapis. */
+  /** Minutes réellement faites les jours habituels. */
   minutes?: number;
+  /** Parmi ces jours, ceux où c'est plus court (facultatif) : la variation est comptée, pas lissée en silence. */
+  shortDays?: number;
+  shortMinutes?: number;
   speedKmh?: number;
+  /** Vitesse lue sur le tapis (true) ou estimée (false). */
+  speedShown?: boolean;
   inclinePct?: number;
 }
 
@@ -98,9 +104,13 @@ export function estimateEnergy(i: { bmr: number; weightKg: number; activity?: Ac
   if (t?.daysPerWeek && t.minutes) {
     const speed = t.speedKmh ?? DEFAULT_SPEED_KMH;
     const perMin = walkKcalPerMin(w, speed, t.inclinePct ?? 0);
-    tread = (perMin * t.minutes * t.daysPerWeek) / 7;
-    lines.push(`tapis : ${t.daysPerWeek} j/sem. × ${t.minutes} min à ${fmt(speed)} km/h${t.inclinePct ? `, ${fmt(t.inclinePct)} %` : ''} → +${Math.round(tread)} kcal/jour (moyenne sur la semaine)`);
+    const short = Math.min(t.shortDays ?? 0, t.daysPerWeek);
+    const weeklyMin = (t.daysPerWeek - short) * t.minutes + (short && t.shortMinutes !== undefined ? short * t.shortMinutes : short * t.minutes);
+    tread = (perMin * weeklyMin) / 7;
+    const detail = short && t.shortMinutes !== undefined ? `${t.daysPerWeek - short} j × ${t.minutes} min + ${short} j × ${t.shortMinutes} min` : `${t.daysPerWeek} j × ${t.minutes} min`;
+    lines.push(`tapis : ${detail} par semaine à ${fmt(speed)} km/h${t.speedKmh !== undefined ? (t.speedShown === false ? ' (estimés)' : t.speedShown === true ? ' (affichés)' : '') : ''}${t.inclinePct ? `, ${fmt(t.inclinePct)} %` : ''} → +${Math.round(tread)} kcal/jour (moyenne sur la semaine)`);
     if (t.speedKmh === undefined) notes.push(`Vitesse du tapis non renseignée : ${fmt(DEFAULT_SPEED_KMH)} km/h supposés.`);
+    if (t.speedKmh !== undefined && t.speedShown === false) notes.push('Vitesse estimée : marge d’erreur plus large sur le tapis.');
   } else {
     notes.push('Tapis non renseigné (jours et durée réels) : non compté.');
   }

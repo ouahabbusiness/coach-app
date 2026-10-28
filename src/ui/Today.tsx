@@ -7,11 +7,12 @@ import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
 import { NOVEMBER_2026, habitStatus, weekStart } from '../engine/challenge';
-import { addWater, daysUntil } from '../engine/daily';
+import { addWater, dayStepsTotal, daysUntil } from '../engine/daily';
 import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
 import { WhyModal, useTargets } from './Targets';
 import { ComplementModal } from './Complement';
+import { ActivityDayModal } from './ActivityDay';
 import { NextStepCard } from './Nutrition';
 import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
@@ -205,6 +206,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const [goal, setGoal] = useState<GoalVersion | undefined>();
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
   const [complement, setComplement] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [hero, setHero] = useState<Hero | null>(null);
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState('');
@@ -386,10 +388,10 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
           icon={<Footprints size={16} aria-hidden="true" />}
           label="Pas"
           onLabel={() => openEditor('steps')}
-          value={daily?.steps !== undefined || daily?.treadmillSteps !== undefined ? fmtNum((daily?.steps ?? 0) + (daily?.treadmillSteps ?? 0)) : '—'}
+          value={daily?.steps !== undefined || daily?.treadmillSteps !== undefined ? fmtNum(dayStepsTotal(daily)) : '—'}
           sub={`/ ${fmtNum(STEPS_GOAL)}`}
         >
-          <Meter value={((daily?.steps ?? 0) + (daily?.treadmillSteps ?? 0)) / STEPS_GOAL} />
+          <Meter value={dayStepsTotal(daily) / STEPS_GOAL} />
           <div className="row" style={{ gap: 6 }}>
             <button className="pill" onClick={() => openEditor('steps')}>
               <Watch size={12} aria-hidden="true" /> {daily?.steps !== undefined ? fmtNum(daily.steps) : 'montre'}
@@ -400,6 +402,9 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
               onClick={() => openEditor('treadmillSteps')}
             >
               + tapis{daily?.treadmillSteps ? ` ${fmtNum(daily.treadmillSteps)}` : ''}
+            </button>
+            <button className="pill" onClick={() => setActivityOpen(true)}>
+              Bilan
             </button>
           </div>
         </Kpi>
@@ -569,6 +574,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         </button>
       </WhyModal>
 
+      <ActivityDayModal open={activityOpen} onClose={() => setActivityOpen(false)} repo={repo} daily={daily} saveDaily={saveDaily} runKm={targets.runs.filter((r) => r.day === today).reduce((t, r) => t + r.km, 0)} />
       <ComplementModal open={complement} onClose={() => setComplement(false)} repo={repo} />
       <HabitsSheet open={sheet} onClose={() => setSheet(false)} h={habits} onReading={() => go({ name: 'reading' })} />
 

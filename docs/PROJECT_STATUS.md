@@ -110,3 +110,9 @@ Adaptation au contexte du jour et de la saison, sans mode « hiver » automatiqu
 - Une recommandation principale + une alternative réaliste (dehors, dedans, séance adaptée, report) ; un remplacement n'est pas un échec et ne déclenche aucun rattrapage.
 - Nutrition : pas de changement de calories à cause du froid ; examiner d'abord apports réels, activité, sommeil, récupération. Vitamine D : recommandations locales, compléments déjà pris vérifiés, aucun diagnostic ni prescription automatique ; fatigue durable inexpliquée → avis médical.
 - Contrôle quotidien très court (3 questions), changements journalisés avec leur raison ; scénario inverse vérifié (beau temps et bonne forme = aucune modification).
+
+### Précisions du 28/10/2026 (soir)
+- **Gêne** : « apparu d'un coup » n'est plus une case : le questionnaire demande comment ça a commencé (événement précis / progressif / je ne me souviens pas) et si les symptômes sont encore présents ou seulement anciens, par zone. Un début brutal récent encore présent = évaluation rapide ; plus ancien = avis ; ancienne réponse non précisée = « à clarifier ». Tant que la force ou la tenue est à clarifier : pas de série lourde ni de test maximal pour « vérifier ».
+- **Tapis** : jours plus courts comptés tels quels (pas de lissage), vitesse affichée ou estimée, jamais modifiée pour retrouver 10 000 pas.
+- **Chrono du 16/11** : remplacé, à la validation, par une évaluation facile (durée courue confortablement, difficulté, récupération).
+- **Bilan d'activité du jour** (Écran du jour → Pas → « Bilan ») : deux modes, jamais mélangés (pas séparés / total du jour avec ce qu'il comprend), mesuré ou estimé, journée partielle ou terminée, incohérences signalées sans remplacer les données. Il ne modifie jamais la cible alimentaire. Import Apple Santé : plus tard, avec autorisation et vérification des doublons.
