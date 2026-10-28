@@ -181,3 +181,5 @@ Défauts connus corrigés, testés sur base fictive (tests/arbitrage.test.ts, pa
 - Écart corrigé : quand la progression est gelée/maintenue, la charge reprise est celle de la DERNIÈRE séance (ex. +12 kg), plus celle de départ du modèle (+5 kg). Test : `tests/cards.test.ts` (échoue sans le correctif).
 - Durée : une seule estimation (celle du planning, échauffement 8 min compris) ; les exercices unilatéraux ne sont pas doublés (estimation prudente à lire comme un ordre de grandeur).
 - Lignes de test : « sous-max · 3 en réserve » au lieu de « 1×? ».
+- Charge reprise = référence, pas obligation : baisse validée, transition, séance partielle et adaptation plus récente priment ; la raison est affichée au lancement.
+- Durée : exercices unilatéraux = temps de travail des deux côtés (×2), repos inchangé (A 46, B 38, C 50 min, échauffement compris) ; estimation, à comparer à la durée réelle.

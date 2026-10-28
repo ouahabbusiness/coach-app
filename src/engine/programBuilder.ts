@@ -2,6 +2,7 @@
 // Règles d'entraînement générales (double progression, répartition, récupération), rédigées par l'assistant,
 // NON relues par un professionnel. Aucune mécanique punitive : la rigueur porte sur l'organisation, pas sur des sanctions.
 
+import { findVariant } from '../catalog/exercises';
 import type { SetRole } from './types';
 
 export type Priority = 'force' | 'muscle' | 'seche' | 'course' | 'hybride';
@@ -187,7 +188,8 @@ const DAYS: Record<number, number[]> = { 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4
 const START: Record<Slot, string> = { matin: '07:00', midi: '12:15', soir: '18:30' };
 
 export function estimateLineMinutes(lines: GenLine[]): number {
-  const sec = lines.reduce((s, l) => s + l.sets * ((l.kind === 'hold' ? l.targetSeconds ?? 30 : 45) + l.restSeconds), 0);
+  // Exercice unilatéral : le travail se fait des deux côtés (temps de travail ×2), le repos reste celui de la série.
+  const sec = lines.reduce((s, l) => s + l.sets * ((l.kind === 'hold' ? l.targetSeconds ?? 30 : 45) * (findVariant(l.variantId)?.variant.unilateral ? 2 : 1) + l.restSeconds), 0);
   return Math.ceil(sec / 60) + 8; // + échauffement
 }
 

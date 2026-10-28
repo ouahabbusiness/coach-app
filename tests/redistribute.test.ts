@@ -39,9 +39,9 @@ describe('répartition A/B/C : mêmes séries, jambes réparties, aucune séance
     expect(after.dos).toEqual({ sets: 11, sessions: 'ABC' });
     for (const m of ['pectoraux', 'triceps', 'épaules', 'biceps', 'abdominaux'] as const) expect(after[m]!.sets).toBe(before[m]!.sets);
   });
-  it('durées estimées : A 46, B 36, C 45 min (avant 46 / 49 / 39) ; trois séances, pas une de plus', () => {
+  it('durées estimées : A 46, B 38, C 50 min, unilatéral compté des deux côtés (avant 46 / 49 / 39) ; trois séances, pas une de plus', () => {
     const r = redistribute(A(), B(), C())!;
-    expect([estimateLineMinutes(r.A as never), estimateLineMinutes(r.B as never), estimateLineMinutes(r.C as never)]).toEqual([46, 36, 45]);
+    expect([estimateLineMinutes(r.A as never), estimateLineMinutes(r.B as never), estimateLineMinutes(r.C as never)]).toEqual([46, 38, 50]);
     expect([estimateLineMinutes(A() as never), estimateLineMinutes(B() as never), estimateLineMinutes(C() as never)]).toEqual([46, 49, 39]);
   });
   it('rowing : plage haute de calibration à 2 en réserve ; pont fessier retiré ; swings à 3', () => {
@@ -83,14 +83,14 @@ describe('application aux séances à venir sans toucher à l’historique', () 
     expect(t.find((x) => x.id === 'prog-C')!.lines.map((l) => l.variantId)).toContain('lunge-reverse');
     const items = (await repo.getKv<PlannedItem[]>('planning.items'))!;
     expect(items.find((x) => x.id === 'past')).toMatchObject({ durationMin: 46, sessionId: 'faite' }); // séance faite : inchangée
-    expect(items.find((x) => x.id === 'futureB')!.durationMin).toBe(36);
+    expect(items.find((x) => x.id === 'futureB')!.durationMin).toBe(38);
     const trip = items.find((x) => x.id === 'tripB')!;
     expect(trip.adapted!.removed).not.toContain('ancien');
     expect(trip.adapted!.lines.length).toBeGreaterThan(0);
     const prog = (await repo.getKv<{ program: { notes: string[]; week: { durationMin: number }[] } }>('program.current'))!;
     expect(prog.program.notes.join(' ')).not.toMatch(/Bas du corps prioritaire/);
     expect(prog.program.notes.join(' ')).toMatch(/Orientation : Physique athlétique/);
-    expect(prog.program.week[0]!.durationMin).toBe(36);
+    expect(prog.program.week[0]!.durationMin).toBe(38);
     // journal : l'ancienne entrée est conservée, la répartition y est tracée
     const log = (await repo.getKv<{ id: string; rule: string }[]>('decisions.log'))!;
     expect(log.some((e) => e.id === 'ancien')).toBe(true);

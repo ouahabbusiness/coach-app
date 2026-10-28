@@ -89,7 +89,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
               {(eff ?? t.lines.map((l) => ({ first: { ...l, blockId: l.id } as never, count: l.sets }))).map((g, i) => {
                 const l = g.first as unknown as TemplateLine & { role?: SetRole; progression?: string };
                 const test = l.role === 'test';
-                const adapted = !!l.progression && /Adaptée à ta gêne|Phase allégée|Pas de test maximal|sous-maximale/.test(l.progression);
+                const adapted = !!l.progression && /Adaptée à ta gêne|Phase allégée|Pas de test maximal|sous-maximale|Charge reprise/.test(l.progression);
                 return (
                   <li key={`${l.id}-${i}`} className="tpl-ex">
                     <span className="tpl-n">{i + 1}</span>
@@ -103,7 +103,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
                 );
               })}
             </ol>
-            <Help>Prescription au lancement : charges réelles, adaptations de gêne et phase allégée comprises. Durée = échauffement compris ; les exercices un bras ou une jambe durent plus (deux côtés). « Modifier » change le modèle de base.</Help>
+            <Help>Prescription au lancement : charges réelles, adaptations de gêne et phase allégée comprises. Durée = échauffement compris ; exercices un bras ou une jambe : travail des deux côtés compté. « Modifier » change le modèle de base.</Help>
             <div className="tpl-actions">
               <button className="btn sm" onClick={() => setEditing(t)}>
                 <Pencil size={16} aria-hidden="true" /> Modifier

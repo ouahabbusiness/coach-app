@@ -88,7 +88,7 @@ function decideCore(variantId: string, rx: Rx, samples: Sample[], loads: number[
       reevaluate: 'prochaine séance comparable',
       ...extra,
     };
-    return !extra.after && held !== undefined && held !== rx.loadKg ? { ...d, reason: `${d.reason} Charge reprise de ta dernière séance : ${fmt(held)} kg.`, observations: [...d.observations, `charge reprise : ${fmt(held)} kg`] } : d;
+    return !extra.after && held !== undefined && held !== rx.loadKg ? { ...d, reason: `${d.reason} Charge reprise de ta dernière séance (${fmt(held)} kg) : une référence, pas une obligation ; une baisse validée ou une adaptation plus récente prime.`, observations: [...d.observations, `charge reprise : ${fmt(held)} kg`] } : d;
   };
 
   if (!last || last.results.length === 0) return keep({ action: 'observer', rule: 'aucune donnée', reason: 'Pas encore de séance comparable : on calibre.', missing: ['résultats de la première séance'] });
