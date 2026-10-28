@@ -6,7 +6,7 @@ export type JointZone = 'epaule' | 'coudes';
 export type JointSide = 'gauche' | 'droite' | 'les-deux';
 export type JointTrigger = 'tractions' | 'dips' | 'pompes' | 'developpe' | 'rowing' | 'autre' | 'inconnu';
 /** Ce que tu ressens, à distinguer : perte de force, dérobement, douleur qui te fait arrêter, simple fatigue en fin de série. */
-export type JointSymptom = 'perte_force' | 'derobement' | 'douleur_limitante' | 'fatigue_fin';
+export type JointSymptom = 'perte_force' | 'derobement' | 'douleur_limitante' | 'fatigue_fin' | 'inconnu';
 /** Signaux qui appellent une évaluation rapide, ou un avis lorsqu'ils s'installent. */
 export type JointAlert = 'engourdissement' | 'blocage' | 'deformation' | 'tres_forte' | 'soudain' | 'nuit';
 export type JointTrend = 'mieux' | 'pareil' | 'pire';
@@ -27,6 +27,7 @@ export const SYMPTOM_LABELS: Record<JointSymptom, string> = {
   derobement: 'Ça se dérobe, ça ne tient pas',
   douleur_limitante: 'Je m’arrête à cause de la douleur',
   fatigue_fin: 'Je fatigue seulement en fin de série',
+  inconnu: 'Je ne sais pas distinguer',
 };
 export const ALERT_LABELS: Record<JointAlert, string> = {
   engourdissement: 'Fourmillements ou perte de sensibilité qui durent',
@@ -54,11 +55,12 @@ export interface JointAnswer {
   alerts: (JointAlert | 'faiblesse')[];
 }
 
-/** Anciennes réponses : la case « perte de force ou instabilité » devient le symptôme « moins de force », à préciser. */
-export function normalizeJoint(a: JointAnswer): JointAnswer & { symptoms: JointSymptom[]; alerts: JointAlert[] } {
-  const symptoms = new Set<JointSymptom>(a.symptoms ?? []);
-  if (a.alerts.includes('faiblesse')) symptoms.add('perte_force');
-  return { ...a, symptoms: [...symptoms], alerts: a.alerts.filter((x): x is JointAlert => x !== 'faiblesse') };
+/**
+ * Ancienne réponse « perte de force ou instabilité » : elle mélangeait perte de force, dérobement et douleur. Elle n'est PAS
+ * convertie en « moins de force » : elle reste une information à clarifier (`clarify`), jamais un symptôme précoché.
+ */
+export function normalizeJoint(a: JointAnswer): JointAnswer & { symptoms: JointSymptom[]; alerts: JointAlert[]; clarify: boolean } {
+  return { ...a, symptoms: a.symptoms ?? [], alerts: a.alerts.filter((x): x is JointAlert => x !== 'faiblesse'), clarify: a.alerts.includes('faiblesse') && !(a.symptoms ?? []).length };
 }
 
 export interface JointReferral {
@@ -69,6 +71,8 @@ export interface JointReferral {
 
 export interface JointAdvice {
   referral?: JointReferral;
+  /** Zones dont l'ancienne réponse combinée reste à préciser. */
+  clarify: JointZone[];
   /** Adaptation par mouvement déclencheur : une proposition à vérifier pendant la séance et le lendemain, pas une garantie. */
   items: { zone: JointZone; text: string }[];
 }
@@ -94,6 +98,7 @@ const FOR: Partial<Record<JointTrigger, string>> = {
 
 export function jointAdvice(raw: JointAnswer[]): JointAdvice {
   const answers = raw.map(normalizeJoint);
+  const clarify = answers.filter((a) => a.clarify).map((a) => a.zone);
   const items: JointAdvice['items'] = [];
   const urgent: string[] = [];
   const avis: string[] = [];
@@ -125,7 +130,7 @@ export function jointAdvice(raw: JointAnswer[]): JointAdvice {
   } else if (avis.length) {
     referral = { level: 'avis', text: `Un avis médical ou d’un kiné est recommandé sans attendre une baisse de performance (${[...new Set(avis)].join(' ; ')}). L’app ne pose pas de diagnostic.` };
   }
-  return { referral, items: uniq };
+  return { referral, items: uniq, clarify };
 }
 
 /** Une gêne déclarée gèle la montée de charge des mouvements concernés. */

@@ -14,7 +14,6 @@ import {
   ZONE_LABELS,
   adaptationPatterns,
   jointAdvice,
-  normalizeJoint,
   testPatterns,
   type JointAlert,
   type JointAnswer,
@@ -159,10 +158,6 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       const z = declaredZones(prog?.answers?.pains, ob.answers.safety.pains);
       if (z.length) comp.joints = z.map((zone) => ({ zone, triggers: [], alerts: [] }));
     }
-    comp.joints = comp.joints?.map((j) => {
-      const n = normalizeJoint(j);
-      return { ...j, symptoms: n.symptoms, alerts: n.alerts };
-    });
     // Réponses d'avant la version 2 : le total de pas était ambigu, il est à refaire. Les heures assises sont conservées.
     const legacySteps = !!comp.activity && comp.activity.v !== 2 && (comp.activity as { steps?: number }).steps !== undefined;
     if (comp.activity && comp.activity.v !== 2) comp.activity = { v: 2, sitHours: comp.activity.sitHours, at: comp.activity.at };
@@ -213,7 +208,9 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const tread: TreadmillUse = act.treadmill ?? {};
   const setTread = (patch: Partial<TreadmillUse>) => setAct({ treadmill: { ...tread, ...patch } });
   const joints = c.joints ?? [];
-  const setJoint = (zone: JointZone, patch: Partial<JointAnswer>) => update((x) => ({ ...x, joints: (x.joints ?? []).map((j) => (j.zone === zone ? { ...j, ...patch } : j)) }));
+  // Dès que tu précises ce que tu ressens, l'ancienne réponse combinée disparaît : seule ta nouvelle réponse est conservée.
+  const setJoint = (zone: JointZone, patch: Partial<JointAnswer>) =>
+    update((x) => ({ ...x, joints: (x.joints ?? []).map((j) => (j.zone === zone ? { ...j, ...patch, ...(patch.symptoms?.length ? { alerts: j.alerts.filter((a) => a !== 'faiblesse') } : {}) } : j)) }));
   const toggleZone = (zone: JointZone) =>
     update((x) => ({ ...x, joints: (x.joints ?? []).some((j) => j.zone === zone) ? (x.joints ?? []).filter((j) => j.zone !== zone) : [...(x.joints ?? []), { zone, triggers: [], alerts: [] }] }));
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -326,7 +323,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
 
   const bands: SitBand[] = ['<6', '6-9', '9-12', '>12'];
   const triggers: JointTrigger[] = ['tractions', 'dips', 'pompes', 'developpe', 'rowing', 'inconnu'];
-  const symptoms: JointSymptom[] = ['perte_force', 'derobement', 'douleur_limitante', 'fatigue_fin'];
+  const symptoms: JointSymptom[] = ['perte_force', 'derobement', 'douleur_limitante', 'fatigue_fin', 'inconnu'];
   const alerts: JointAlert[] = ['engourdissement', 'blocage', 'deformation', 'tres_forte', 'soudain', 'nuit'];
   const num = (v: string) => (v === '' ? undefined : Math.max(0, Number(v.replace(',', '.')) || 0));
   const hasActivityNow = act.steps !== undefined || act.sitHours !== undefined;
@@ -446,6 +443,11 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             </div>
           </section>
         ))}
+        {advice.clarify.length > 0 && (
+          <p role="status" className="notice" style={{ margin: 0 }}>
+            Ton ancienne réponse « perte de force ou instabilité » ({advice.clarify.map((z) => ZONE_LABELS[z].toLowerCase()).join(', ')}) est à clarifier : coche ce que tu ressens vraiment, ou « Je ne sais pas distinguer ». Elle n’est pas reprise comme « moins de force ».
+          </p>
+        )}
         {advice.referral && (
           <p role="alert" className="notice warn" style={{ margin: 0, fontWeight: advice.referral.level === 'urgent' ? 700 : 400 }}>
             {advice.referral.text}

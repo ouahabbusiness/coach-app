@@ -99,11 +99,17 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
   it('simple fatigue en fin de série, gêne rare et ancienne ou score seul : pas d’orientation', () => {
     expect(jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], symptoms: ['fatigue_fin'], freq: 'rare', since: '1-6m', maxPain: 9 }]).referral).toBeUndefined();
   });
-  it('anciennes réponses : « perte de force ou instabilité » devient le symptôme à préciser', () => {
+  it('ancienne réponse « perte de force ou instabilité » : jamais convertie en « moins de force », à clarifier', () => {
     const n = normalizeJoint({ zone: 'epaule', triggers: [], alerts: ['faiblesse', 'nuit'] });
-    expect(n.symptoms).toEqual(['perte_force']);
+    expect(n.symptoms).toEqual([]);
     expect(n.alerts).toEqual(['nuit']);
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse'] }]).referral).toMatchObject({ level: 'avis' });
+    expect(n.clarify).toBe(true);
+    const a = jointAdvice([{ zone: 'epaule', triggers: ['tractions'], alerts: ['faiblesse'] }]);
+    expect(a.clarify).toEqual(['epaule']);
+    expect(a.referral).toBeUndefined();
+    // une fois précisée, plus rien à clarifier
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['inconnu'] }]).clarify).toEqual([]);
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['derobement'] }]).referral).toMatchObject({ level: 'avis' });
   });
   it('zones déjà déclarées proposées, jamais inventées', () => {
     expect(declaredZones(['coudes'], 'Légère à l’épaule')).toEqual(['epaule', 'coudes']);
