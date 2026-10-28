@@ -57,7 +57,8 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
       setAdjustments((await repo.getKv<CalorieAdjust[]>(ADJUST)) ?? []);
       const loadEnergy = async () => {
         const ob = (await loadOnboarding(repo)).answers.schedule;
-        setEnergy({ activity: (await loadComplement(repo)).activity, training: await loadTraining(repo), treadmillDays: ob.treadmillDays?.length ?? 0, workDays: ob.workDays?.length ?? 0 });
+        const comp = await loadComplement(repo);
+        setEnergy({ activity: comp.validated ? comp.activity : undefined, training: await loadTraining(repo), treadmillDays: ob.treadmillDays?.length ?? 0, workDays: ob.workDays?.length ?? 0 });
       };
       await loadEnergy();
       window.addEventListener(COMPLEMENT_EVENT, loadEnergy);

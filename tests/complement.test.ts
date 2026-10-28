@@ -1,12 +1,17 @@
-// Données de test fictives.
+// Données de test fictives (base simulée).
+import 'fake-indexeddb/auto';
+// @ts-ignore -- module Node disponible pendant les tests (types Node non installés)
+import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { estimateEnergy, hasActivity } from '../src/engine/activity';
-import { jointAdvice } from '../src/engine/joints';
-import { spaceRuns } from '../src/engine/runSchedule';
+import { adaptSets, adaptationPatterns, jointAdvice } from '../src/engine/joints';
+import { adviseRuns, spaceRuns } from '../src/engine/runSchedule';
 import { calorieTarget } from '../src/engine/targets';
 import { trainingOfProgram, declaredZones } from '../src/ui/profileComplement';
 import { planRuns } from '../src/ui/Complement';
 import type { PlannedItem } from '../src/engine/planning';
+
+if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
 
 const training = { strengthMinPerWeek: 134, runKmPerWeek: 5.5 };
 
@@ -30,8 +35,8 @@ describe('dépense : activité de la journée + entraînement, sans double compt
     expect(e.maintenance).toBeLessThan(legacy - 500);
   });
 
-  it('les pas contiennent déjà tapis et trajets : ils ne sont pas ajoutés une seconde fois', () => {
-    const withSteps = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { steps: 8000, treadmillMin: 60, walkCommuteMin: 30 }, training, treadmillDaysPerWeek: 4, workDaysPerWeek: 5 })!;
+  it('pas qui comprennent tapis et trajets déclarés : ils ne sont pas ajoutés une seconde fois', () => {
+    const withSteps = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { steps: 8000, stepsIncludes: ['tapis', 'trajets'], treadmillMin: 60, walkCommuteMin: 30 }, training, treadmillDaysPerWeek: 4, workDaysPerWeek: 5 })!;
     const stepsOnly = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { steps: 8000 }, training })!;
     expect(withSteps.maintenance).toBe(stepsOnly.maintenance);
     const noSteps = estimateEnergy({ bmr: 1800, weightKg: 79, activity: { sitHours: '9-12', treadmillMin: 60 }, training, treadmillDaysPerWeek: 4 })!;
@@ -59,11 +64,16 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
     const a = jointAdvice([{ zone: 'coudes', triggers: ['inconnu'], alerts: [] }]);
     expect(a.items[0]!.text).toMatch(/inconnu/);
   });
-  it('signaux d’alerte, douleur forte, gêne fréquente ou qui dure : orientation vers un professionnel', () => {
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['nuit'] }]).referral).toMatch(/avis médical/);
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], maxPain: 7 }]).referral).toBeDefined();
-    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], freq: 'souvent', since: '>6m' }]).referral).toBeDefined();
-    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], next: 'dure' }]).referral).toBeDefined();
+  it('niveaux d’orientation : perte de force, fourmillements ou blocage = évaluation rapide ; le reste = avis', () => {
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse'] }]).referral).toMatchObject({ level: 'urgent' });
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['blocage'] }]).referral?.text).toMatch(/sans attendre/);
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['nuit'] }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], trend: 'pire' }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], freq: 'souvent', since: '>6m' }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], next: 'dure' }]).referral).toMatchObject({ level: 'avis' });
+  });
+  it('un score de douleur seul n’est jamais une frontière médicale', () => {
+    expect(jointAdvice([{ zone: 'epaule', triggers: ['dips'], alerts: [], maxPain: 9 }]).referral).toBeUndefined();
   });
   it('zones déjà déclarées proposées, jamais inventées', () => {
     expect(declaredZones(['coudes'], 'Légère à l’épaule')).toEqual(['epaule', 'coudes']);
@@ -107,7 +117,10 @@ describe('courses espacées', () => {
     ];
     // Mercredi 28/10 : mardi est passé, donc rien de libre cette semaine ; la semaine suivante est corrigée.
     const r = planRuns(items, [], '2026-10-28');
-    expect(r.unresolved.map((u) => u.date)).toContain('2026-10-31');
+    expect(r.advice).toHaveLength(1);
+    expect(r.advice[0]!.keep.date).toBe('2026-11-01');
+    expect(r.advice[0]!.replace.date).toBe('2026-10-31');
+    expect(r.advice[0]!.reason).toMatch(/Pas de rattrapage/);
     expect(r.changes).toEqual([{ id: 'b-sam', title: 'b-sam', weekStart: '2026-11-02', fromDay: 5, toDay: 1, start: '12:30' }]);
   });
 });
@@ -117,5 +130,95 @@ describe('charge d’entraînement du programme', () => {
     const t = trainingOfProgram({ program: { weekly: [[{ kind: 'seance', durationMin: 46 }, { kind: 'course', durationMin: 11, km: 1.5 }, { kind: 'seance', durationMin: 49 }, { kind: 'course', durationMin: 19, km: 2.5 }]] } });
     expect(t).toEqual({ strengthMinPerWeek: 95, runKmPerWeek: 4 });
     expect(trainingOfProgram(null)).toBeUndefined();
+  });
+});
+
+describe('pas : ce qu’ils comprennent, sans omission ni doublon', () => {
+  const base = { bmr: 1800, weightKg: 79, training, treadmillDaysPerWeek: 4, workDaysPerWeek: 5 };
+  const withTread = { steps: 6000, treadmillMin: 60 };
+
+  it('total qui exclut le tapis : le tapis est ajouté ; total qui l’inclut : non ajouté', () => {
+    const excl = estimateEnergy({ ...base, activity: withTread })!;
+    const incl = estimateEnergy({ ...base, activity: { ...withTread, stepsIncludes: ['tapis'] } })!;
+    expect(excl.maintenance).toBeGreaterThan(incl.maintenance);
+    expect(excl.lines.join(' ')).toMatch(/de tapis \(non compris dans tes pas\)/);
+    expect(incl.notes.join(' ')).toMatch(/Tapis déjà dans tes pas/);
+  });
+  it('pas sur tous les jours ou comprenant les courses : la course n’est pas comptée deux fois', () => {
+    const jours = estimateEnergy({ ...base, activity: { steps: 8000 } })!;
+    const tous = estimateEnergy({ ...base, activity: { steps: 8000, stepsPeriod: 'tous' } })!;
+    const courses = estimateEnergy({ ...base, activity: { steps: 8000, stepsIncludes: ['courses'] } })!;
+    expect(tous.maintenance).toBeLessThan(jours.maintenance);
+    expect(courses.maintenance).toBe(tous.maintenance);
+    expect(tous.lines.join(' ')).toMatch(/course : déjà dans tes pas/);
+  });
+  it('sans précision : l’hypothèse est écrite ; pas estimés : marge d’erreur signalée', () => {
+    expect(estimateEnergy({ ...base, activity: { steps: 8000 } })!.notes.join(' ')).toMatch(/Hypothèse/);
+    expect(estimateEnergy({ ...base, activity: { steps: 8000, stepsMeasured: false } })!.notes.join(' ')).toMatch(/estimés/);
+  });
+});
+
+describe('adaptation à la gêne : elle modifie la prescription', () => {
+  const set = (variantId: string, blockId: string): { variantId: string; blockId: string; role: string; targetRir: number; lastSetToFailure: boolean; progression?: string } => ({ variantId, blockId, role: 'work', targetRir: 2, lastSetToFailure: true });
+  const sets = [set('pullup-strict', 'b1'), set('pullup-strict', 'b1'), set('pullup-strict', 'b1'), set('pullup-strict', 'b1'), set('kb-row-1arm', 'b2'), set('kb-row-1arm', 'b2'), set('kb-row-1arm', 'b2')];
+
+  it('déclencheurs → motifs de variantes ; inconnu → aucun motif', () => {
+    expect(adaptationPatterns([{ zone: 'epaule', triggers: ['tractions', 'dips'], alerts: [] }])).toEqual(['pullup|chinup', 'dips']);
+    expect(adaptationPatterns([{ zone: 'coudes', triggers: ['inconnu'], alerts: [] }])).toEqual([]);
+  });
+  it('marge de 3, jamais à l’échec, une série de moins, consigne ; les autres exercices ne bougent pas', () => {
+    const out = adaptSets(sets, ['pullup|chinup']);
+    expect(out.filter((x) => x.variantId === 'pullup-strict')).toHaveLength(3);
+    expect(out.filter((x) => x.variantId === 'kb-row-1arm')).toHaveLength(3);
+    for (const x of out.filter((y) => y.variantId === 'pullup-strict')) expect(x).toMatchObject({ targetRir: 3, lastSetToFailure: false });
+    expect(out.find((x) => x.variantId === 'pullup-strict')!.progression).toMatch(/Adaptée à ta gêne/);
+    expect(out.find((x) => x.variantId === 'kb-row-1arm')).toMatchObject({ targetRir: 2, lastSetToFailure: true });
+  });
+  it('jamais sous 2 séries ; aucun motif : rien ne change', () => {
+    expect(adaptSets([set('dips-weighted', 'b'), set('dips-weighted', 'b')], ['dips'])).toHaveLength(2);
+    expect(adaptSets(sets, [])).toBe(sets);
+  });
+});
+
+describe('deux courses consécutives sans jour libre', () => {
+  const run = (day: number, km: number) => ({ day, start: '09:30', durationMin: 15, kind: 'course', km, title: 'c' + day });
+  it('sans fatigue : on garde la plus longue ; avec fatigue : la plus courte ; jamais de rattrapage', () => {
+    const e = run(5, 1.5);
+    const l = run(6, 2.5);
+    expect(adviseRuns(e, l, { tired: false, sessionsDone: 1 })).toMatchObject({ keep: l, replace: e });
+    expect(adviseRuns(e, l, { tired: true, sessionsDone: 1 })).toMatchObject({ keep: e, replace: l });
+    expect(adviseRuns(e, l, { tired: false, sessionsDone: 2 }).reason).toMatch(/2 séances de force déjà faites/);
+    expect(adviseRuns(e, l, { tired: false, sessionsDone: 0 }).reason).toMatch(/Pas de rattrapage/);
+  });
+});
+
+describe('adaptation acceptée : elle apparaît dans la séance lancée et ne touche pas l’historique', () => {
+  it('lancement : marge de 3, une série de moins, consigne ; sans adaptation : prescription inchangée', async () => {
+    const { CoachDb, Repository } = await import('../src/storage/db');
+    const { startSessionFromTemplate } = await import('../src/ui/actions');
+    const { project } = await import('../src/engine/session');
+    const { JOINT_ADAPT } = await import('../src/ui/profileComplement');
+    const tpl = {
+      id: 'A',
+      title: 'Force haut du corps',
+      updatedAt: 0,
+      lines: [
+        { id: 'l1', variantId: 'pullup-strict', kind: 'reps' as const, role: 'work' as const, sets: 4, targetReps: 7, repRange: [7, 10] as [number, number], targetRir: 2, restSeconds: 150 },
+        { id: 'l2', variantId: 'kb-row-1arm', kind: 'reps' as const, role: 'work' as const, sets: 3, targetReps: 10, repRange: [10, 15] as [number, number], targetRir: 2, loadKg: 12, restSeconds: 75 },
+      ],
+    };
+    const repo = new Repository(new CoachDb('adapt-1'));
+    const plain = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tpl)))!;
+    expect(plain.sets.filter((s) => s.planned.variantId === 'pullup-strict')).toHaveLength(4);
+
+    await repo.setKv(JOINT_ADAPT, { patterns: ['pullup|chinup'], at: 1 });
+    const st = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tpl)))!;
+    const pulls = st.sets.filter((s) => s.planned.variantId === 'pullup-strict');
+    expect(pulls).toHaveLength(3);
+    expect(pulls[0]!.planned).toMatchObject({ targetRir: 3, lastSetToFailure: false });
+    expect(pulls[0]!.planned.progression).toMatch(/Adaptée à ta gêne/);
+    expect(st.sets.filter((s) => s.planned.variantId === 'kb-row-1arm')).toHaveLength(3);
+    // les séances déjà enregistrées ne sont pas modifiées
+    expect(plain.sets.filter((s) => s.planned.variantId === 'pullup-strict')).toHaveLength(4);
   });
 });

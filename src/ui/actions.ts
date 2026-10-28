@@ -5,8 +5,8 @@ import { lightLoad, nextSessionAdjust, type LightLoad } from '../engine/progress
 import { decide as decideProgression, JOINT_LOADED, type Decision, type Sample } from '../engine/decide';
 import { findVariant } from '../catalog/exercises';
 import { appendJournal } from './journal';
-import { hasJointDeclared } from '../engine/joints';
-import { loadComplement } from './profileComplement';
+import { adaptSets, hasJointDeclared } from '../engine/joints';
+import { JOINT_ADAPT, loadComplement, type JointAdapt } from './profileComplement';
 import { loadEquipment, loadsFor } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
 import { EXERCISES } from '../catalog/exercises';
@@ -133,7 +133,8 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     await repo.setKv(OVERRIDES, rest);
   }
   const blockIdx = new Map<string, number>();
-  return {
+  const adapt = await repo.getKv<JointAdapt>(JOINT_ADAPT);
+  const out: SessionPlan = {
     ...plan,
     sets: plan.sets.map((set) => {
       if (set.role !== 'work') return set;
@@ -156,6 +157,8 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       return { ...set, loadKg: a.loadKg ?? set.loadKg, targetReps: a.targetReps ?? set.targetReps, progression: a.note };
     }),
   };
+  // Adaptation à la gêne acceptée : elle modifie la prescription réelle de la séance (marge, séries, consigne).
+  return adapt?.patterns.length ? { ...out, sets: adaptSets(out.sets, adapt.patterns) } : out;
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

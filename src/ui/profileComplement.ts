@@ -10,6 +10,8 @@ export const COMPLEMENT_EVENT = 'coach-complement';
 export interface Complement {
   activity?: ActivityAnswers;
   joints?: JointAnswer[];
+  /** Synthèse validée par toi (instant). Tant qu'elle ne l'est pas, rien n'est appliqué : ni cible, ni semaine, ni adaptation. */
+  validated?: number;
 }
 
 export async function loadComplement(repo: Pick<Repository, 'getKv'>): Promise<Complement> {
@@ -47,6 +49,13 @@ export function declaredZones(programPains?: string[], onboardingPains?: string)
   if (programPains?.includes('epaules') || /[ée]paule/i.test(onboardingPains ?? '')) out.add('epaule');
   if (programPains?.includes('coudes') || /coude/i.test(onboardingPains ?? '')) out.add('coudes');
   return [...out];
+}
+
+/** Adaptation de la prescription acceptée (gêne) : appliquée au lancement de chaque séance. */
+export const JOINT_ADAPT = 'joint.adapt';
+export interface JointAdapt {
+  patterns: string[];
+  at: number;
 }
 
 export async function loadTraining(repo: Pick<Repository, 'getKv'>): Promise<Training | undefined> {

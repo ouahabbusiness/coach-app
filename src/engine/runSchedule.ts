@@ -54,3 +54,22 @@ export function spaceRuns<T extends RunLike>(
   }
   return { items, moved, unresolved };
 }
+
+export interface RunAdvice<T> {
+  keep: T;
+  replace: T;
+  reason: string;
+}
+
+/**
+ * Deux courses consécutives sans jour libre : on en garde une, l'autre devient une marche facile, sans rattrapage.
+ * Fatigue récente → on garde la plus courte ; sinon la plus longue. La raison cite les séances déjà faites.
+ */
+export function adviseRuns<T extends RunLike & { km?: number }>(earlier: T, later: T, ctx: { tired: boolean; sessionsDone: number }): RunAdvice<T> {
+  const ek = earlier.km ?? 0;
+  const lk = later.km ?? 0;
+  const keepEarlier = ctx.tired ? ek <= lk : ek > lk;
+  const done = ctx.sessionsDone > 0 ? `${ctx.sessionsDone} séance${ctx.sessionsDone > 1 ? 's' : ''} de force déjà faite${ctx.sessionsDone > 1 ? 's' : ''} cette semaine` : 'aucune séance de force encore faite cette semaine';
+  const why = ctx.tired ? 'fatigue déclarée ces derniers jours : on garde la plus courte' : 'pas de fatigue déclarée : on garde la plus longue';
+  return { keep: keepEarlier ? earlier : later, replace: keepEarlier ? later : earlier, reason: `${done}, ${why}. Pas de rattrapage.` };
+}

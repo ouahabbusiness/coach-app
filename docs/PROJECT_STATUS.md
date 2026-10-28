@@ -89,3 +89,10 @@ En ligne : https://ouahabbusiness.github.io/coach-app/ (GitHub Pages, publicatio
 - Valeurs nutritionnelles moyennes, imprévus de repas = ordres de grandeur. Aucune recommandation de complément.
 - Règles d'entraînement générales, **non relues par un professionnel** ; catalogue sans média.
 - Pas d'accès Apple Santé (fréquence cardiaque, Watch, balance) : nécessite l'app native (prochaine étape, xtool).
+
+## Ajouts du 28/10/2026 : « Compléter mon profil »
+- Réglages → « Compléter : activité et gêne » (aussi depuis la fenêtre Calories). Questions courtes, préremplies, conditionnelles.
+- **Calories** : l'estimation utilise l'activité réelle (assis, pas avec ce qu'ils comprennent, tapis, trajets) + entraînement ajouté une fois ; elle ne s'applique qu'après validation de la synthèse. Sans activité renseignée : ancien facteur par nombre de séances, signalé comme grossier.
+- **Gêne** : déclencheur → adaptation de la prescription (marge de 3 répétitions, une série de moins, consigne), tracée dans le journal ; orientation « avis » ou « évaluation rapide » selon les signaux, jamais selon le seul score de douleur. Pas de diagnostic.
+- **Courses** : jamais deux jours de suite. Jour libre → déplacement (à midi) ; sinon on garde la plus longue (la plus courte si fatigue) et l'autre devient une marche facile, sans rattrapage.
+- Une seule validation applique la synthèse ; modifier une réponse l'annule. Clés : `profile.complement`, `joint.adapt`.
