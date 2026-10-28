@@ -66,6 +66,8 @@ export interface DecideOpts {
   addedLoad?: boolean;
   /** Mouvement dont la tolérance n'est pas confirmée alors qu'une gêne est déclarée (décidé par l'appelant, d'après l'état du mouvement) : les répétitions montent, pas la charge. */
   guarded?: boolean;
+  /** Évolution d'une douleur signalée à la dernière séance, d'après TES réponses : encore présente, disparue (rien le lendemain) ou non renseignée. */
+  painState?: 'presente' | 'resolue' | 'inconnue';
   /** Seuil de saut « important » en part de la résistance totale (choix de conception). */
   bigJumpRatio?: number;
 }
@@ -93,7 +95,18 @@ function decideCore(variantId: string, rx: Rx, samples: Sample[], loads: number[
   };
 
   if (!last || last.results.length === 0) return keep({ action: 'observer', rule: 'aucune donnée', reason: 'Pas encore de séance comparable : on calibre.', missing: ['résultats de la première séance'] });
-  if (opts.pain) return keep({ done: true, rule: 'sécurité', reason: held !== undefined ? `Douleur signalée à ${fmt(held)} kg : pas de hausse, charge plafonnée à ${fmt(held)} kg ; allège si la gêne revient. Le mouvement est réévalué.` : 'Douleur signalée : aucune progression, le mouvement est réévalué.', observations: ['douleur signalée'], after: { loadKg: held ?? rx.loadKg, target: rx.target } });
+  if (opts.pain) {
+    const at = held !== undefined ? ` à ${fmt(held)} kg` : '';
+    const ref = held !== undefined ? `${fmt(held)} kg = ta dernière charge, pas une charge validée. ` : '';
+    const state = opts.painState ?? 'inconnue';
+    const [rule, reason, missing] =
+      state === 'presente'
+        ? ['sécurité', `Douleur signalée${at}, encore présente le lendemain : mouvement À REVOIR avant d’être prescrit. ${ref}Ne le fais pas tant que la douleur est là ; une douleur vive ou qui persiste justifie un avis (médecin, kiné).`, [] as string[]]
+        : state === 'resolue'
+          ? ['sécurité', `Douleur signalée${at}, plus rien le lendemain : pas de hausse. ${ref}Reprise proposée puisque la gêne a disparu ; à confirmer pendant la séance.`, [] as string[]]
+          : ['sécurité', `Douleur signalée${at}, évolution non renseignée : réponds au retour du lendemain avant de décider. ${ref}Pas de hausse.`, ['retour du lendemain sur la douleur']];
+    return keep({ done: true, rule, reason, missing, observations: ['douleur signalée', `douleur : ${state}`], after: { loadKg: held ?? rx.loadKg, target: rx.target } });
+  }
   if (!last.comparable) return keep({ action: 'observer', done: true, rule: 'séance non comparable', reason: `Séance non comparable (${last.why ?? 'conditions différentes'}) : elle ne compte ni comme progrès ni comme échec.` });
 
   const reps = last.results.map((r) => r.reps);

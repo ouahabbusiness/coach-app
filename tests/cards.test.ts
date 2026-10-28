@@ -84,19 +84,36 @@ describe('charge connue + gêne/proposition : décision du coach explicite, jama
     await repo.setKv('profile.complement', { joints: [{ zone: 'epaule', triggers: ['dips'], alerts: [] }] });
     await repo.setKv('joint.adapt', { patterns: ['dips'], tests: ['dips'], at: 1 });
   };
-  it('douleur signalée sur la dernière séance à 12 kg : pas de hausse, plafond 12 kg écrit, fiche = lancement', async () => {
-    const repo = new Repository(new CoachDb('cards-pain'));
+  for (const [label, fb, rx] of [
+    ['évolution non renseignée', undefined, /évolution non renseignée.*retour du lendemain.*pas une charge validée/],
+    ['encore présente le lendemain', { next: 'dure' as const }, /encore présente.*À REVOIR.*pas une charge validée.*avis/],
+    ['légère le lendemain (toujours présente)', { next: 'legere' as const }, /encore présente.*À REVOIR/],
+    ['disparue : rien le lendemain', { next: 'rien' as const }, /plus rien le lendemain.*pas de hausse.*à confirmer/],
+  ] as const) {
+    it(`douleur signalée à 12 kg, ${label} : pas de hausse, 12 kg jamais présenté comme validé sauf disparition, fiche = lancement`, async () => {
+      const repo = new Repository(new CoachDb(`cards-pain-${label}`));
+      const s0 = await startSessionFromTemplate(repo, tpl(12));
+      await perform(repo, s0, 'dips-weighted', 8, 2); // haut de plage : sans douleur, une hausse serait permise
+      const first = project(await repo.sessionEvents(s0))!.sets[0]!.planned.id;
+      await run(repo, s0, { type: 'report_pain', plannedSetId: first, location: 'épaule', intensity: 4, stop: false });
+      await run(repo, s0, { type: 'end_session' });
+      if (fb) await repo.setKv(`joint.feedback.${s0}`, fb);
+      await declare(repo);
+      const preview = await previewTemplate(repo, tpl(5));
+      const launched = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tpl(5))))!.sets.map((s) => s.planned);
+      expect(sig(preview.sets)).toEqual(sig(launched));
+      expect(Math.max(...launched.map((s) => s.loadKg ?? 0))).toBeLessThanOrEqual(12);
+      expect(launched[0]!.progression).toMatch(rx);
+      expect(launched[0]!.progression).not.toMatch(/allège si la gêne revient/);
+    });
+  }
+  it('l’aperçu ne change pas ton historique : le retour de la séance reste tel que saisi', async () => {
+    const repo = new Repository(new CoachDb('cards-pain-history'));
     const s0 = await startSessionFromTemplate(repo, tpl(12));
-    await perform(repo, s0, 'dips-weighted', 8, 2); // haut de plage : sans douleur, une hausse serait permise
-    const first = project(await repo.sessionEvents(s0))!.sets[0]!.planned.id;
-    await run(repo, s0, { type: 'report_pain', plannedSetId: first, location: 'épaule', intensity: 4, stop: false });
     await run(repo, s0, { type: 'end_session' });
-    await declare(repo);
-    const preview = await previewTemplate(repo, tpl(5));
-    const launched = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tpl(5))))!.sets.map((s) => s.planned);
-    expect(sig(preview.sets)).toEqual(sig(launched));
-    expect(Math.max(...launched.map((s) => s.loadKg ?? 0))).toBeLessThanOrEqual(12);
-    expect(launched[0]!.progression).toMatch(/Douleur signalée à 12 kg.*plafonnée.*allège/);
+    await repo.setKv(`joint.feedback.${s0}`, { next: 'dure' });
+    await previewTemplate(repo, tpl(5));
+    expect(await repo.getKv(`joint.feedback.${s0}`)).toEqual({ next: 'dure' });
   });
   it('proposition de baisse en attente : prescription inchangée (12 kg, pas 5 kg), marquée « à valider » ; validée : appliquée', async () => {
     const repo = new Repository(new CoachDb('cards-proposal'));

@@ -146,7 +146,8 @@ export async function withProgression(repo: Repository, plan: SessionPlan, opts:
       const rx = { lo: set.repRange[0], hi: set.repRange[1], rir: effRir ?? 2, loadKg: set.loadKg, target: set.targetReps ?? set.repRange[0] };
       const addedLoad = (findVariant(set.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
       const guarded = await jointGuard(repo, set.variantId, tolCtx);
-      decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, bodyweightKg, addedLoad, guarded }));
+      const painState = pain ? await painFollowUp(repo, states, set.variantId) : undefined;
+      decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, painState, bodyweightKg, addedLoad, guarded }));
     } else legacy.set(set.blockId, nextSessionAdjust(lastWork(states, set.variantId), set, loads));
   }
   if (decisions.size && !opts.dryRun) await appendJournal(repo, [...decisions.values()], `lancement · ${plan.title}`, plan.id);
@@ -188,6 +189,15 @@ export async function withProgression(repo: Repository, plan: SessionPlan, opts:
  */
 export async function previewTemplate(repo: Repository, template: SessionTemplate): Promise<SessionPlan> {
   return withProgression(repo, planFromTemplate(template, exerciseOf), { dryRun: true });
+}
+
+/** Évolution de la douleur signalée à la dernière séance de ce mouvement, d'après tes réponses du lendemain (jamais supposée). */
+async function painFollowUp(repo: Repository, states: SessionState[], variantId: string): Promise<'presente' | 'resolue' | 'inconnue'> {
+  const last = [...states].sort((a, b) => b.startedAt - a.startedAt).find((s) => s.sets.some((x) => x.planned.variantId === variantId && x.planned.role === 'work' && x.status === 'done'));
+  const fb = last ? await repo.getKv<{ during?: string; next?: string }>(`joint.feedback.${last.sessionId}`) : undefined;
+  if (fb?.next === 'dure' || fb?.next === 'legere') return 'presente';
+  if (fb?.next === 'rien') return 'resolue';
+  return 'inconnue';
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

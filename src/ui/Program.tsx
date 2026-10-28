@@ -89,6 +89,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
               {(eff ?? t.lines.map((l) => ({ first: { ...l, blockId: l.id } as never, count: l.sets }))).map((g, i) => {
                 const l = g.first as unknown as TemplateLine & { role?: SetRole; progression?: string };
                 const test = l.role === 'test';
+                const review = !!l.progression && /À REVOIR|évolution non renseignée/.test(l.progression);
                 const adapted = !!l.progression && /Adaptée à ta gêne|Phase allégée|Pas de test maximal|sous-maximale|Charge reprise/.test(l.progression);
                 return (
                   <li key={`${l.id}-${i}`} className="tpl-ex">
@@ -97,7 +98,7 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
                     <span className="tpl-stat">
                       {test ? `${g.count}× ${(l.targetRir ?? 0) >= 3 ? `sous-max · ${l.targetRir} en réserve` : 'max'}` : `${g.count}×${l.kind === 'reps' ? (l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps ?? '?') : `${l.targetSeconds ?? '?'} s`}`}
                       {l.loadKg ? <b>+{l.loadKg} kg</b> : null}
-                      {adapted ? <b>adaptée · {l.targetRir} en réserve</b> : null}
+                      {review ? <b>à revoir · charge non validée</b> : adapted ? <b>adaptée · {l.targetRir} en réserve</b> : null}
                     </span>
                   </li>
                 );
