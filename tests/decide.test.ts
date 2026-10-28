@@ -68,3 +68,18 @@ describe('double progression (choix de conception)', () => {
     expect(decide('x', rx, [s([10, 10, 10], 10, 3)], loads, { pain: true }).rule).toBe('sécurité');
   });
 });
+
+describe('gêne déclarée (épaule, coudes)', () => {
+  const dipsRx: Rx = { lo: 5, hi: 8, rir: 2, loadKg: 10, target: 5 };
+  it('haut de plage atteint : sans gêne la charge monte, avec gêne elle est gelée', () => {
+    const up = decide('dips-weighted', dipsRx, [s([8, 8, 8], 10, 2)], loads, { bodyweightKg: 77, addedLoad: true });
+    expect(up.action).not.toBe('maintenir');
+    const held = decide('dips-weighted', dipsRx, [s([8, 8, 8], 10, 2)], loads, { bodyweightKg: 77, addedLoad: true, guarded: true });
+    expect(held).toMatchObject({ action: 'maintenir', rule: 'gêne déclarée', progressionAllowed: false, after: { loadKg: 10, target: 8 } });
+    expect(held.transition).toBeUndefined();
+  });
+  it('ne touche pas aux autres mouvements', () => {
+    const d = decide('kb-row-1arm', { lo: 10, hi: 15, rir: 2, loadKg: 6, target: 10 }, [s([15, 15, 15], 6, 2)], kb, { guarded: true });
+    expect(d.rule).not.toBe('gêne déclarée');
+  });
+});

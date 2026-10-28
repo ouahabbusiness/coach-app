@@ -2,7 +2,7 @@ import { decide, project } from '../engine/session';
 import { currentResult, localDay } from '../engine/derive';
 import { DELOAD, deloadSets, inDeload, type Deload } from '../engine/stagnation';
 import { lightLoad, nextSessionAdjust, type LightLoad } from '../engine/progression';
-import { decide as decideProgression, type Decision, type Sample } from '../engine/decide';
+import { decide as decideProgression, JOINT_LOADED, type Decision, type Sample } from '../engine/decide';
 import { findVariant } from '../catalog/exercises';
 import { appendJournal } from './journal';
 import { loadEquipment, loadsFor } from './equipment';
@@ -79,6 +79,15 @@ export async function samplesFor(repo: Repository, states: SessionState[], set: 
   return { samples: out, pain };
 }
 
+/** Épaule ou coudes déclarés sensibles (entretien du programme ou fiche d'accueil) : gèle la montée de charge des tractions, dips et poussées. */
+export async function jointGuard(repo: Repository, variantId: string): Promise<boolean> {
+  if (!JOINT_LOADED.test(variantId)) return false;
+  const prog = await repo.getKv<{ pains?: string[] }>('program.answers');
+  if (prog?.pains?.some((p) => p === 'epaules' || p === 'coudes')) return true;
+  const onb = await repo.getKv<{ answers?: { safety?: { pains?: string } } }>('onboarding');
+  return /[ée]paule|coude/i.test(onb?.answers?.safety?.pains ?? '');
+}
+
 /**
  * Au lancement : une décision par exercice, enregistrée dans le journal AVANT d'être appliquée.
  * Transition → seule la 1re série passe à la charge d'essai. Proposition (baisse) → rien n'est appliqué
@@ -110,7 +119,8 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       const { samples, pain } = await samplesFor(repo, states, set);
       const rx = { lo: set.repRange[0], hi: set.repRange[1], rir: set.targetRir ?? 2, loadKg: set.loadKg, target: set.targetReps ?? set.repRange[0] };
       const addedLoad = (findVariant(set.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
-      decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, bodyweightKg, addedLoad }));
+      const guarded = await jointGuard(repo, set.variantId);
+      decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, bodyweightKg, addedLoad, guarded }));
     } else legacy.set(set.blockId, nextSessionAdjust(lastWork(states, set.variantId), set, loads));
   }
   if (decisions.size) await appendJournal(repo, [...decisions.values()], `lancement · ${plan.title}`, plan.id);

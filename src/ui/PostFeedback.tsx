@@ -9,7 +9,7 @@ import { project } from '../engine/session';
 import type { SessionState, SetResult } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { loadsFor, useEquipment } from './equipment';
-import { samplesFor } from './actions';
+import { jointGuard, samplesFor } from './actions';
 
 interface Row {
   name: string;
@@ -54,7 +54,7 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
           // Même règle qu'au lancement : cette séance d'abord, puis les précédentes, avec leur comparabilité.
           const { samples, pain } = await samplesFor(repo, [st, ...others], p);
           const addedLoad = (findVariant(p.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
-          decision = decide(p.variantId, { lo: p.repRange[0], hi: p.repRange[1], rir: p.targetRir ?? 2, loadKg: p.loadKg, target: p.targetReps ?? p.repRange[0] }, samples, loadsFor(p.variantId, eq), { pain, addedLoad, bodyweightKg: bw });
+          decision = decide(p.variantId, { lo: p.repRange[0], hi: p.repRange[1], rir: p.targetRir ?? 2, loadKg: p.loadKg, target: p.targetReps ?? p.repRange[0] }, samples, loadsFor(p.variantId, eq), { pain, addedLoad, bodyweightKg: bw, guarded: await jointGuard(repo, p.variantId) });
         }
         out.push({
           name: findVariant(p.variantId)?.variant.name ?? p.variantId,

@@ -64,11 +64,13 @@ export interface DecideOpts {
   /** Poids du corps : la résistance réelle des tractions/dips lestés = poids du corps + lest. */
   bodyweightKg?: number;
   addedLoad?: boolean;
+  /** Gêne déclarée (épaule, coudes) sur un mouvement de tirage ou de poussée : les répétitions montent, pas la charge. */
+  guarded?: boolean;
   /** Seuil de saut « important » en part de la résistance totale (choix de conception). */
   bigJumpRatio?: number;
 }
 
-export function decide(variantId: string, rx: Rx, samples: Sample[], loads: number[], opts: DecideOpts = {}): Decision {
+function decideCore(variantId: string, rx: Rx, samples: Sample[], loads: number[], opts: DecideOpts = {}): Decision {
   const base = { variantId, before: { loadKg: rx.loadKg, target: rx.target } };
   const keep = (extra: Partial<Decision> & Pick<Decision, 'rule' | 'reason'>): Decision => ({
     ...base,
@@ -179,4 +181,26 @@ export function decide(variantId: string, rx: Rx, samples: Sample[], loads: numb
     };
   }
   return { ...base, ...common, action: 'augmenter', progressionAllowed: true, after: { loadKg: up, target: rx.lo }, rule: 'double progression', reason: `Haut de plage avec l’effort prévu : ${fmt(from)} → ${fmt(up)} kg, retour à ${rx.lo} rép.`, missing: [], reevaluate: 'prochaine séance' };
+}
+
+/** Mouvements qui chargent l'épaule ou le coude (tractions, dips, pompes, développés). */
+export const JOINT_LOADED = /pullup|chinup|dips|pushup|pike|press/;
+
+export function decide(variantId: string, rx: Rx, samples: Sample[], loads: number[], opts: DecideOpts = {}): Decision {
+  const d = decideCore(variantId, rx, samples, loads, opts);
+  // Une gêne déclarée n'interdit pas le mouvement : elle gèle seulement la montée de charge.
+  if (opts.guarded && JOINT_LOADED.test(variantId) && (d.action === 'augmenter' || d.action === 'transition')) {
+    return {
+      ...d,
+      action: 'maintenir',
+      transition: undefined,
+      after: { loadKg: rx.loadKg, target: rx.hi },
+      progressionAllowed: false,
+      rule: 'gêne déclarée',
+      observations: [...d.observations, 'épaule ou coudes déclarés sensibles'],
+      reason: 'Haut de plage atteint, mais épaule ou coudes sensibles : on garde la charge et on consolide les répétitions.',
+      reevaluate: 'prochaine séance comparable',
+    };
+  }
+  return d;
 }
