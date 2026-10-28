@@ -6,8 +6,10 @@ import type { Repository } from '../storage/db';
 import { ProgramTabs } from './common';
 import { newId } from './support';
 import { loadTemplates, saveTemplates, type SessionTemplate, type TemplateLine } from './templates';
-import { startSessionFromTemplate } from './actions';
-import { estimateMinutes } from '../engine/disruption';
+import { previewTemplate, startSessionFromTemplate } from './actions';
+import { estimateLineMinutes } from '../engine/programBuilder';
+import type { SessionPlan } from '../engine/types';
+import { Help } from './common';
 import type { Route } from './App';
 import { RunCard } from './RunCard';
 
@@ -21,9 +23,15 @@ const ROLE_LABEL: Record<SetRole, string> = {
 export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void }) {
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
   const [editing, setEditing] = useState<SessionTemplate | null>(null);
+  /** Prescription effective au lancement, par modèle (charges réelles, adaptations de gêne, phase allégée). */
+  const [effective, setEffective] = useState<Record<string, SessionPlan>>({});
 
   useEffect(() => {
-    loadTemplates(repo).then(setTemplates);
+    loadTemplates(repo).then(async (list) => {
+      setTemplates(list);
+      const entries = await Promise.all(list.map(async (t) => [t.id, await previewTemplate(repo, t).catch(() => undefined)] as const));
+      setEffective(Object.fromEntries(entries.filter((e): e is readonly [string, SessionPlan] => !!e[1])));
+    });
   }, [repo]);
 
   const persist = async (list: SessionTemplate[]) => {
@@ -50,16 +58,22 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
       <h1>Entraînement</h1>
       <ProgramTabs current="program" go={go} />
       {templates.map((t) => {
-        const sets = t.lines.reduce((n, l) => n + l.sets, 0);
+        const plan = effective[t.id];
+        // Lignes effectives (une par exercice) d'après l'aperçu ; en attendant l'aperçu, le modèle.
+        const eff = plan
+          ? [...new Map(plan.sets.map((s) => [s.blockId, plan.sets.filter((x) => x.blockId === s.blockId)])).values()].map((g) => ({ first: g[0]!, count: g.length }))
+          : undefined;
+        const sets = eff ? eff.reduce((n, g) => n + g.count, 0) : t.lines.reduce((n, l) => n + l.sets, 0);
+        const minutes = eff ? estimateLineMinutes(eff.map((g) => ({ ...g.first, sets: g.count })) as never) : estimateLineMinutes(t.lines as never);
         return (
           <section key={t.id} className="ui-card tpl" aria-label={t.title}>
             <div className="tpl-head">
               <div className="grow">
                 <h2 className="tpl-title">{t.title}</h2>
                 <div className="tpl-meta">
-                  <span className="pill num"><Dumbbell size={12} aria-hidden="true" /> {t.lines.length}</span>
+                  <span className="pill num"><Dumbbell size={12} aria-hidden="true" /> {eff ? eff.length : t.lines.length}</span>
                   <span className="pill num"><Layers size={12} aria-hidden="true" /> {sets}</span>
-                  <span className="pill num"><Timer size={12} aria-hidden="true" /> ≈ {estimateMinutes(t.lines)} min</span>
+                  <span className="pill num"><Timer size={12} aria-hidden="true" /> ≈ {minutes} min</span>
                 </div>
               </div>
               <button
@@ -72,17 +86,24 @@ export function Program({ repo, go }: { repo: Repository; go: (r: Route) => void
               </button>
             </div>
             <ol className="tpl-list">
-              {t.lines.map((l, i) => (
-                <li key={l.id} className="tpl-ex">
-                  <span className="tpl-n">{i + 1}</span>
-                  <span className="tpl-name">{findVariant(l.variantId)?.variant.name ?? l.variantId}</span>
-                  <span className="tpl-stat">
-                    {l.sets}×{l.kind === 'reps' ? (l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps ?? '?') : `${l.targetSeconds ?? '?'} s`}
-                    {l.loadKg ? <b>+{l.loadKg} kg</b> : null}
-                  </span>
-                </li>
-              ))}
+              {(eff ?? t.lines.map((l) => ({ first: { ...l, blockId: l.id } as never, count: l.sets }))).map((g, i) => {
+                const l = g.first as unknown as TemplateLine & { role?: SetRole; progression?: string };
+                const test = l.role === 'test';
+                const adapted = !!l.progression && /Adaptée à ta gêne|Phase allégée|Pas de test maximal|sous-maximale/.test(l.progression);
+                return (
+                  <li key={`${l.id}-${i}`} className="tpl-ex">
+                    <span className="tpl-n">{i + 1}</span>
+                    <span className="tpl-name">{findVariant(l.variantId)?.variant.name ?? l.variantId}</span>
+                    <span className="tpl-stat">
+                      {test ? `${g.count}× ${(l.targetRir ?? 0) >= 3 ? `sous-max · ${l.targetRir} en réserve` : 'max'}` : `${g.count}×${l.kind === 'reps' ? (l.repRange ? `${l.repRange[0]}–${l.repRange[1]}` : l.targetReps ?? '?') : `${l.targetSeconds ?? '?'} s`}`}
+                      {l.loadKg ? <b>+{l.loadKg} kg</b> : null}
+                      {adapted ? <b>adaptée · {l.targetRir} en réserve</b> : null}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
+            <Help>Prescription au lancement : charges réelles, adaptations de gêne et phase allégée comprises. Durée = échauffement compris ; les exercices un bras ou une jambe durent plus (deux côtés). « Modifier » change le modèle de base.</Help>
             <div className="tpl-actions">
               <button className="btn sm" onClick={() => setEditing(t)}>
                 <Pencil size={16} aria-hidden="true" /> Modifier

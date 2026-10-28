@@ -175,3 +175,9 @@ Défauts connus corrigés, testés sur base fictive (tests/arbitrage.test.ts, pa
 - Fin de bloc → bilan → bloc suivant : **absent** (le bloc s'arrête le 22/11 ; les adaptations stockées à part restent, pas la répartition A/B/C ni les charges réelles).
 - Poids, apports, performances, récupération → recommandation globale : **manuel** (date de début de créatine non enregistrée).
 - Chat → app : **manuel** (seules voies : nouvelle version, action de l'utilisateur, import).
+
+## Fiches « Mes séances » = prescription au lancement (28/10)
+- Les fiches affichent maintenant l'aperçu EXACT du lancement (`previewTemplate`, `withProgression` en `dryRun` : rien n'est écrit) : charges réelles, adaptation de gêne, phase allégée. Le modèle de base ne change que via « Modifier ».
+- Écart corrigé : quand la progression est gelée/maintenue, la charge reprise est celle de la DERNIÈRE séance (ex. +12 kg), plus celle de départ du modèle (+5 kg). Test : `tests/cards.test.ts` (échoue sans le correctif).
+- Durée : une seule estimation (celle du planning, échauffement 8 min compris) ; les exercices unilatéraux ne sont pas doublés (estimation prudente à lire comme un ordre de grandeur).
+- Lignes de test : « sous-max · 3 en réserve » au lieu de « 1×? ».

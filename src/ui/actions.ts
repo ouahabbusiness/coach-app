@@ -102,7 +102,7 @@ export async function jointGuard(repo: Repository, variantId: string, tol?: Tole
  * Transition → seule la 1re série passe à la charge d'essai. Proposition (baisse) → rien n'est appliqué
  * tant qu'elle n'est pas validée. Baisse validée (override) → appliquée une fois puis effacée.
  */
-export async function withProgression(repo: Repository, plan: SessionPlan): Promise<SessionPlan> {
+export async function withProgression(repo: Repository, plan: SessionPlan, opts: { dryRun?: boolean } = {}): Promise<SessionPlan> {
   const states = [...(await repo.allSessionEvents()).values()].map((ev) => project(ev)).filter((s): s is SessionState => s !== null);
   // Adaptation à la gêne : la prescription adaptée stable (réserve visée 3) se compare à elle-même. Sans cela, la séance précédente
   // (faite à 3 en réserve) paraîtrait « à prescription différente » du modèle (2 en réserve) et la calibration ne se terminerait jamais.
@@ -149,8 +149,8 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, bodyweightKg, addedLoad, guarded }));
     } else legacy.set(set.blockId, nextSessionAdjust(lastWork(states, set.variantId), set, loads));
   }
-  if (decisions.size) await appendJournal(repo, [...decisions.values()], `lancement · ${plan.title}`, plan.id);
-  if (forced.size) {
+  if (decisions.size && !opts.dryRun) await appendJournal(repo, [...decisions.values()], `lancement · ${plan.title}`, plan.id);
+  if (forced.size && !opts.dryRun) {
     const rest = { ...overrides };
     for (const s of plan.sets) if (forced.has(s.blockId)) delete rest[s.variantId];
     await repo.setKv(OVERRIDES, rest);
@@ -180,6 +180,14 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     }),
   };
   return finish(out);
+}
+
+/**
+ * Aperçu de la prescription au lancement : EXACTEMENT ce que `startSessionFromTemplate` appliquerait (charges réelles, adaptation de gêne,
+ * tolérance, phase allégée), sans rien écrire (ni journal, ni baisse validée consommée).
+ */
+export async function previewTemplate(repo: Repository, template: SessionTemplate): Promise<SessionPlan> {
+  return withProgression(repo, planFromTemplate(template, exerciseOf), { dryRun: true });
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

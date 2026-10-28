@@ -72,20 +72,25 @@ export interface DecideOpts {
 
 function decideCore(variantId: string, rx: Rx, samples: Sample[], loads: number[], opts: DecideOpts = {}): Decision {
   const base = { variantId, before: { loadKg: rx.loadKg, target: rx.target } };
-  const keep = (extra: Partial<Decision> & Pick<Decision, 'rule' | 'reason'>): Decision => ({
-    ...base,
-    action: 'maintenir',
-    after: { loadKg: rx.loadKg, target: rx.target },
-    done: false,
-    targetReached: false,
-    progressionAllowed: false,
-    observations: [],
-    missing: [],
-    reevaluate: 'prochaine séance comparable',
-    ...extra,
-  });
-
   const last = samples[0];
+  // Charge réellement faite à la dernière séance (ex. +12 kg) : c'est elle qui est maintenue, pas la charge de départ du modèle (ex. +5 kg).
+  const held = last ? maxLoad(last.results) : undefined;
+  const keep = (extra: Partial<Decision> & Pick<Decision, 'rule' | 'reason'>): Decision => {
+    const d: Decision = {
+      ...base,
+      action: 'maintenir',
+      after: { loadKg: held ?? rx.loadKg, target: rx.target },
+      done: false,
+      targetReached: false,
+      progressionAllowed: false,
+      observations: [],
+      missing: [],
+      reevaluate: 'prochaine séance comparable',
+      ...extra,
+    };
+    return !extra.after && held !== undefined && held !== rx.loadKg ? { ...d, reason: `${d.reason} Charge reprise de ta dernière séance : ${fmt(held)} kg.`, observations: [...d.observations, `charge reprise : ${fmt(held)} kg`] } : d;
+  };
+
   if (!last || last.results.length === 0) return keep({ action: 'observer', rule: 'aucune donnée', reason: 'Pas encore de séance comparable : on calibre.', missing: ['résultats de la première séance'] });
   if (opts.pain) return keep({ done: true, rule: 'sécurité', reason: 'Douleur signalée : aucune progression, le mouvement est réévalué.', observations: ['douleur signalée'] });
   if (!last.comparable) return keep({ action: 'observer', done: true, rule: 'séance non comparable', reason: `Séance non comparable (${last.why ?? 'conditions différentes'}) : elle ne compte ni comme progrès ni comme échec.` });
@@ -194,7 +199,7 @@ export function decide(variantId: string, rx: Rx, samples: Sample[], loads: numb
       ...d,
       action: 'maintenir',
       transition: undefined,
-      after: { loadKg: rx.loadKg, target: rx.hi },
+      after: { loadKg: maxLoad(samples[0]?.results ?? []) ?? rx.loadKg, target: rx.hi },
       progressionAllowed: false,
       rule: 'gêne déclarée',
       observations: [...d.observations, 'épaule ou coudes déclarés sensibles'],
