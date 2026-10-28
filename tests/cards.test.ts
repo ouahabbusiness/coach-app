@@ -131,3 +131,35 @@ describe('charge connue + gêne/proposition : décision du coach explicite, jama
     expect(accepted.sets[0]!.progression).toMatch(/Baisse validée par toi : 10 kg/);
   });
 });
+
+describe('liaison avec le contrôle avant séance : ta réponse du jour prime sur un ancien « rien le lendemain »', () => {
+  it('douleur → « rien » le lendemain → douleur revenue : proposition provisoire sur la fiche, mouvement retiré au contrôle ; « aucune » : rien n’est retiré, rien n’est validé', async () => {
+    const { painHeldBlocks, PAIN_HOLD_REASON } = await import('../src/ui/painHold');
+    const { COACH_REMOVED } = await import('../src/ui/actions');
+    const repo = new Repository(new CoachDb('cards-pain-return'));
+    const s0 = await startSessionFromTemplate(repo, tpl(12));
+    await perform(repo, s0, 'dips-weighted', 8, 2);
+    const first = project(await repo.sessionEvents(s0))!.sets[0]!.planned.id;
+    await run(repo, s0, { type: 'report_pain', plannedSetId: first, location: 'épaule', intensity: 4, stop: false });
+    await run(repo, s0, { type: 'end_session' });
+    await repo.setKv(`joint.feedback.${s0}`, { next: 'rien' });
+    // fiche : proposition provisoire (reprise à confirmer), jamais présentée comme validée
+    const card = await previewTemplate(repo, tpl(5));
+    expect(card.sets[0]!.progression).toMatch(/plus rien le lendemain.*à confirmer/);
+    // lancement : même plan ; aucune réponse du jour encore (pas de contrôle) → rien n'est retiré ni supposé « aucune douleur »
+    const launched = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tpl(5))))!;
+    const planned = launched.sets.map((s) => s.planned);
+    expect(launched.sets.every((s) => s.status === 'pending')).toBe(true);
+    // contrôle avant séance : douleur revenue / nouvelle / aggravée → mouvement retiré (décision du coach, pas un abandon)
+    for (const pain of ['nouvelle', 'aggravée'] as const) {
+      const held = painHeldBlocks(planned, pain);
+      expect(planned.filter((p) => held.has(p.blockId))).toHaveLength(planned.length);
+    }
+    expect(painHeldBlocks(planned, 'aucune').size).toBe(0); // rien le lendemain + aucune douleur aujourd'hui : reprise proposée
+    // douleur encore présente au dernier retour : « À REVOIR » est respecté dans le déroulement, même avec « aucune » aujourd'hui
+    expect(painHeldBlocks([{ blockId: 'x', role: 'work', progression: 'Douleur signalée à 12 kg, encore présente le lendemain : mouvement À REVOIR' }], 'aucune').has('x')).toBe(true);
+    expect(COACH_REMOVED.test(PAIN_HOLD_REASON)).toBe(true);
+    // un mouvement sans douleur signalée n'est jamais retiré par ce mécanisme
+    expect(painHeldBlocks([{ blockId: 'x', role: 'work', progression: 'Double progression' }], 'nouvelle').size).toBe(0);
+  });
+});

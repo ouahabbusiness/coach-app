@@ -10,6 +10,7 @@ import { deviceTimeZone } from './support';
 import { localDay } from '../engine/derive';
 import type { ReadinessDecision, ReadinessInput } from '../engine/readiness';
 import { ReadinessCheck } from './ReadinessCheck';
+import { PAIN_HOLD_REASON, painHeldBlocks } from './painHold';
 import { loadsFor, useEquipment } from './equipment';
 import { project } from '../engine/session';
 import type { SessionState, SetResult, SetState } from '../engine/types';
@@ -99,8 +100,12 @@ export function SessionScreen({ repo, sessionId, onExit, onSummary, booted }: { 
       onExit();
       return;
     }
+    // Douleur nouvelle ou aggravée aujourd'hui : les mouvements liés à une douleur signalée sont retirés (à revoir), quel que soit un ancien « rien le lendemain ».
+    const held = painHeldBlocks(state.sets.map((x) => x.planned), input.pain);
+    for (const x of work) if (held.has(x.planned.blockId)) await send({ type: 'skip_set', plannedSetId: x.planned.id, reason: PAIN_HOLD_REASON });
     const blocks = [...new Set(state.sets.map((x) => x.planned.blockId))];
     for (const [bi, b] of blocks.entries()) {
+      if (held.has(b)) continue;
       const sets = state.sets.filter((x) => x.planned.blockId === b && x.planned.role === 'work');
       if (d.shorten && bi >= 2) {
         for (const x of sets) await send({ type: 'skip_set', plannedSetId: x.planned.id, reason: 'version courte (contrôle avant séance)' });
