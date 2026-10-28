@@ -7,6 +7,7 @@ import { loadTemplates } from './templates';
 import type { Repository } from '../storage/db';
 import { loadOnboarding } from './profileStore';
 import { loadPrayer, withPrayers } from './prayerStore';
+import { loadTolerance } from './toleranceContext';
 
 const RECURRING = 'agenda.recurring';
 const ONE_OFFS = 'planning.oneoffs';
@@ -41,13 +42,14 @@ export async function fitPlanning(repo: Repository, items: PlannedItem[], today:
   const [templates, trips, fixed, baseOneOffs, prayer] = await Promise.all([loadTemplates(repo), loadTrips(repo), loadAllFixed(repo), loadOneOffs(repo), loadPrayer(repo)]);
   const oneOffs = withPrayers(baseOneOffs, [...new Set(items.map((i) => dateOf(i.weekStart, i.day)))], prayer);
   const notes: string[] = [];
+  const tol = await loadTolerance(repo);
   let out = items.map((i) => {
     const date = dateOf(i.weekStart, i.day);
     const t = trips.find((x) => inTrip(date, x));
     if (!t || i.sessionId || i.kind !== 'seance' || date < today || i.adjustment) return i;
     const tpl = templates.find((x) => x.id === i.templateId);
     if (!tpl) return i;
-    const a = adaptToEquipment(tpl.lines, t.equipment);
+    const a = adaptToEquipment(tpl.lines, t.equipment, tol.opts);
     if (!a.removed.length) return i;
     notes.push(`${date} · ${i.title} : ${a.removed.join(', ')}`);
     return { ...i, adapted: { lines: a.lines, estimatedMin: a.estimatedMin, removed: a.removed }, adjustment: { reason: 'deplacement' as const, decision: 'adaptée' as const, at: Date.now(), note: t.label } };

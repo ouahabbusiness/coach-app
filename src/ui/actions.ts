@@ -6,6 +6,7 @@ import { decide as decideProgression, JOINT_LOADED, type Decision, type Sample }
 import { findVariant } from '../catalog/exercises';
 import { appendJournal } from './journal';
 import { adaptSets, hasJointDeclared } from '../engine/joints';
+import { isUpperLoaded, toleranceOf, toleratedVariants } from '../engine/tolerance';
 import { JOINT_ADAPT, loadComplement, type JointAdapt } from './profileComplement';
 import { loadEquipment, loadsFor } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
@@ -158,7 +159,11 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     }),
   };
   // Adaptation à la gêne acceptée : elle modifie la prescription réelle de la séance (marge, séries, consigne).
-  return adapt && (adapt.patterns.length || adapt.tests?.length) ? { ...out, sets: adaptSets(out.sets, adapt.patterns, adapt.tests ?? adapt.patterns) } : out;
+  if (!adapt || !(adapt.patterns.length || adapt.tests?.length)) return out;
+  // Tolérance inconnue (mouvement sollicitant épaule ou coudes, jamais déclaré gênant, pas fait récemment sans douleur signalée) : même prudence au départ.
+  const ctx = { triggerPatterns: adapt.patterns, tolerated: toleratedVariants(states, Date.now()) };
+  const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) === 'inconnue').map((x) => '^' + x.variantId + '$'))];
+  return { ...out, sets: adaptSets(out.sets, [...adapt.patterns, ...unknown], adapt.tests ?? adapt.patterns) };
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

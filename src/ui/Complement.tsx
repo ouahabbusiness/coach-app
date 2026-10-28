@@ -45,6 +45,8 @@ import { programStrategy } from './Targets';
 import { deviceTimeZone } from './support';
 import { localDay } from '../engine/derive';
 import { project } from '../engine/session';
+import { TOLERANCE_LABELS, toleranceOf, type Tolerance } from '../engine/tolerance';
+import { loadTolerance } from './toleranceContext';
 
 const PLAN_KEY = 'planning.items';
 const PROGRAM_KEY = 'program.current';
@@ -62,6 +64,8 @@ interface Inputs {
   sessionDays: string[];
   /** Variantes du programme (pour montrer ce que l'adaptation à la gêne touche). */
   variants: string[];
+  /** Variantes faites récemment dans une séance sans douleur signalée. */
+  tolerated: ReadonlySet<string>;
   /** Variantes des tests maximaux du programme. */
   testVariants: string[];
   /** Les réponses d'avant la version 2 sur les pas sont à refaire. */
@@ -192,6 +196,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       tired: rlog.some((x) => x.tired && recent.has(x.day)),
       sessionDays,
       variants: [...new Set(lines.filter((l) => l.role !== 'test').map((l) => l.variantId))],
+      tolerated: (await loadTolerance(repo)).ctx.tolerated,
       testVariants: [...new Set(lines.filter((l) => l.role === 'test').map((l) => l.variantId))],
       legacySteps,
     });
@@ -232,6 +237,12 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const testsTouched = useMemo(() => (inp ? inp.testVariants.filter((v) => match(tests, v)) : []), [inp, tests]);
   const chronos = useMemo(() => (inp ? inp.items.filter((x) => x.kind === 'course' && /chrono/i.test(x.title) && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp]);
   const retests = useMemo(() => (inp && tests.length ? inp.items.filter((x) => x.templateId === 'prog-T' && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp, tests]);
+  // Tolérance de chaque mouvement du haut du corps : déclencheur connu / fait récemment sans douleur signalée / tolérance inconnue.
+  const tolerance = useMemo(() => {
+    if (!inp || !joints.length) return [] as { id: string; t: Tolerance }[];
+    const ctx = { triggerPatterns: patterns, tolerated: inp.tolerated };
+    return inp.variants.map((id) => ({ id, t: toleranceOf(id, ctx) })).filter((x): x is { id: string; t: Tolerance } => !!x.t);
+  }, [inp, patterns, joints.length]);
   const kcal = useMemo(() => {
     if (!inp) return undefined;
     const base = { sex: inp.a.body.formulaSex, age: inp.a.body.age.value, heightCm: inp.a.body.heightCm.value, weightKg: inp.weightKg, strategy: inp.strategy, goal: inp.a.goal.main };
@@ -551,7 +562,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
         )}
         {joints.length > 0 && (
           <section className="card stack" aria-label="Adaptation à la gêne">
-            <strong>Programme adapté et évaluations</strong>
+            <strong>Base provisoire à évaluer · programme adapté et évaluations</strong>
             {touched.length > 0 ? (
               <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
                 Exercices adaptés : {touched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}. Marge de 3 répétitions, une série de moins, jamais à l’échec, charge gelée. Une proposition à vérifier, pas une garantie.
@@ -564,6 +575,14 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
                 ? `Test maximal remplacé par une série sous-maximale sur : ${testsTouched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}${retests.length ? ` (séance du ${retests.map((x) => dm(dateOf(x.weekStart, x.day))).join(', ')})` : ''}. Report ou annulation possibles selon l’évolution.`
                 : 'Aucun test maximal sur un mouvement symptomatique.'}
             </p>
+            {(['declencheur', 'toleree', 'inconnue'] as Tolerance[]).map((t) => {
+              const ids = tolerance.filter((x) => x.t === t).map((x) => findVariant(x.id)?.variant.name ?? x.id);
+              return ids.length ? (
+                <p key={t} className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                  {TOLERANCE_LABELS[t][0]!.toUpperCase() + TOLERANCE_LABELS[t].slice(1)} : {ids.join(', ')}.{t === 'inconnue' ? ' Prudence au départ : marge de 3 répétitions, une série de moins, stop si gêne.' : ''}
+                </p>
+              ) : null;
+            })}
             {advice.clarify.length > 0 && (
               <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
                 À clarifier ({advice.clarify.map((z) => ZONE_LABELS[z].toLowerCase()).join(', ')}) : ni perte de force affirmée, ni « tout va bien ».

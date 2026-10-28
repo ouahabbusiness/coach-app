@@ -11,6 +11,7 @@ import { appendJournal } from './journal';
 import { localDay } from '../engine/derive';
 import { deviceTimeZone } from './support';
 import type { SessionTemplate } from './templates';
+import { loadTolerance } from './toleranceContext';
 
 export const REDISTRIBUTION_KEY = 'program.redistribution';
 const PLAN_KEY = 'planning.items';
@@ -69,12 +70,13 @@ export async function applyRedistribution(repo: Repository): Promise<number> {
   // Séances à venir : durée recalculée ; versions adaptées (voyage) refaites à partir des nouveaux modèles. Les séances faites ne bougent pas.
   const today = localDay(now, deviceTimeZone());
   const trips = (await repo.getKv<Trip[]>('agenda.trips')) ?? [];
+  const tol = await loadTolerance(repo);
   const items = ((await repo.getKv<PlannedItem[]>(PLAN_KEY)) ?? []).map((x) => {
     const tpl = x.templateId ? templates.find((t) => t.id === x.templateId) : undefined;
     if (!tpl || !nextLines[tpl.id] || x.kind !== 'seance' || x.sessionId || dateOf(x.weekStart, x.day) < today) return x;
     const trip = trips.find((t) => inTrip(dateOf(x.weekStart, x.day), t));
     if (x.adapted && trip) {
-      const ad = adaptToEquipment(tpl.lines, trip.equipment);
+      const ad = adaptToEquipment(tpl.lines, trip.equipment, tol.opts);
       return { ...x, durationMin: minutes(tpl.lines as unknown as RLine[]), adapted: { lines: ad.lines, estimatedMin: ad.estimatedMin, removed: ad.removed } };
     }
     return x.adapted ? x : { ...x, durationMin: minutes(tpl.lines as unknown as RLine[]) };
@@ -98,4 +100,34 @@ export async function applyRedistribution(repo: Repository): Promise<number> {
   await appendJournal(repo, decisions, 'programme · répartition A/B/C', `repartition-${today}`);
   await repo.setKv(REDISTRIBUTION_KEY, { at: now, templates: ['prog-A', 'prog-B', 'prog-C'] });
   return 3;
+}
+
+export const TRIP_REFIT_KEY = 'program.tripRefit';
+
+/**
+ * Séances de séjour déjà adaptées : refaites une fois avec la règle de tolérance (jamais de remplaçant « déclencheur connu »,
+ * tolérance annoncée). Séances faites, passées ou sans voyage : inchangées.
+ */
+export async function refitTripSessions(repo: Repository): Promise<number> {
+  if (await repo.getKv(TRIP_REFIT_KEY)) return 0;
+  const trips = (await repo.getKv<Trip[]>('agenda.trips')) ?? [];
+  const stored = (await repo.getKv<SessionTemplate[]>('templates')) ?? [];
+  const items = (await repo.getKv<PlannedItem[]>(PLAN_KEY)) ?? [];
+  if (!trips.length || !items.length) return 0;
+  const tol = await loadTolerance(repo);
+  if (!tol.declared) return 0;
+  const today = localDay(Date.now(), deviceTimeZone());
+  let changed = 0;
+  const next = items.map((x) => {
+    const date = dateOf(x.weekStart, x.day);
+    const trip = trips.find((t) => inTrip(date, t));
+    const tpl = x.templateId ? stored.find((t) => t.id === x.templateId) : undefined;
+    if (!trip || !tpl || !x.adapted || x.kind !== 'seance' || x.sessionId || date < today) return x;
+    const ad = adaptToEquipment(tpl.lines, trip.equipment, tol.opts);
+    changed++;
+    return { ...x, adapted: { lines: ad.lines, estimatedMin: ad.estimatedMin, removed: ad.removed } };
+  });
+  if (changed) await repo.setKv(PLAN_KEY, next);
+  await repo.setKv(TRIP_REFIT_KEY, { at: Date.now(), changed });
+  return changed;
 }

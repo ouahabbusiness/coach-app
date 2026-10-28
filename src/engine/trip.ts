@@ -41,7 +41,14 @@ const nameOf = (id: string) => findVariant(id)?.variant.name ?? id;
 const feasible = (id: string, have: Set<string>) => (findVariant(id)?.variant.equipment ?? []).every((e) => have.has(e));
 
 /** Adapte une séance au matériel disponible. Les charges disparaissent si le remplaçant n'en a pas besoin. */
-export function adaptToEquipment<T extends PlanLine & { loadKg?: number }>(lines: T[], equipment: string[]): Adapted<T> {
+export interface AdaptOpts {
+  /** Remplaçant à ne jamais choisir automatiquement (geste déclaré comme déclencheur de ta gêne). */
+  avoid?: (variantId: string) => boolean;
+  /** Mention ajoutée au remplacement (ex. « tolérance inconnue »). */
+  note?: (variantId: string) => string | undefined;
+}
+
+export function adaptToEquipment<T extends PlanLine & { loadKg?: number }>(lines: T[], equipment: string[], opts: AdaptOpts = {}): Adapted<T> {
   const have = new Set(equipment);
   const removed: string[] = [];
   const out: T[] = [];
@@ -50,9 +57,10 @@ export function adaptToEquipment<T extends PlanLine & { loadKg?: number }>(lines
       out.push(l);
       continue;
     }
-    const sub = (SUBS[l.variantId] ?? []).find((id) => feasible(id, have));
+    const possible = (SUBS[l.variantId] ?? []).filter((id) => feasible(id, have));
+    const sub = possible.find((id) => !opts.avoid?.(id));
     if (!sub) {
-      removed.push(`${nameOf(l.variantId)} : retiré (matériel absent)`);
+      removed.push(possible.length ? `${nameOf(l.variantId)} : retiré (le remplaçant possible est un geste déclencheur : à choisir avec toi)` : `${nameOf(l.variantId)} : retiré (matériel absent)`);
       continue;
     }
     const v = findVariant(sub)!.variant;
@@ -61,7 +69,8 @@ export function adaptToEquipment<T extends PlanLine & { loadKg?: number }>(lines
     if (v.kind === 'hold') Object.assign(next, { targetReps: undefined, targetSeconds: 30 });
     else if (l.kind === 'hold') Object.assign(next, { targetSeconds: undefined, targetReps: 10 });
     out.push(next);
-    removed.push(`${nameOf(l.variantId)} → ${v.name}`);
+    const note = opts.note?.(sub);
+    removed.push(`${nameOf(l.variantId)} → ${v.name}${note ? ` (${note})` : ''}`);
   }
   return { lines: out, estimatedMin: estimateMinutes(out), removed };
 }

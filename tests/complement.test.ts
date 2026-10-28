@@ -298,7 +298,8 @@ describe('adaptation acceptée : elle apparaît dans la séance lancée et ne to
     expect(pulls).toHaveLength(3);
     expect(pulls[0]!.planned).toMatchObject({ targetRir: 3, lastSetToFailure: false });
     expect(pulls[0]!.planned.progression).toMatch(/Adaptée à ta gêne/);
-    expect(st.sets.filter((s) => s.planned.variantId === 'kb-row-1arm')).toHaveLength(3);
+    // rowing : jamais fait récemment, non déclaré gênant = tolérance inconnue : prudence au départ (une série de moins)
+    expect(st.sets.filter((s) => s.planned.variantId === 'kb-row-1arm')).toHaveLength(2);
     // les séances déjà enregistrées ne sont pas modifiées
     expect(plain.sets.filter((s) => s.planned.variantId === 'pullup-strict')).toHaveLength(4);
   });

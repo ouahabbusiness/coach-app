@@ -125,3 +125,12 @@ Adaptation au contexte du jour et de la saison, sans mode « hiver » automatiqu
 
 ### Référence esthétique (28/10/2026)
 Préférence esthétique déclarée par l'utilisateur : haut du corps dense (pectoraux, épaules larges, bras épais, abdominaux visibles sans définition extrême), jambes fortes et proportionnées. Ce n'est PAS un corps à reproduire : aucun poids idéal, taux de graisse ni délai n'en est déduit, et elle ne modifie automatiquement ni les calories ni le volume. Réévaluation du volume haut du corps après les séances de calibration, selon les symptômes (épaule, coudes), la récupération et l'évolution mesurée.
+
+### Séances de voyage et tolérance (28/10/2026, soir)
+- **Tolérance par mouvement** (haut du corps) : « déclencheur connu » / « fait récemment sans douleur signalée » / « tolérance inconnue ». Un mouvement non cité n'est jamais considéré comme adapté. Tolérance inconnue = prudence au départ (marge de 3 répétitions, une série de moins, stop si gêne) jusqu'à une séance sans douleur signalée.
+- **Séjour** : jamais de remplaçant « déclencheur connu » (plus de dips sur banc automatiques) ; la tolérance du remplaçant est annoncée ; si le seul remplaçant est un déclencheur, l'exercice est retiré et dit. Les séances de séjour déjà adaptées sont refaites une fois. Dates vérifiées : séjour du 3 au 10/11, séances adaptées les 4/11 (B), 6/11 (C) et 9/11 (A) ; la séance du 2/11 n'est pas concernée. Matériel garanti : tapis + banc seulement.
+- Le programme est présenté comme une **base provisoire à évaluer**, jamais « sûr ».
+
+### Feuille de route : séjours (non démarrée, après stabilisation)
+- **Alternative « salle »** : séance activable le jour même si l'accès est confirmé (matériel de salle à confirmer sur place, jamais supposé), sans travail ajouté au-dessus de la séance prévue.
+- **Lieux d'entraînement à proximité** : la recherche OpenStreetMap existante (street workout, pistes, parcs, depuis la position réelle, avec distance) ne couvre PAS encore : adresse ou zone saisie, rayon / temps de trajet maximal demandé, temps à pied, matériel signalé (barre de traction, barres parallèles), accès et horaires, source et niveau de confiance, confirmation sur place avant toute adaptation. Aucune adaptation automatique à un équipement seulement repéré sur une carte ; une barre accessible n'autorise pas les tractions (symptômes et tolérance d'abord).
