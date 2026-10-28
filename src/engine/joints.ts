@@ -204,7 +204,7 @@ interface AdaptableSet {
 }
 
 const ADAPT_NOTE = 'Adaptée à ta gêne : marge de 3 répétitions, amplitude confortable, stop si gêne > 3/10.';
-const TEST_CUE = 'Pas de test maximal (gêne déclarée) : une série sous-maximale, arrête avec 3 répétitions en réserve et note-les.';
+const TEST_CUE = 'Pas de test maximal (gêne déclarée) : une série sous-maximale, arrête avec 3 répétitions en réserve et note-les. Si tes symptômes ne le permettent pas, passe ce test (aucune pénalité).';
 
 /**
  * Adaptation acceptée : marge de 3 répétitions, jamais à l'échec, une série de moins par exercice (jamais sous 2),

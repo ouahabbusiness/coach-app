@@ -45,7 +45,7 @@ import { programStrategy } from './Targets';
 import { deviceTimeZone } from './support';
 import { localDay } from '../engine/derive';
 import { project } from '../engine/session';
-import { TOLERANCE_LABELS, toleranceDetail, toleranceOf, type Tolerance, type ToleranceContext } from '../engine/tolerance';
+import { TOLERANCE_LABELS, isUpperLoaded, toleranceDetail, toleranceOf, type Tolerance, type ToleranceContext } from '../engine/tolerance';
 import { loadTolerance } from './toleranceContext';
 
 const PLAN_KEY = 'planning.items';
@@ -234,9 +234,14 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const tests = useMemo(() => testPatterns(joints), [joints]);
   const match = (list: string[], v: string) => list.some((p) => new RegExp(p).test(v));
   const touched = useMemo(() => (inp ? inp.variants.filter((v) => match(patterns, v)) : []), [inp, patterns]);
-  const testsTouched = useMemo(() => (inp ? inp.testVariants.filter((v) => match(tests, v)) : []), [inp, tests]);
+  // Tests concernés : gestes déclarés + tout mouvement du haut du corps dont la tolérance n'est pas confirmée (série sous-maximale).
+  const testsTouched = useMemo(() => {
+    if (!inp || !joints.length) return [];
+    const ctx = { ...inp.toleranceCtx, triggerPatterns: patterns };
+    return inp.testVariants.filter((v) => match(tests, v) || (isUpperLoaded(v) && toleranceOf(v, ctx) !== 'toleree'));
+  }, [inp, tests, patterns, joints.length]);
   const chronos = useMemo(() => (inp ? inp.items.filter((x) => x.kind === 'course' && /chrono/i.test(x.title) && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp]);
-  const retests = useMemo(() => (inp && tests.length ? inp.items.filter((x) => x.templateId === 'prog-T' && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp, tests]);
+  const retests = useMemo(() => (inp && testsTouched.length ? inp.items.filter((x) => x.templateId === 'prog-T' && dateOf(x.weekStart, x.day) >= inp.today && !x.sessionId) : []), [inp, testsTouched]);
   // Tolérance de chaque mouvement du haut du corps : déclencheur connu / fait récemment sans douleur signalée / tolérance inconnue.
   const tolerance = useMemo(() => {
     if (!inp || !joints.length) return [] as { id: string; t: Tolerance; detail: string }[];
@@ -313,8 +318,8 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       if (retestIds.size) done.push('test maximal remplacé par une série sous-maximale');
     }
     // Adaptation à la gêne : elle modifie la prescription de chaque séance et laisse une trace dans le journal.
-    if (patterns.length || tests.length) {
-      const adapt: JointAdapt = { patterns, tests, at: Date.now() };
+    if (patterns.length || tests.length || testsTouched.length) {
+      const adapt: JointAdapt = { patterns, tests: [...tests, ...testsTouched.filter((v) => !match(tests, v)).map((v) => '^' + v + '$')], at: Date.now() };
       await repo.setKv(JOINT_ADAPT, adapt);
       const reason = (kind: string) => `${kind} Proposition à vérifier pendant la séance et le lendemain, pas une garantie.`;
       const mk = (variantId: string, rule: string, text: string): Decision => ({
@@ -354,7 +359,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const alerts: JointAlert[] = JOINT_ALERT_CHOICES;
   const num = (v: string) => (v === '' ? undefined : Math.max(0, Number(v.replace(',', '.')) || 0));
   const hasActivityNow = act.steps !== undefined || act.sitHours !== undefined;
-  const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !tests.length && !chronos.length && !hasActivityNow;
+  const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !tests.length && !testsTouched.length && !chronos.length && !hasActivityNow;
 
   return (
     <Modal open={open} onClose={onClose} title="Compléter mon profil">

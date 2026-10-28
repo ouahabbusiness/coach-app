@@ -166,7 +166,9 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
   const ctx = { triggerPatterns: adapt.patterns, ...toleranceHistory(states, feedback, Date.now(), (at, tz) => localDay(at, tz ?? 'UTC')) };
   // « Toléré » = réponses explicites ; tout le reste (inconnue, gêne signalée) garde la prudence de départ.
   const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
-  return { ...out, sets: adaptSets(out.sets, [...adapt.patterns, ...unknown], adapt.tests ?? adapt.patterns) };
+  // Tests : tolérance non confirmée = série sous-maximale (jamais un maximum imposé) ; tu peux aussi passer le test sans pénalité.
+  const unknownTests = [...new Set(out.sets.filter((x) => x.role === 'test' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
+  return { ...out, sets: adaptSets(out.sets, [...adapt.patterns, ...unknown], [...(adapt.tests ?? adapt.patterns), ...unknownTests]) };
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

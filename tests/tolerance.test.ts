@@ -185,3 +185,25 @@ describe('passer un mouvement sans pénalité', () => {
     expect(sessionOutcome(await finish('skip-all', 'Passé : tolérance inconnue', false))).toBe('partial');
   });
 });
+
+describe('tests : tolérance non confirmée = série sous-maximale, passage possible sans pénalité', () => {
+  const tplT: SessionTemplate = { id: 'T', title: 'Re-test', updatedAt: 0, lines: [{ id: 't1', variantId: 'pushup-standard', kind: 'reps', role: 'test', sets: 1, restSeconds: 180, cue: 'Max, poitrine au sol' }] };
+  const tplW: SessionTemplate = { id: 'W', title: 'W', updatedAt: 0, lines: [{ id: 'w1', variantId: 'pushup-standard', kind: 'reps', role: 'work', sets: 1, restSeconds: 75, repRange: [10, 15], targetReps: 10, targetRir: 2 }] };
+  it('pompes jamais déclarées gênantes mais non confirmées : le maximum n’est pas maintenu ; confirmées par tes réponses : il le redevient', async () => {
+    const repo = new Repository(new CoachDb('tolerance-tests'));
+    await repo.setKv('profile.complement', { joints: [{ zone: 'epaule', triggers: ['tractions'], alerts: [] }] });
+    await repo.setKv('joint.adapt', { patterns: ['pullup|chinup'], tests: ['pullup|chinup'], at: 1 });
+    const sub = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tplT)))!.sets[0]!.planned;
+    expect(sub).toMatchObject({ targetRir: 3, lastSetToFailure: false });
+    expect(sub.cue).toMatch(/passe ce test \(aucune pénalité\)/);
+    // une séance de pompes faite, avec retours explicites après la séance et le lendemain
+    const id = await startSessionFromTemplate(repo, tplW);
+    const set = project(await repo.sessionEvents(id))!.sets[0]!;
+    await run(repo, id, { type: 'start_set', plannedSetId: set.planned.id });
+    await run(repo, id, { type: 'end_set', plannedSetId: set.planned.id });
+    await saveFeedback(repo, id, { during: 'aucune', next: 'rien' });
+    const max = project(await repo.sessionEvents(await startSessionFromTemplate(repo, tplT)))!.sets[0]!.planned;
+    expect(max.cue).toBe('Max, poitrine au sol');
+    expect(max.targetRir).toBeUndefined();
+  });
+});

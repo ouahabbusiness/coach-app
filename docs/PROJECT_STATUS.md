@@ -141,3 +141,12 @@ Préférence esthétique déclarée par l'utilisateur : haut du corps dense (pec
 - Retours : après la séance (écran de fin de séance) et le lendemain (écran du jour). Aucune réponse n'est supposée.
 - **Passer un mouvement sans pénalité** : raison « Passé : tolérance inconnue » dans la fenêtre « Passer cette série » : ni séance partielle, ni échec, ni rattrapage, jamais comptée comme réalisée.
 - Matériel garanti en voyage : tapis et banc uniquement. Salle et parc = possibilités supplémentaires à confirmer (feuille de route).
+
+### Mesures facultatives et tests sous-maximaux (28/10/2026, soir)
+- Mensurations facultatives : **bras, poitrine, épaules** (toutes les 4 semaines, mêmes conditions, pas juste après l'entraînement, mesure douteuse à refaire). Indicateur complémentaire, jamais une preuve de muscle gagné ; aucun ajustement automatique à partir d'une seule mesure.
+- Tests : tout mouvement du haut du corps dont la tolérance n'est pas confirmée (dont les pompes) passe en série sous-maximale (3 en réserve) ; le test peut être passé sans pénalité ou reporté selon les symptômes.
+
+### Ce qui est automatisé et ce qui ne l'est pas (honnêteté)
+- Automatique : décisions de progression et journal, contrôle avant séance, adaptation de gêne et tolérance, retours après séance et lendemain, rapport de séance, bilan hebdomadaire, volume par muscle, analyse de stagnation et proposition de phase allégée (à valider), cible de course, **bilan calorique (applique seul une correction après conditions : ≥ 14 jours, pesées, 7 jours d'apports notés)**.
+- Manuel (avec le coach, sur export ou synthèse) : décision « calibré » par exercice, volume et variantes du haut du corps, bilans du 16/11 et de fin de bloc, recommandation de stratégie alimentaire, lecture des mensurations.
+- Nécessiterait une nouvelle version : statut « calibré » par exercice, proposition de volume haut du corps, bilan calorique en proposition à valider, rappels de mesures, alternative salle, lieux d'entraînement.
