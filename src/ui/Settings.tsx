@@ -15,6 +15,7 @@ import { STEPS } from './Onboarding';
 import { useBackgrounds, type BgSlot } from './backgrounds';
 import { useWinterMode, type WinterMode } from './winterArc';
 import { loadGoals, loadOnboarding } from './profileStore';
+import { ComplementModal } from './Complement';
 
 type Status = 'testé' | 'non testé sur iPhone' | 'non implémenté' | 'à valider';
 
@@ -140,6 +141,7 @@ const FIELD_LABEL: Record<string, string> = {
 function ProfileCard({ repo, onEdit }: { repo: Repository; onEdit: () => void }) {
   const [goals, setGoals] = useState<GoalVersion[]>([]);
   const [done, setDone] = useState<boolean | null>(null);
+  const [complement, setComplement] = useState(false);
   useEffect(() => {
     loadGoals(repo).then(setGoals);
     loadOnboarding(repo).then((o) => setDone(!!o.completedAt));
@@ -159,6 +161,10 @@ function ProfileCard({ repo, onEdit }: { repo: Repository; onEdit: () => void })
       <button className="btn primary block" onClick={edit}>
         {done ? 'Modifier mon profil' : 'Reprendre la configuration'}
       </button>
+      <button className="btn block" onClick={() => setComplement(true)}>
+        Compléter : activité et gêne
+      </button>
+      <ComplementModal open={complement} onClose={() => setComplement(false)} repo={repo} />
       {goals.length > 0 && (
         <details>
           <summary style={{ cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center' }}>Historique de l’objectif ({goals.length} version{goals.length > 1 ? 's' : ''})</summary>

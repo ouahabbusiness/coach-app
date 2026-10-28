@@ -5,6 +5,8 @@ import { lightLoad, nextSessionAdjust, type LightLoad } from '../engine/progress
 import { decide as decideProgression, JOINT_LOADED, type Decision, type Sample } from '../engine/decide';
 import { findVariant } from '../catalog/exercises';
 import { appendJournal } from './journal';
+import { hasJointDeclared } from '../engine/joints';
+import { loadComplement } from './profileComplement';
 import { loadEquipment, loadsFor } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
 import { EXERCISES } from '../catalog/exercises';
@@ -84,6 +86,7 @@ export async function jointGuard(repo: Repository, variantId: string): Promise<b
   if (!JOINT_LOADED.test(variantId)) return false;
   const prog = await repo.getKv<{ pains?: string[] }>('program.answers');
   if (prog?.pains?.some((p) => p === 'epaules' || p === 'coudes')) return true;
+  if (hasJointDeclared((await loadComplement(repo)).joints)) return true;
   const onb = await repo.getKv<{ answers?: { safety?: { pains?: string } } }>('onboarding');
   return /[ée]paule|coude/i.test(onb?.answers?.safety?.pains ?? '');
 }

@@ -8,6 +8,8 @@ import type { WeighIn } from '../engine/weight';
 import type { Repository } from '../storage/db';
 import { Modal } from './common';
 import { saveProof } from './Habits';
+import { COMPLEMENT_EVENT, loadComplement, loadTraining } from './profileComplement';
+import type { ActivityAnswers, Training } from '../engine/activity';
 import { loadGoals, loadOnboarding, patchAnswers } from './profileStore';
 import { deviceTimeZone, newId } from './support';
 
@@ -16,7 +18,7 @@ const RUNS = 'run.log';
 
 /** Objectif calorique déduit du programme validé avec le coach (sèche → déficit, muscle → surplus, gras + muscle → recomposition). */
 /** Stratégie issue du programme validé avec le coach : muscle → développement, sèche → réduction, le reste → maintien (observation). */
-function programStrategy(p?: { answers: { priority?: string } }): Strategy | undefined {
+export function programStrategy(p?: { answers: { priority?: string } }): Strategy | undefined {
   const pr = p?.answers.priority;
   if (!pr) return undefined;
   return pr === 'muscle' ? 'développement' : pr === 'seche' ? 'réduction' : 'maintien';
@@ -34,8 +36,10 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   const [profile, setProfile] = useState<{ age?: number; heightCm?: number; weightKg?: number; spw?: number; goal?: Parameters<typeof calorieTarget>[0]['goal']; strategy?: Strategy }>({});
   const [adjustments, setAdjustments] = useState<CalorieAdjust[]>([]);
   const [review, setReview] = useState<{ reason: string; uncertain: boolean } | null>(null);
+  const [energy, setEnergy] = useState<{ activity?: ActivityAnswers; training?: Training; treadmillDays: number; workDays: number }>({ treadmillDays: 0, workDays: 0 });
 
   useEffect(() => {
+    let cleanup: (() => void) | undefined;
     (async () => {
       const a0 = (await loadOnboarding(repo)).answers;
       setSexState(a0.body.formulaSex ?? (await repo.getKv<FormulaSex>(SEX)));
@@ -51,7 +55,15 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
         strategy: programStrategy(await repo.getKv<{ answers: { priority?: string } }>('program.current')),
       });
       setAdjustments((await repo.getKv<CalorieAdjust[]>(ADJUST)) ?? []);
+      const loadEnergy = async () => {
+        const ob = (await loadOnboarding(repo)).answers.schedule;
+        setEnergy({ activity: (await loadComplement(repo)).activity, training: await loadTraining(repo), treadmillDays: ob.treadmillDays?.length ?? 0, workDays: ob.workDays?.length ?? 0 });
+      };
+      await loadEnergy();
+      window.addEventListener(COMPLEMENT_EVENT, loadEnergy);
+      cleanup = () => window.removeEventListener(COMPLEMENT_EVENT, loadEnergy);
     })();
+    return () => cleanup?.();
   }, [repo]);
 
   const setSex = useCallback(
@@ -78,7 +90,7 @@ export function useTargets(repo: Repository, weights: WeighIn[], trainingMin: nu
   // Statut de la donnée : observée (pesée), déclarée (configuration), à confirmer (pesée de plus de 30 jours).
   const weightStatus = lastW ? (Math.round((Date.parse(`${today}T12:00:00Z`) - Date.parse(`${lastW.day}T12:00:00Z`)) / 864e5) > 30 ? 'à confirmer' : lastW.status === 'estimé' ? 'estimée' : 'observée') : profile.weightKg ? 'déclarée' : undefined;
   const water = waterTarget(weightKg, trainingMin);
-  const calories = calorieTarget({ sex, age: profile.age, heightCm: profile.heightCm, weightKg, sessionsPerWeek: profile.spw, goal: profile.goal, strategy: profile.strategy, adjustments });
+  const calories = calorieTarget({ sex, age: profile.age, heightCm: profile.heightCm, weightKg, sessionsPerWeek: profile.spw, goal: profile.goal, strategy: profile.strategy, adjustments, activity: energy.activity, training: energy.training, treadmillDaysPerWeek: energy.treadmillDays, workDaysPerWeek: energy.workDays });
 
   // Bilan calorique : une fois par jour ; un ajustement est SAUVEGARDÉ avant d'être affiché.
   useEffect(() => {

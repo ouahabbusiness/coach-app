@@ -2,6 +2,7 @@
 // Ce sont des estimations issues de formules publiques, jamais des mesures ni des prescriptions médicales.
 // Chaque cible renvoie sa justification (« why ») pour être affichée telle quelle.
 
+import { estimateEnergy, type ActivityAnswers, type Training } from './activity';
 import type { GoalCategory } from './profile';
 import type { TrendStatus } from './weight';
 
@@ -39,6 +40,11 @@ export interface CalorieInput {
   strategy?: Strategy;
   /** Ajustements décidés par les bilans précédents. */
   adjustments?: CalorieAdjust[];
+  /** Activité de la journée (hors séances) : si elle est connue, elle remplace le facteur par nombre de séances. */
+  activity?: ActivityAnswers;
+  training?: Training;
+  treadmillDaysPerWeek?: number;
+  workDaysPerWeek?: number;
 }
 
 export interface CalorieTarget {
@@ -50,6 +56,8 @@ export interface CalorieTarget {
   strategy: Strategy;
   /** Ajustements cumulés issus des bilans (kcal). */
   adjusted: number;
+  /** Base du maintien : activité réelle déclarée, ou facteur grossier par nombre de séances. */
+  basis: 'activité' | 'séances';
 }
 
 /** Stratégie validée : développement (surplus), réduction (déficit), maintien (observation). */
@@ -87,10 +95,13 @@ export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   if (!i.weightKg) missing.push('poids');
   if (missing.length) return { why: [], missing };
   const bmr = 10 * i.weightKg! + 6.25 * i.heightCm! - 5 * i.age! + (i.sex === 'homme' ? 5 : -161);
-  const factor = activityFactor(i.sessionsPerWeek);
-  const maintenance = bmr * factor;
   const strategy = strategyOf(i);
-  const why = [`Mifflin-St Jeor ${Math.round(bmr)} kcal`, `× ${fmt(factor, 3)} (${i.sessionsPerWeek ?? 0} séances/sem.) = maintien estimé`];
+  const energy = i.training ? estimateEnergy({ bmr, weightKg: i.weightKg!, activity: i.activity, training: i.training, treadmillDaysPerWeek: i.treadmillDaysPerWeek, workDaysPerWeek: i.workDaysPerWeek }) : undefined;
+  const factor = activityFactor(i.sessionsPerWeek);
+  const maintenance = energy ? energy.maintenance : bmr * factor;
+  const why = energy
+    ? [...energy.lines, ...energy.notes]
+    : [`Mifflin-St Jeor ${Math.round(bmr)} kcal`, `× ${fmt(factor, 3)} (${i.sessionsPerWeek ?? 0} séances/sem.) = maintien estimé`, 'Facteur grossier par nombre de séances : renseigne ton activité pour une estimation plus juste.'];
   const pct = strategy === 'développement' ? 0.05 : strategy === 'réduction' ? -0.12 : 0;
   if (pct) why.push(`${strategy} : ${pct > 0 ? '+' : '−'}${Math.round(Math.abs(pct) * 100)} %`);
   else why.push('maintien : observation avant de décider');
@@ -104,7 +115,7 @@ export function calorieTarget(i: CalorieInput): Computed<CalorieTarget> {
   const fatG = Math.round(Math.max(0.8 * i.weightKg!, (kcal * 0.25) / 9));
   const carbG = Math.max(0, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
   why.push(`protéines ${fmt(perKg, 1)} g/kg = ${proteinG} g · lipides ${fatG} g · glucides ${carbG} g`);
-  return { value: { kcal, proteinG, fatG, carbG, maintenance: roundTo(maintenance, 50), strategy, adjusted }, why, missing: [] };
+  return { value: { kcal, proteinG, fatG, carbG, maintenance: roundTo(maintenance, 50), strategy, adjusted, basis: energy ? 'activité' : 'séances' }, why, missing: [] };
 }
 
 /** Trajectoire visée et zone de tolérance par stratégie (choix de conception, à valider avec l'utilisateur). */

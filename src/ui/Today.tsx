@@ -11,6 +11,7 @@ import { addWater, daysUntil } from '../engine/daily';
 import { DAILY_PAGES, currentPage } from '../engine/reading';
 import { HabitsSheet, useDayHabits } from './Habits';
 import { WhyModal, useTargets } from './Targets';
+import { ComplementModal } from './Complement';
 import { NextStepCard } from './Nutrition';
 import { useTracking } from './trackingPrefs';
 import { timesFor, usePrayer } from './prayerStore';
@@ -203,6 +204,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
   const today = localDay(Date.now(), tz);
   const [goal, setGoal] = useState<GoalVersion | undefined>();
   const [onboardingStep, setOnboardingStep] = useState<number | null>(null);
+  const [complement, setComplement] = useState(false);
   const [hero, setHero] = useState<Hero | null>(null);
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState('');
@@ -533,6 +535,11 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
               P {kcal.proteinG} g · L {kcal.fatG} g · G {kcal.carbG} g
             </p>
             {targets.review && <p className="why-missing" style={{ margin: 0 }}>Dernier bilan : {targets.review.reason}</p>}
+            {kcal.basis === 'séances' && (
+              <button className="btn block" onClick={() => { setWhy(null); setComplement(true); }}>
+                Compléter mon activité
+              </button>
+            )}
             <p className="why-missing" style={{ margin: 0 }}>Estimation provisoire. Correction (± 125 kcal) seulement avec 2 semaines de pesées ET 7 jours de repas notés, jamais si tu manges déjà sous la cible ou si tu récupères mal.</p>
           </section>
         )}
@@ -562,6 +569,7 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         </button>
       </WhyModal>
 
+      <ComplementModal open={complement} onClose={() => setComplement(false)} repo={repo} />
       <HabitsSheet open={sheet} onClose={() => setSheet(false)} h={habits} onReading={() => go({ name: 'reading' })} />
 
       <WeightModal
