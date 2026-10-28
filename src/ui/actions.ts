@@ -108,6 +108,14 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
   const weights = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];
   const bodyweightKg = weights.length ? [...weights].sort((a, b) => (a.day < b.day ? -1 : 1)).pop()!.kg : undefined;
   const overrides = (await repo.getKv<Record<string, { loadKg: number }>>(OVERRIDES)) ?? {};
+  // Adaptation à la gêne : la prescription adaptée stable (réserve visée 3) se compare à elle-même. Sans cela, la séance précédente
+  // (faite à 3 en réserve) paraîtrait « à prescription différente » du modèle (2 en réserve) et la calibration ne se terminerait jamais.
+  const adapt = await repo.getKv<JointAdapt>(JOINT_ADAPT);
+  const adaptOn = !!adapt && !!(adapt.patterns.length || adapt.tests?.length);
+  const feedback: Record<string, JointFeedback | undefined> = {};
+  if (adaptOn) for (const st of states) feedback[st.sessionId] = await repo.getKv<JointFeedback>(`joint.feedback.${st.sessionId}`);
+  const tolCtx = { triggerPatterns: adapt?.patterns ?? [], ...toleranceHistory(states, feedback, Date.now(), (at, tz) => localDay(at, tz ?? 'UTC')) };
+  const adaptedVariant = (variantId: string) => adaptOn && (adapt!.patterns.some((p) => new RegExp(p).test(variantId)) || (isUpperLoaded(variantId) && toleranceOf(variantId, tolCtx) !== 'toleree'));
   const decisions = new Map<string, Decision>();
   const forced = new Map<string, number>();
   const legacy = new Map<string, ReturnType<typeof nextSessionAdjust>>();
@@ -120,8 +128,9 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     }
     const loads = loadsFor(set.variantId, eq);
     if (set.repRange) {
-      const { samples, pain } = await samplesFor(repo, states, set);
-      const rx = { lo: set.repRange[0], hi: set.repRange[1], rir: set.targetRir ?? 2, loadKg: set.loadKg, target: set.targetReps ?? set.repRange[0] };
+      const effRir = adaptedVariant(set.variantId) ? Math.max(set.targetRir ?? 2, 3) : set.targetRir;
+      const { samples, pain } = await samplesFor(repo, states, { ...set, targetRir: effRir });
+      const rx = { lo: set.repRange[0], hi: set.repRange[1], rir: effRir ?? 2, loadKg: set.loadKg, target: set.targetReps ?? set.repRange[0] };
       const addedLoad = (findVariant(set.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
       const guarded = await jointGuard(repo, set.variantId);
       decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, bodyweightKg, addedLoad, guarded }));
@@ -134,7 +143,6 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     await repo.setKv(OVERRIDES, rest);
   }
   const blockIdx = new Map<string, number>();
-  const adapt = await repo.getKv<JointAdapt>(JOINT_ADAPT);
   const out: SessionPlan = {
     ...plan,
     sets: plan.sets.map((set) => {
@@ -159,11 +167,9 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
     }),
   };
   // Adaptation à la gêne acceptée : elle modifie la prescription réelle de la séance (marge, séries, consigne).
-  if (!adapt || !(adapt.patterns.length || adapt.tests?.length)) return out;
-  // Tolérance inconnue (mouvement sollicitant épaule ou coudes, jamais déclaré gênant, pas fait récemment sans douleur signalée) : même prudence au départ.
-  const feedback: Record<string, JointFeedback | undefined> = {};
-  for (const s of states) feedback[s.sessionId] = await repo.getKv<JointFeedback>(`joint.feedback.${s.sessionId}`);
-  const ctx = { triggerPatterns: adapt.patterns, ...toleranceHistory(states, feedback, Date.now(), (at, tz) => localDay(at, tz ?? 'UTC')) };
+  if (!adaptOn || !adapt) return out;
+  // Tolérance inconnue (mouvement sollicitant épaule ou coudes, jamais déclaré gênant, pas confirmé par tes réponses) : même prudence au départ.
+  const ctx = tolCtx;
   // « Toléré » = réponses explicites ; tout le reste (inconnue, gêne signalée) garde la prudence de départ.
   const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
   // Tests : tolérance non confirmée = série sous-maximale (jamais un maximum imposé) ; tu peux aussi passer le test sans pénalité.

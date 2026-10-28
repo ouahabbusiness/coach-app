@@ -207,3 +207,26 @@ describe('tests : tolérance non confirmée = série sous-maximale, passage poss
     expect(max.targetRir).toBeUndefined();
   });
 });
+
+describe('prescription adaptée stable : la première séance sert de référence à la suivante', () => {
+  it('séance 1 adaptée (3 en réserve) → le lancement de la séance 2 la compare à elle-même, pas « prescription différente »', async () => {
+    const repo = new Repository(new CoachDb('tolerance-reference'));
+    await repo.setKv('profile.complement', { joints: [{ zone: 'epaule', triggers: ['tractions'], alerts: [] }] });
+    await repo.setKv('joint.adapt', { patterns: ['pullup|chinup'], tests: ['pullup|chinup'], at: 1 });
+    const tplP: SessionTemplate = { id: 'P', title: 'P', updatedAt: 0, lines: [{ id: 'p1', variantId: 'pullup-strict', kind: 'reps', role: 'work', sets: 4, restSeconds: 150, repRange: [7, 10], targetReps: 7, targetRir: 2 }] };
+    const first = await startSessionFromTemplate(repo, tplP);
+    const sets = project(await repo.sessionEvents(first))!.sets;
+    expect(sets).toHaveLength(3); // adaptée : une série de moins, réserve 3
+    for (const s of sets) {
+      await run(repo, first, { type: 'start_set', plannedSetId: s.planned.id });
+      await run(repo, first, { type: 'end_set', plannedSetId: s.planned.id });
+      await run(repo, first, { type: 'record_result', plannedSetId: s.planned.id, result: { reps: 8, rir: 3 } });
+    }
+    await run(repo, first, { type: 'end_session' });
+    await startSessionFromTemplate(repo, tplP);
+    const log = (await repo.getKv<{ variantId: string; rule: string; at: number }[]>('decisions.log'))!.filter((e) => e.variantId === 'pullup-strict');
+    const last = log[log.length - 1]!;
+    expect(last.rule).not.toMatch(/non comparable|aucune donnée/);
+    expect(last.rule).toMatch(/double progression|haut de plage|gêne/);
+  });
+});
