@@ -2,12 +2,13 @@ import { decide, project } from '../engine/session';
 import { currentResult, localDay } from '../engine/derive';
 import { DELOAD, deloadSets, inDeload, type Deload } from '../engine/stagnation';
 import { lightLoad, nextSessionAdjust, type LightLoad } from '../engine/progression';
-import { decide as decideProgression, JOINT_LOADED, type Decision, type Sample } from '../engine/decide';
+import { decide as decideProgression, type Decision, type Sample } from '../engine/decide';
 import { findVariant } from '../catalog/exercises';
 import { appendJournal } from './journal';
 import { adaptSets, hasJointDeclared } from '../engine/joints';
-import { isUpperLoaded, toleranceHistory, toleranceOf, type JointFeedback } from '../engine/tolerance';
+import { isUpperLoaded, toleranceHistory, toleranceOf, type JointFeedback, type ToleranceContext } from '../engine/tolerance';
 import { JOINT_ADAPT, loadComplement, type JointAdapt } from './profileComplement';
+import { loadTolerance } from './toleranceContext';
 import { loadEquipment, loadsFor } from './equipment';
 import type { SessionPlan, SessionState, SetResult } from '../engine/types';
 import { EXERCISES } from '../catalog/exercises';
@@ -82,14 +83,18 @@ export async function samplesFor(repo: Repository, states: SessionState[], set: 
   return { samples: out, pain };
 }
 
-/** Épaule ou coudes déclarés sensibles (entretien du programme ou fiche d'accueil) : gèle la montée de charge des tractions, dips et poussées. */
-export async function jointGuard(repo: Repository, variantId: string): Promise<boolean> {
-  if (!JOINT_LOADED.test(variantId)) return false;
+/**
+ * Montée de charge gelée ? Oui si une gêne épaule ou coudes est déclarée (entretien du programme, fiche d'accueil ou questionnaire)
+ * ET si le mouvement sollicite l'épaule ou le coude sans tolérance confirmée par tes réponses (déclencheur, gêne signalée,
+ * mouvement non identifié, tolérance inconnue). Le critère est l'ÉTAT du mouvement, jamais une liste de noms.
+ */
+export async function jointGuard(repo: Repository, variantId: string, tol?: ToleranceContext): Promise<boolean> {
+  if (!isUpperLoaded(variantId)) return false;
   const prog = await repo.getKv<{ pains?: string[] }>('program.answers');
-  if (prog?.pains?.some((p) => p === 'epaules' || p === 'coudes')) return true;
-  if (hasJointDeclared((await loadComplement(repo)).joints)) return true;
   const onb = await repo.getKv<{ answers?: { safety?: { pains?: string } } }>('onboarding');
-  return /[ée]paule|coude/i.test(onb?.answers?.safety?.pains ?? '');
+  const declared = !!prog?.pains?.some((p) => p === 'epaules' || p === 'coudes') || hasJointDeclared((await loadComplement(repo)).joints) || /[ée]paule|coude/i.test(onb?.answers?.safety?.pains ?? '');
+  if (!declared) return false;
+  return toleranceOf(variantId, tol ?? (await loadTolerance(repo)).ctx) !== 'toleree';
 }
 
 /**
@@ -98,24 +103,32 @@ export async function jointGuard(repo: Repository, variantId: string): Promise<b
  * tant qu'elle n'est pas validée. Baisse validée (override) → appliquée une fois puis effacée.
  */
 export async function withProgression(repo: Repository, plan: SessionPlan): Promise<SessionPlan> {
-  // Phase allégée validée : pas de progression, séries réduites, réserve +1, pas d'échec.
-  const deload = await repo.getKv<Deload>(DELOAD);
-  if (inDeload(deload ?? undefined, localDay(Date.now(), deviceTimeZone()))) {
-    return { ...plan, sets: deloadSets(plan.sets, `Phase allégée (validée) jusqu’au ${deload!.to} : moins de séries, réserve +1, pas d’échec.`) };
-  }
   const states = [...(await repo.allSessionEvents()).values()].map((ev) => project(ev)).filter((s): s is SessionState => s !== null);
-  const eq = await loadEquipment(repo);
-  const weights = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];
-  const bodyweightKg = weights.length ? [...weights].sort((a, b) => (a.day < b.day ? -1 : 1)).pop()!.kg : undefined;
-  const overrides = (await repo.getKv<Record<string, { loadKg: number }>>(OVERRIDES)) ?? {};
   // Adaptation à la gêne : la prescription adaptée stable (réserve visée 3) se compare à elle-même. Sans cela, la séance précédente
   // (faite à 3 en réserve) paraîtrait « à prescription différente » du modèle (2 en réserve) et la calibration ne se terminerait jamais.
   const adapt = await repo.getKv<JointAdapt>(JOINT_ADAPT);
   const adaptOn = !!adapt && !!(adapt.patterns.length || adapt.tests?.length);
-  const feedback: Record<string, JointFeedback | undefined> = {};
-  if (adaptOn) for (const st of states) feedback[st.sessionId] = await repo.getKv<JointFeedback>(`joint.feedback.${st.sessionId}`);
-  const tolCtx = { triggerPatterns: adapt?.patterns ?? [], ...toleranceHistory(states, feedback, Date.now(), (at, tz) => localDay(at, tz ?? 'UTC')) };
+  const tolCtx: ToleranceContext = (await loadTolerance(repo)).ctx;
   const adaptedVariant = (variantId: string) => adaptOn && (adapt!.patterns.some((p) => new RegExp(p).test(variantId)) || (isUpperLoaded(variantId) && toleranceOf(variantId, tolCtx) !== 'toleree'));
+  /**
+   * Finition commune, appliquée À LA FIN quelle que soit la route (progression, phase allégée…) : les contraintes liées aux symptômes ne
+   * disparaissent jamais ; elles se combinent avec la règle générale (la plus prudente l'emporte) et les raisons s'additionnent.
+   */
+  const finish = (out: SessionPlan): SessionPlan => {
+    if (!adaptOn || !adapt) return out;
+    const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, tolCtx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
+    const unknownTests = [...new Set(out.sets.filter((x) => x.role === 'test' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, tolCtx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
+    return { ...out, sets: adaptSets(out.sets, [...adapt.patterns, ...unknown], [...(adapt.tests ?? adapt.patterns), ...unknownTests]) };
+  };
+  // Phase allégée validée : pas de progression, séries réduites, réserve +1, pas d'échec.
+  const deload = await repo.getKv<Deload>(DELOAD);
+  if (inDeload(deload ?? undefined, localDay(Date.now(), deviceTimeZone()))) {
+    return finish({ ...plan, sets: deloadSets(plan.sets, `Phase allégée (validée) jusqu’au ${deload!.to} : moins de séries, réserve +1, pas d’échec.`) });
+  }
+  const eq = await loadEquipment(repo);
+  const weights = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];
+  const bodyweightKg = weights.length ? [...weights].sort((a, b) => (a.day < b.day ? -1 : 1)).pop()!.kg : undefined;
+  const overrides = (await repo.getKv<Record<string, { loadKg: number }>>(OVERRIDES)) ?? {};
   const decisions = new Map<string, Decision>();
   const forced = new Map<string, number>();
   const legacy = new Map<string, ReturnType<typeof nextSessionAdjust>>();
@@ -132,7 +145,7 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       const { samples, pain } = await samplesFor(repo, states, { ...set, targetRir: effRir });
       const rx = { lo: set.repRange[0], hi: set.repRange[1], rir: effRir ?? 2, loadKg: set.loadKg, target: set.targetReps ?? set.repRange[0] };
       const addedLoad = (findVariant(set.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
-      const guarded = await jointGuard(repo, set.variantId);
+      const guarded = await jointGuard(repo, set.variantId, tolCtx);
       decisions.set(set.blockId, decideProgression(set.variantId, rx, samples, loads, { pain, bodyweightKg, addedLoad, guarded }));
     } else legacy.set(set.blockId, nextSessionAdjust(lastWork(states, set.variantId), set, loads));
   }
@@ -166,15 +179,7 @@ export async function withProgression(repo: Repository, plan: SessionPlan): Prom
       return { ...set, loadKg: a.loadKg ?? set.loadKg, targetReps: a.targetReps ?? set.targetReps, progression: a.note };
     }),
   };
-  // Adaptation à la gêne acceptée : elle modifie la prescription réelle de la séance (marge, séries, consigne).
-  if (!adaptOn || !adapt) return out;
-  // Tolérance inconnue (mouvement sollicitant épaule ou coudes, jamais déclaré gênant, pas confirmé par tes réponses) : même prudence au départ.
-  const ctx = tolCtx;
-  // « Toléré » = réponses explicites ; tout le reste (inconnue, gêne signalée) garde la prudence de départ.
-  const unknown = [...new Set(out.sets.filter((x) => x.role === 'work' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
-  // Tests : tolérance non confirmée = série sous-maximale (jamais un maximum imposé) ; tu peux aussi passer le test sans pénalité.
-  const unknownTests = [...new Set(out.sets.filter((x) => x.role === 'test' && isUpperLoaded(x.variantId) && toleranceOf(x.variantId, ctx) !== 'toleree').map((x) => '^' + x.variantId + '$'))];
-  return { ...out, sets: adaptSets(out.sets, [...adapt.patterns, ...unknown], [...(adapt.tests ?? adapt.patterns), ...unknownTests]) };
+  return finish(out);
 }
 
 /** Exercices dont la dernière séance était trop légère pour l'objectif (voir `lightLoad`). */

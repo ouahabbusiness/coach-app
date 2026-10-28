@@ -10,6 +10,7 @@ import type { SessionState, SetResult } from '../engine/types';
 import type { Repository } from '../storage/db';
 import { loadsFor, useEquipment } from './equipment';
 import { jointGuard, samplesFor } from './actions';
+import { loadTolerance } from './toleranceContext';
 
 interface Row {
   name: string;
@@ -30,6 +31,7 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
         .map((e) => project(e))
         .filter((s): s is SessionState => !!s && s.sessionId !== st.sessionId && s.startedAt < st.startedAt)
         .sort((a, b) => b.startedAt - a.startedAt);
+      const tolCtx = (await loadTolerance(repo)).ctx;
       const ws = (await repo.getKv<{ day: string; kg: number }[]>('weight.log')) ?? [];
       const bw = ws.length ? [...ws].sort((a, b) => (a.day < b.day ? -1 : 1)).pop()!.kg : undefined;
       const blocks = [...new Set(st.sets.filter((x) => x.planned.role === 'work').map((x) => x.planned.blockId))];
@@ -54,7 +56,7 @@ export function PostFeedback({ repo, st }: { repo: Repository; st: SessionState 
           // Même règle qu'au lancement : cette séance d'abord, puis les précédentes, avec leur comparabilité.
           const { samples, pain } = await samplesFor(repo, [st, ...others], p);
           const addedLoad = (findVariant(p.variantId)?.variant.equipment ?? []).includes('ceinture de lest');
-          decision = decide(p.variantId, { lo: p.repRange[0], hi: p.repRange[1], rir: p.targetRir ?? 2, loadKg: p.loadKg, target: p.targetReps ?? p.repRange[0] }, samples, loadsFor(p.variantId, eq), { pain, addedLoad, bodyweightKg: bw, guarded: await jointGuard(repo, p.variantId) });
+          decision = decide(p.variantId, { lo: p.repRange[0], hi: p.repRange[1], rir: p.targetRir ?? 2, loadKg: p.loadKg, target: p.targetReps ?? p.repRange[0] }, samples, loadsFor(p.variantId, eq), { pain, addedLoad, bodyweightKg: bw, guarded: await jointGuard(repo, p.variantId, tolCtx) });
         }
         out.push({
           name: findVariant(p.variantId)?.variant.name ?? p.variantId,

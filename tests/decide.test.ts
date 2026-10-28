@@ -78,8 +78,9 @@ describe('gêne déclarée (épaule, coudes)', () => {
     expect(held).toMatchObject({ action: 'maintenir', rule: 'gêne déclarée', progressionAllowed: false, after: { loadKg: 10, target: 8 } });
     expect(held.transition).toBeUndefined();
   });
-  it('ne touche pas aux autres mouvements', () => {
-    const d = decide('kb-row-1arm', { lo: 10, hi: 15, rir: 2, loadKg: 6, target: 10 }, [s([15, 15, 15], 6, 2)], kb, { guarded: true });
-    expect(d.rule).not.toBe('gêne déclarée');
+  it('le gel dépend de l’ÉTAT du mouvement désigné par l’appelant, jamais d’une liste de noms : le rowing est gelé s’il est désigné, libre sinon', () => {
+    const rx2 = { lo: 10, hi: 15, rir: 2, loadKg: 6, target: 10 };
+    expect(decide('kb-row-1arm', rx2, [s([15, 15, 15], 6, 2)], kb, { guarded: true }).rule).toBe('gêne déclarée');
+    expect(decide('kb-row-1arm', rx2, [s([15, 15, 15], 6, 2)], kb, { guarded: false }).rule).not.toBe('gêne déclarée');
   });
 });

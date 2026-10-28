@@ -64,7 +64,7 @@ export interface DecideOpts {
   /** Poids du corps : la résistance réelle des tractions/dips lestés = poids du corps + lest. */
   bodyweightKg?: number;
   addedLoad?: boolean;
-  /** Gêne déclarée (épaule, coudes) sur un mouvement de tirage ou de poussée : les répétitions montent, pas la charge. */
+  /** Mouvement dont la tolérance n'est pas confirmée alors qu'une gêne est déclarée (décidé par l'appelant, d'après l'état du mouvement) : les répétitions montent, pas la charge. */
   guarded?: boolean;
   /** Seuil de saut « important » en part de la résistance totale (choix de conception). */
   bigJumpRatio?: number;
@@ -189,7 +189,7 @@ export const JOINT_LOADED = /pullup|chinup|dips|pushup|pike|press/;
 export function decide(variantId: string, rx: Rx, samples: Sample[], loads: number[], opts: DecideOpts = {}): Decision {
   const d = decideCore(variantId, rx, samples, loads, opts);
   // Une gêne déclarée n'interdit pas le mouvement : elle gèle seulement la montée de charge.
-  if (opts.guarded && JOINT_LOADED.test(variantId) && (d.action === 'augmenter' || d.action === 'transition')) {
+  if (opts.guarded && (d.action === 'augmenter' || d.action === 'transition')) {
     return {
       ...d,
       action: 'maintenir',

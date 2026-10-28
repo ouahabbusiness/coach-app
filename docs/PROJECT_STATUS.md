@@ -158,3 +158,20 @@ Préférence esthétique déclarée par l'utilisateur : haut du corps dense (pec
 ### Bilan calorique actuel (transparence) et mode d'autonomie à venir
 - **Actif aujourd'hui** : une fois par jour, seulement si ≥ 14 jours depuis le dernier changement, ≥ 3 pesées par semaine sur 2 semaines et ≥ 7 jours d'alimentation COMPLÈTEMENT notée. Sens : maintien → ±125 kcal si le poids bouge de plus de 0,25 kg/semaine (poids qui monte → −125, qui baisse → +125) ; développement → +125 si < +0,1 kg/sem., −125 si > +0,35 ; réduction → −125 si la baisse est trop lente, +125 si trop rapide. Garde-fous : aucune correction si tu manges nettement sous ou au-dessus de la cible (±10 %), si la récupération est difficile (≥ 3 jours) pour une réduction, ou si les données sont insuffisantes. Chaque correction est enregistrée (date, valeur, raison) et affichée dans le détail de la cible ; **pas de bouton de retour arrière aujourd'hui**.
 - **À venir (non démarré, après le premier bilan réel)** : mode d'autonomie choisi une fois : petits ajustements de maintien automatiques dans des limites annoncées (avant/après, raison, prochaine réévaluation, retour arrière possible) ; confirmation demandée si les données sont ambiguës ou si la stratégie change (prise de masse, perte de poids).
+
+### Arbitrage des prescriptions et liaison symptômes (28/10/2026, soir) : correctifs, à revoir sur usage réel
+Défauts connus corrigés, testés sur base fictive (tests/arbitrage.test.ts, parcours complet avec redémarrage) ; NON encore validés par un usage réel :
+1. **Phase allégée + gêne** : la phase allégée ne supprime plus les adaptations liées aux symptômes ; les contraintes se combinent (la plus prudente l'emporte) et les raisons s'additionnent (phase allégée, décision de progression, adaptation de gêne) dans la prescription affichée.
+2. **Gel d'après l'état, pas le nom** : un mouvement du haut du corps dont la tolérance n'est pas confirmée par tes réponses (déclencheur, gêne signalée, mouvement non identifié, tolérance inconnue) ne monte pas en charge tant qu'une gêne est déclarée ; le rowing n'est plus une exception.
+3. **Séjour** : l'adaptation d'une séance de séjour est recalculée AU LANCEMENT d'après le matériel du séjour et les symptômes actuels (les autres adaptations, comme la version courte, sont gardées).
+4. **Gêne globale ≠ gêne sur chaque exercice** : une gêne marquée ou qui dure doit être rattachée à un mouvement (question « sur quel mouvement ? ») ; sans précision, elle reste « mouvement non identifié » : jamais attribuée à un exercice, et aucun mouvement de la séance n'est confirmé toléré. Un statut ne change que sur une information explicite : une séance sans réponse ne révoque pas une confirmation et n'efface pas une gêne. Les anciennes réponses ne sont pas réécrites : une gêne ancienne sans mouvement désigné est lue comme « non identifiée ».
+5. **Contrôle avant séance** : une douleur « nouvelle » ou « aggravée » relie la séance aux statuts de tolérance (mouvement non identifié, rien de confirmé) ; une absence de réponse n'a aucun effet.
+
+### État des lieux des liaisons (28/10/2026)
+- Objectif → programme : orientation stockée (migration), non lue par les décisions ; zones haut du corps sans effet sur le constructeur. **Absent.**
+- Symptôme → prescription : automatique, testé sur base fictive (parcours complet) ; usage réel non vérifié.
+- Arbitrage progression + gêne + fatigue + matériel : automatique, testé sur base fictive ; usage réel non vérifié.
+- Tapis et course → récupération : **absent** (calories seulement).
+- Fin de bloc → bilan → bloc suivant : **absent** (le bloc s'arrête le 22/11 ; les adaptations stockées à part restent, pas la répartition A/B/C ni les charges réelles).
+- Poids, apports, performances, récupération → recommandation globale : **manuel** (date de début de créatine non enregistrée).
+- Chat → app : **manuel** (seules voies : nouvelle version, action de l'utilisateur, import).

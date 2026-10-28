@@ -19,8 +19,12 @@ export async function loadTolerance(repo: Repository, now = Date.now()): Promise
   const joints = (await loadComplement(repo)).joints ?? [];
   const states = [...(await repo.allSessionEvents()).values()].map((ev) => project(ev)).filter((s): s is NonNullable<ReturnType<typeof project>> => s !== null);
   const feedback: Record<string, JointFeedback | undefined> = {};
-  for (const s of states) feedback[s.sessionId] = await repo.getKv<JointFeedback>(`joint.feedback.${s.sessionId}`);
-  const ctx: ToleranceContext = { triggerPatterns: adaptationPatterns(joints), ...toleranceHistory(states, feedback, now, (at, tz) => localDay(at, tz ?? 'UTC')) };
+  const readinessPain: Record<string, string | undefined> = {};
+  for (const s of states) {
+    feedback[s.sessionId] = await repo.getKv<JointFeedback>(`joint.feedback.${s.sessionId}`);
+    readinessPain[s.sessionId] = (await repo.getKv<{ input?: { pain?: string } }>(`readiness.${s.sessionId}`))?.input?.pain;
+  }
+  const ctx: ToleranceContext = { triggerPatterns: adaptationPatterns(joints), ...toleranceHistory(states, feedback, now, (at, tz) => localDay(at, tz ?? 'UTC'), 28, readinessPain) };
   const declared = joints.length > 0;
   return {
     declared,

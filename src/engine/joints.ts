@@ -226,8 +226,8 @@ export function adaptSets<T extends AdaptableSet>(sets: T[], patterns: string[],
       return !(t > 2 && n === t);
     })
     .map((s) => {
-      if (hit(s)) return { ...s, targetRir: Math.max(s.targetRir ?? 2, 3), lastSetToFailure: false, cue: [s.cue, 'Amplitude confortable'].filter(Boolean).join(' · '), progression: ADAPT_NOTE };
-      if (s.role === 'test' && match(tests, s.variantId)) return { ...s, targetRir: 3, lastSetToFailure: false, cue: TEST_CUE, progression: 'Test maximal remplacé par une série sous-maximale (gêne déclarée).' };
+      if (hit(s)) return { ...s, targetRir: Math.max(s.targetRir ?? 2, 3), lastSetToFailure: false, cue: [s.cue, 'Amplitude confortable'].filter(Boolean).join(' · '), progression: [s.progression, ADAPT_NOTE].filter(Boolean).join(' · ') };
+      if (s.role === 'test' && match(tests, s.variantId)) return { ...s, targetRir: 3, lastSetToFailure: false, cue: TEST_CUE, progression: [s.progression, 'Test maximal remplacé par une série sous-maximale (gêne déclarée).'].filter(Boolean).join(' · ') };
       return s;
     });
 }

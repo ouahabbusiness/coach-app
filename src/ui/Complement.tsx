@@ -580,7 +580,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
                 ? `Test maximal remplacé par une série sous-maximale sur : ${testsTouched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}${retests.length ? ` (séance du ${retests.map((x) => dm(dateOf(x.weekStart, x.day))).join(', ')})` : ''}. Report ou annulation possibles selon l’évolution.`
                 : 'Aucun test maximal sur un mouvement symptomatique.'}
             </p>
-            {(['declencheur', 'signalee', 'toleree', 'inconnue'] as Tolerance[]).map((t) => {
+            {(['declencheur', 'signalee', 'non_localisee', 'toleree', 'inconnue'] as Tolerance[]).map((t) => {
               const rows = tolerance.filter((x) => x.t === t);
               return rows.length ? (
                 <div key={t} className="stack" style={{ gap: 2 }}>

@@ -25,6 +25,7 @@ import { startSessionFromTemplate } from './actions';
 import { DisruptionPanel } from './Disruption';
 import { busy, replanDay, ONE_OFF_LABELS, type Move, type OneOff, type OneOffKind } from '../engine/availability';
 import { loadAllFixed, loadOneOffs, saveOneOffs } from './agenda';
+import { refreshTripAdaptation } from './programMigration';
 import { usePrayer, withPrayers } from './prayerStore';
 import { REASON_LABELS, type DisruptionReason } from '../engine/disruption';
 import type { Strictness } from '../engine/programBuilder';
@@ -38,7 +39,8 @@ export async function loadPlanning(repo: Repository): Promise<PlannedItem[]> {
 
 /** Lance la séance prévue (version adaptée si un imprévu l'a modifiée) et la lie à l'élément par identifiant. */
 export async function startPlanned(repo: Repository, item: PlannedItem, tpl: SessionTemplate): Promise<string> {
-  const source: SessionTemplate = item.adapted ? { ...tpl, title: `${tpl.title} (adaptée)`, lines: item.adapted.lines as SessionTemplate['lines'] } : tpl;
+  const adapted = await refreshTripAdaptation(repo, item, tpl); // séjour : recalculé d'après les symptômes et le matériel actuels
+  const source: SessionTemplate = adapted ? { ...tpl, title: `${tpl.title} (adaptée)`, lines: adapted.lines as SessionTemplate['lines'] } : tpl;
   const sessionId = await startSessionFromTemplate(repo, source);
   const all = await loadPlanning(repo);
   await repo.setKv(KEY, all.map((x) => (x.id === item.id ? { ...x, sessionId } : x)));

@@ -102,6 +102,20 @@ export async function applyRedistribution(repo: Repository): Promise<number> {
   return 3;
 }
 
+/**
+ * Au lancement d'une séance adaptée à un séjour : l'adaptation est recalculée d'après le matériel du séjour ET les symptômes actuels
+ * (un symptôme apparu après la création du programme change le remplaçant). Les autres adaptations (version courte, imprévu) sont gardées.
+ */
+export async function refreshTripAdaptation(repo: Repository, item: PlannedItem, tpl: SessionTemplate): Promise<PlannedItem['adapted']> {
+  if (!item.adapted) return undefined;
+  const trips = (await repo.getKv<Trip[]>('agenda.trips')) ?? [];
+  const date = dateOf(item.weekStart, item.day);
+  const trip = trips.find((t) => inTrip(date, t) && item.adjustment?.reason === 'deplacement' && item.adjustment.decision === 'adaptée' && item.adjustment.note === t.label);
+  if (!trip) return item.adapted;
+  const ad = adaptToEquipment(tpl.lines, trip.equipment, (await loadTolerance(repo)).opts);
+  return { lines: ad.lines, estimatedMin: ad.estimatedMin, removed: ad.removed };
+}
+
 export const TRIP_REFIT_KEY = 'program.tripRefit';
 
 /**

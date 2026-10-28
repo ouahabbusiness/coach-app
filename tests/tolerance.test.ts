@@ -56,10 +56,11 @@ describe('tolérance d’un mouvement : une réponse explicite n’est pas une i
     expect(hist([s], { s1: { next: 'rien' } }).confirmed.size).toBe(0);
     expect(hist([s], { s1: { during: 'aucune', next: 'rien' } }).confirmed.has('kb-row-1arm')).toBe(true);
   });
-  it('gêne marquée, gêne qui dure ou douleur signalée en séance : « gêne signalée »', () => {
-    expect(hist([session('s1', 2, 'pushup-diamond')], { s1: { during: 'marquee' } }).flagged.has('pushup-diamond')).toBe(true);
-    expect(hist([session('s1', 2, 'pushup-diamond')], { s1: { during: 'aucune', next: 'dure' } }).flagged.has('pushup-diamond')).toBe(true);
+  it('douleur sur une série : « gêne signalée » sur CE mouvement ; gêne marquée ou qui dure : rattachée seulement aux mouvements que tu désignes', () => {
     expect(hist([session('s1', 2, 'pushup-diamond', true)]).flagged.has('pushup-diamond')).toBe(true);
+    const named = hist([session('s1', 2, 'pushup-diamond')], { s1: { during: 'marquee', moves: ['pushup-diamond'], movesAnswered: true } });
+    expect(named.flagged.has('pushup-diamond')).toBe(true);
+    expect(hist([session('s1', 2, 'pushup-diamond')], { s1: { during: 'aucune', next: 'dure', moves: ['pushup-diamond'], movesAnswered: true } }).flagged.has('pushup-diamond')).toBe(true);
     // une gêne légère n'est ni une confirmation ni un signal : le mouvement reste inconnu
     const h = hist([session('s1', 2, 'pushup-diamond')], { s1: { during: 'legere', next: 'legere' } });
     expect(h.confirmed.size + h.flagged.size).toBe(0);
