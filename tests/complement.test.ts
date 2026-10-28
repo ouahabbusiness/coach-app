@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto';
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { estimateEnergy, hasActivity, usableActivity, walkKcalPerMin } from '../src/engine/activity';
-import { adaptSets, adaptationPatterns, jointAdvice, normalizeJoint, testPatterns } from '../src/engine/joints';
+import { adaptSets, adaptationPatterns, jointAdvice, normalizeJoint, testPatterns, toggleSymptom } from '../src/engine/joints';
 import { adviseRuns, spaceRuns } from '../src/engine/runSchedule';
 import { calorieTarget } from '../src/engine/targets';
 import { trainingOfProgram, declaredZones } from '../src/ui/profileComplement';
@@ -110,6 +110,21 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
     // une fois précisée, plus rien à clarifier
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['inconnu'] }]).clarify).toEqual([]);
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['derobement'] }]).referral).toMatchObject({ level: 'avis' });
+  });
+  it('réponses précises : elles coexistent ; « je ne sais pas distinguer » est exclusif', () => {
+    let l = toggleSymptom([], 'derobement');
+    l = toggleSymptom(l, 'douleur_limitante');
+    expect(l).toEqual(['derobement', 'douleur_limitante']);
+    expect(toggleSymptom(l, 'derobement')).toEqual(['douleur_limitante']);
+    expect(toggleSymptom(l, 'inconnu')).toEqual(['inconnu']);
+    expect(toggleSymptom(['inconnu'], 'perte_force')).toEqual(['perte_force']);
+    const a = jointAdvice([{ zone: 'epaule', side: 'gauche', triggers: [], alerts: [], symptoms: ['derobement', 'douleur_limitante'] }]);
+    expect(a.referral?.text).toMatch(/ça se dérobe/);
+    expect(a.referral?.text).toMatch(/tu t’arrêtes à cause de la douleur/);
+    // incertitude : ni affirmation de symptôme, ni « tout va bien » inventé
+    const u = jointAdvice([{ zone: 'epaule', triggers: [], alerts: [], symptoms: ['inconnu'] }]);
+    expect(u.referral).toBeUndefined();
+    expect(u.clarify).toEqual([]);
   });
   it('zones déjà déclarées proposées, jamais inventées', () => {
     expect(declaredZones(['coudes'], 'Légère à l’épaule')).toEqual(['epaule', 'coudes']);

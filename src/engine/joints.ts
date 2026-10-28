@@ -63,6 +63,16 @@ export function normalizeJoint(a: JointAnswer): JointAnswer & { symptoms: JointS
   return { ...a, symptoms: a.symptoms ?? [], alerts: a.alerts.filter((x): x is JointAlert => x !== 'faiblesse'), clarify: a.alerts.includes('faiblesse') && !(a.symptoms ?? []).length };
 }
 
+/**
+ * Coche ou décoche un symptôme. Les réponses précises coexistent (dérobement ET douleur limitante) ;
+ * « Je ne sais pas distinguer » est exclusif : il exprime l'incertitude sans mélanger de réponse inventée.
+ */
+export function toggleSymptom(list: JointSymptom[], s: JointSymptom): JointSymptom[] {
+  if (list.includes(s)) return list.filter((x) => x !== s);
+  if (s === 'inconnu') return ['inconnu'];
+  return [...list.filter((x) => x !== 'inconnu'), s];
+}
+
 export interface JointReferral {
   /** « urgent » : évaluation rapide ; « avis » : avis d'un médecin ou d'un kiné. */
   level: 'urgent' | 'avis';

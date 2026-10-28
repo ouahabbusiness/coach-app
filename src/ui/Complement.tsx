@@ -15,6 +15,7 @@ import {
   adaptationPatterns,
   jointAdvice,
   testPatterns,
+  toggleSymptom,
   type JointAlert,
   type JointAnswer,
   type JointSide,
@@ -396,7 +397,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
             <p className="eyebrow" style={{ margin: 0 }}>Ce que tu ressens</p>
             <div className="chips">
               {symptoms.map((sy) => (
-                <Chip key={sy} on={(j.symptoms ?? []).includes(sy)} onClick={() => setJoint(j.zone, { symptoms: toggle(j.symptoms ?? [], sy) })}>{SYMPTOM_LABELS[sy]}</Chip>
+                <Chip key={sy} on={(j.symptoms ?? []).includes(sy)} onClick={() => setJoint(j.zone, { symptoms: toggleSymptom(j.symptoms ?? [], sy) })}>{SYMPTOM_LABELS[sy]}</Chip>
               ))}
             </div>
             <p className="eyebrow" style={{ margin: 0 }}>Sur quel geste</p>
@@ -514,6 +515,11 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
                 ? `Test maximal remplacé par une série sous-maximale sur : ${testsTouched.map((v) => findVariant(v)?.variant.name ?? v).join(', ')}${retests.length ? ` (séance du ${retests.map((x) => dm(dateOf(x.weekStart, x.day))).join(', ')})` : ''}. Report ou annulation possibles selon l’évolution.`
                 : 'Aucun test maximal sur un mouvement symptomatique.'}
             </p>
+            {advice.clarify.length > 0 && (
+              <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                À clarifier ({advice.clarify.map((z) => ZONE_LABELS[z].toLowerCase()).join(', ')}) : ni perte de force affirmée, ni « tout va bien ».
+              </p>
+            )}
             {advice.items.map((it) => (
               <p key={it.zone + it.text} className="muted" style={{ margin: 0, fontSize: '0.8rem' }}>{ZONE_LABELS[it.zone]} · {it.text}</p>
             ))}
