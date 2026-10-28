@@ -64,8 +64,10 @@ describe('gêne articulaire : adaptation selon le déclencheur, orientation sans
     const a = jointAdvice([{ zone: 'coudes', triggers: ['inconnu'], alerts: [] }]);
     expect(a.items[0]!.text).toMatch(/inconnu/);
   });
-  it('niveaux d’orientation : perte de force, fourmillements ou blocage = évaluation rapide ; le reste = avis', () => {
-    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse'] }]).referral).toMatchObject({ level: 'urgent' });
+  it('niveaux d’orientation : blocage, choc ou signal apparu d’un coup = évaluation rapide ; perte de force installée, fourmillements, nuit = avis', () => {
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse'] }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['engourdissement'] }]).referral).toMatchObject({ level: 'avis' });
+    expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['faiblesse', 'soudain'] }]).referral).toMatchObject({ level: 'urgent' });
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['blocage'] }]).referral?.text).toMatch(/sans attendre/);
     expect(jointAdvice([{ zone: 'epaule', triggers: [], alerts: ['nuit'] }]).referral).toMatchObject({ level: 'avis' });
     expect(jointAdvice([{ zone: 'coudes', triggers: [], alerts: [], trend: 'pire' }]).referral).toMatchObject({ level: 'avis' });
@@ -121,6 +123,10 @@ describe('courses espacées', () => {
     expect(r.advice[0]!.keep.date).toBe('2026-11-01');
     expect(r.advice[0]!.replace.date).toBe('2026-10-31');
     expect(r.advice[0]!.reason).toMatch(/Pas de rattrapage/);
+    // séance lancée à la main (sans lien avec le planning) : elle compte quand même
+    expect(r.advice[0]!.reason).toMatch(/aucune séance de force/);
+    const r2 = planRuns(items, [], '2026-10-28', { sessionDays: ['2026-10-27'] });
+    expect(r2.advice[0]!.reason).toMatch(/1 séance de force déjà faite/);
     expect(r.changes).toEqual([{ id: 'b-sam', title: 'b-sam', weekStart: '2026-11-02', fromDay: 5, toDay: 1, start: '12:30' }]);
   });
 });

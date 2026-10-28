@@ -21,6 +21,7 @@ import { loadOnboarding } from './profileStore';
 import { programStrategy } from './Targets';
 import { deviceTimeZone } from './support';
 import { localDay } from '../engine/derive';
+import { project } from '../engine/session';
 
 const PLAN_KEY = 'planning.items';
 const PROGRAM_KEY = 'program.current';
@@ -34,6 +35,8 @@ interface Inputs {
   fixed: FixedEvent[];
   today: string;
   tired: boolean;
+  /** Jours des séances de force réellement faites (au moins une série terminée). */
+  sessionDays: string[];
   /** Variantes du programme (pour montrer ce que l'adaptation à la gêne touche). */
   variants: string[];
 }
@@ -57,7 +60,7 @@ export interface RunPlan {
 }
 
 /** Courses à espacer : calcul sur le planning réel (passé, séances démarrées et conflits d'agenda exclus). */
-export function planRuns(items: PlannedItem[], fixed: FixedEvent[], today: string, ctx: { tired?: boolean } = {}): RunPlan {
+export function planRuns(items: PlannedItem[], fixed: FixedEvent[], today: string, ctx: { tired?: boolean; sessionDays?: string[] } = {}): RunPlan {
   const byWeek = new Map<string, PlannedItem[]>();
   for (const it of items) byWeek.set(it.weekStart, [...(byWeek.get(it.weekStart) ?? []), it]);
   const changes: RunPlan['changes'] = [];
@@ -72,7 +75,10 @@ export function planRuns(items: PlannedItem[], fixed: FixedEvent[], today: strin
     for (const u of r.unresolved) {
       const later = week.find((x) => x.kind === 'course' && x.day === u.day + 1);
       if (!later || later.sessionId || u.sessionId || dateOf(weekStart, later.day) < today) continue;
-      const sessionsDone = week.filter((x) => x.kind === 'seance' && x.sessionId).length;
+      // Séances réellement faites cette semaine : celles lancées depuis le planning ET celles lancées à la main.
+      const linked = week.filter((x) => x.kind === 'seance' && x.sessionId).length;
+      const real = (ctx.sessionDays ?? []).filter((d) => d >= weekStart && d <= dateOf(weekStart, 6)).length;
+      const sessionsDone = Math.max(linked, real);
       const a = adviseRuns(u, later, { tired: !!ctx.tired, sessionsDone });
       advice.push({
         weekStart,
@@ -83,6 +89,15 @@ export function planRuns(items: PlannedItem[], fixed: FixedEvent[], today: strin
     }
   }
   return { changes, advice };
+}
+
+async function doneSessionDays(repo: Repository): Promise<string[]> {
+  const days: string[] = [];
+  for (const evs of (await repo.allSessionEvents()).values()) {
+    const st = project(evs);
+    if (st && st.sets.some((x) => x.status === 'done')) days.push(localDay(st.startedAt, st.timeZone));
+  }
+  return days;
 }
 
 export function ComplementModal({ open, onClose, repo }: { open: boolean; onClose: () => void; repo: Repository }) {
@@ -117,6 +132,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       fixed: await loadAllFixed(repo),
       today,
       tired: rlog.some((x) => x.tired && recent.has(x.day)),
+      sessionDays: await doneSessionDays(repo),
       variants: [...new Set((prog?.program?.templates ?? []).flatMap((t) => t.lines.map((l) => l.variantId)))],
     });
   };
@@ -156,7 +172,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
       after: calorieTarget({ ...base, sessionsPerWeek: inp.a.sleep.sessionsPerWeek, activity: c.activity, training: inp.training, treadmillDaysPerWeek: inp.a.schedule.treadmillDays?.length ?? 0, workDaysPerWeek: inp.a.schedule.workDays.length }),
     };
   }, [inp, c.activity]);
-  const runs = useMemo(() => (inp ? planRuns(inp.items, inp.fixed, inp.today, { tired: inp.tired }) : null), [inp]);
+  const runs = useMemo(() => (inp ? planRuns(inp.items, inp.fixed, inp.today, { tired: inp.tired, sessionDays: inp.sessionDays }) : null), [inp]);
   const weekPreview = useMemo(() => {
     if (!inp || !runs || (!runs.changes.length && !runs.advice.length)) return null;
     const ws = (runs.advice[0] ?? runs.changes[0]!).weekStart;
@@ -240,7 +256,7 @@ export function ComplementModal({ open, onClose, repo }: { open: boolean; onClos
   const treadmill = (inp?.a.schedule.treadmillDays?.length ?? 0) > 0;
   const bands: SitBand[] = ['<6', '6-9', '9-12', '>12'];
   const triggers: JointTrigger[] = ['tractions', 'dips', 'pompes', 'developpe', 'rowing', 'inconnu'];
-  const alerts: JointAlert[] = ['faiblesse', 'engourdissement', 'blocage', 'nuit'];
+  const alerts: JointAlert[] = ['faiblesse', 'engourdissement', 'blocage', 'soudain', 'nuit'];
   const num = (v: string) => (v === '' ? undefined : Math.max(0, Math.floor(Number(v) || 0)));
   const stepsOn = act.steps !== undefined;
   const nothing = !runs?.changes.length && !runs?.advice.length && !patterns.length && !c.activity;

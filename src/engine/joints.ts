@@ -3,7 +3,7 @@
 
 export type JointZone = 'epaule' | 'coudes';
 export type JointTrigger = 'tractions' | 'dips' | 'pompes' | 'developpe' | 'rowing' | 'autre' | 'inconnu';
-export type JointAlert = 'faiblesse' | 'engourdissement' | 'blocage' | 'nuit';
+export type JointAlert = 'faiblesse' | 'engourdissement' | 'blocage' | 'soudain' | 'nuit';
 export type JointTrend = 'mieux' | 'pareil' | 'pire';
 
 export const ZONE_LABELS: Record<JointZone, string> = { epaule: 'Épaule', coudes: 'Coudes' };
@@ -20,6 +20,7 @@ export const ALERT_LABELS: Record<JointAlert, string> = {
   faiblesse: 'Perte de force ou instabilité',
   engourdissement: 'Fourmillements, engourdissement',
   blocage: 'Bras bloqué ou choc récent',
+  soudain: 'Apparu d’un coup',
   nuit: 'Douleur la nuit',
 };
 export const TREND_LABELS: Record<JointTrend, string> = { mieux: 'ça s’améliore', pareil: 'pareil', pire: 'ça empire' };
@@ -79,8 +80,12 @@ export function jointAdvice(answers: JointAnswer[]): JointAdvice {
     if (a.triggers.length === 0 || a.triggers.every((t) => t === 'inconnu' || t === 'autre')) {
       items.push({ zone: a.zone, text: 'Mouvement déclencheur inconnu : note pendant quelle série la gêne apparaît. La séance n’est pas modifiée pour l’instant, la charge reste gelée.' });
     }
-    // Signaux qui appellent une évaluation rapide, quel que soit le score de douleur.
-    for (const al of a.alerts) if (al === 'faiblesse' || al === 'engourdissement' || al === 'blocage') urgent.push(`${z} : ${ALERT_LABELS[al].toLowerCase()}`);
+    // Évaluation rapide : bras bloqué, choc récent ou signal apparu d'un coup, quel que soit le score de douleur.
+    if (a.alerts.includes('blocage')) urgent.push(`${z} : ${ALERT_LABELS.blocage.toLowerCase()}`);
+    if (a.alerts.includes('soudain')) urgent.push(`${z} : ${a.alerts.filter((x) => x !== 'soudain' && x !== 'nuit').map((x) => ALERT_LABELS[x].toLowerCase()).join(', ') || 'signal'} apparu d’un coup`);
+    // Perte de force ou fourmillements qui s'installent : avis médical ou d'un kiné.
+    if (a.alerts.includes('faiblesse')) avis.push(`${z} : perte de force ou instabilité`);
+    if (a.alerts.includes('engourdissement')) avis.push(`${z} : fourmillements ou engourdissement`);
     if (a.alerts.includes('nuit')) avis.push(`${z} : douleur la nuit`);
     if (a.trend === 'pire') avis.push(`${z} : ça empire`);
     if (a.next === 'dure') avis.push(`${z} : gêne qui dure le lendemain`);
