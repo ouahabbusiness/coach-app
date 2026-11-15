@@ -159,24 +159,6 @@ export const STEPS: Step[] = [
     ),
   },
   {
-    id: 'devices',
-    title: 'Appareils et applications',
-    todo: 'Indique ton iPhone, ta montre et les apps que tu utilises déjà.',
-    why: 'Pour préparer les connexions de la future app native et éviter les doublons de saisie.',
-    ifSkip: 'Rien ne change pour l’instant : la version web ne se connecte à aucun appareil.',
-    optional: true,
-    render: (a, set) => (
-      <>
-        <Notice tone="warn">
-          Connexion à Apple Santé et à l’Apple Watch : <strong>non disponible dans cette version web</strong>. Elle est prévue dans l’app native. Aucun mot de passe Apple ne te sera demandé ici.
-        </Notice>
-        <Text label="Modèle d’iPhone" hint="Réglages → Général → Informations" value={a.devices.iphone} onChange={(v) => set((x) => void (x.devices.iphone = v))} />
-        <Text label="Modèle d’Apple Watch" hint="App Watch → Général → Informations" value={a.devices.watch} onChange={(v) => set((x) => void (x.devices.watch = v))} />
-        <Text label="Applications sport ou nutrition utilisées" value={a.devices.apps} onChange={(v) => set((x) => void (x.devices.apps = v))} />
-      </>
-    ),
-  },
-  {
     id: 'body',
     title: 'Profil physique',
     todo: 'Renseigne ce que tu connais et précise d’où vient chaque valeur.',
@@ -393,29 +375,6 @@ export const STEPS: Step[] = [
       </>
     ),
   },
-  {
-    id: 'coaching',
-    title: 'Style de coaching',
-    todo: 'Choisis le ton du coach.',
-    why: 'Tu as demandé un accompagnement ferme : il reste factuel et jamais humiliant.',
-    ifSkip: 'Ton par défaut : ferme.',
-    optional: true,
-    render: (a, set) => (
-      <>
-        <Chips
-          label="Ton"
-          options={[
-            { v: 'ferme', l: 'Ferme' },
-            { v: 'neutre', l: 'Neutre' },
-            { v: 'doux', l: 'Doux' },
-          ]}
-          selected={[a.coaching.tone ?? 'ferme']}
-          onToggle={(v) => set((x) => void (x.coaching.tone = v))}
-        />
-        <Notice>Notifications et mode strict : non disponibles dans cette version. Ils seront configurés ici quand ils existeront.</Notice>
-      </>
-    ),
-  },
 ];
 
 /* ---------- Récapitulatif ---------- */
@@ -431,7 +390,6 @@ function fmtValued(v: Valued<number>, unit: string) {
 function Recap({ a, goTo }: { a: OnboardingAnswers; goTo: (i: number) => void }) {
   const idx = (id: string) => STEPS.findIndex((s) => s.id === id);
   const rows: { id: string; label: string; value: string }[] = [
-    { id: 'devices', label: 'Appareils', value: [a.devices.iphone, a.devices.watch].filter(Boolean).join(' · ') || 'non renseigné' },
     { id: 'body', label: 'Profil', value: `Âge ${fmtValued(a.body.age, 'ans')} · taille ${fmtValued(a.body.heightCm, 'cm')} · poids ${fmtValued(a.body.weightKg, 'kg')}` },
     { id: 'history', label: 'Historique', value: `Arrêt : ${a.history.breakDuration ?? 'non renseigné'} · tractions ${fmtValued(a.history.pullupsMax, 'rép.')} · pompes ${fmtValued(a.history.pushupsMax, 'rép.')}` },
     { id: 'safety', label: 'Sécurité', value: a.safety.pains || a.safety.restrictions ? [a.safety.pains, a.safety.restrictions].filter(Boolean).join(' · ') : 'aucune restriction signalée' },
@@ -444,7 +402,6 @@ function Recap({ a, goTo }: { a: OnboardingAnswers; goTo: (i: number) => void })
       value: a.schedule.workDays.length ? `${a.schedule.workDays.map((d) => DAYS_SHORT[d]).join(' ')} · ${a.schedule.workStart ?? '?'}–${a.schedule.workEnd ?? '?'}` : 'non renseigné',
     },
     { id: 'sleep', label: 'Sommeil', value: a.sleep.bedtime && a.sleep.wake ? `${a.sleep.bedtime} → ${a.sleep.wake}` : 'non renseigné' },
-    { id: 'coaching', label: 'Ton', value: a.coaching.tone ?? 'ferme' },
   ];
   return (
     <div className="stack">

@@ -141,7 +141,14 @@ export function buildSteps(a: ProgramAnswers): Step[] {
     { id: 'morning', kind: 'single', prompt: 'Tu veux caler tes séances le matin, après Fajr ?', options: YES_NO },
     { id: 'priority', kind: 'single', prompt: 'Quel est ton objectif principal pour ce bloc ?', options: PRIORITIES },
     { id: 'pains', kind: 'multi', prompt: 'As-tu une douleur ou une gêne à signaler ? Je retirerai les mouvements concernés.', options: PAINS },
-    { id: 'days', kind: 'single', prompt: 'Combien de séances de musculation par semaine, réalistement ?', options: DAYS },
+    {
+      id: 'days',
+      kind: 'single',
+      prompt: (a.boxingPerWeek ?? 0) >= 2
+        ? 'Combien de séances de force par semaine ? Avec 2 boxes, 3 suffisent souvent.'
+        : 'Combien de séances de musculation par semaine, réalistement ?',
+      options: DAYS,
+    },
     { id: 'minutes', kind: 'single', prompt: 'Combien de temps par séance ?', options: MINUTES },
   );
   if (!a.morningAnchor) {
@@ -150,12 +157,13 @@ export function buildSteps(a: ProgramAnswers): Step[] {
   steps.push(
     { id: 'sleep', kind: 'single', prompt: 'Combien d’heures de sommeil, en moyenne ?', options: SLEEP },
     { id: 'quit', kind: 'single', prompt: 'Quand tu arrêtes un programme, c’est plutôt à cause de quoi ?', options: QUIT },
-    { id: 'tests', kind: 'tests', prompt: 'Si tu les connais : ton max de tractions, de dips et de pompes strictes. Laisse vide si tu ne sais pas — je testerai en semaine 1.' },
   );
   const p = a.priority;
   if (p === 'course' || p === 'hybride' || p === 'seche') {
     steps.push({ id: 'runs', kind: 'single', prompt: 'Combien de sorties de course par semaine ?', options: RUNS });
-    steps.push({ id: 'runGoal', kind: 'single', prompt: 'Quel est ton objectif de course ?', options: RUN_GOALS });
+    if ((a.runsPerWeek ?? 0) > 0) {
+      steps.push({ id: 'runGoal', kind: 'single', prompt: 'Quel est ton objectif de course ?', options: RUN_GOALS });
+    }
   }
   return steps;
 }

@@ -9,14 +9,15 @@ const base: ProgramAnswers = { pains: [] };
 describe('buildSteps', () => {
   it('pose les questions de base, sans course quand l’objectif est la force', () => {
     const ids = buildSteps({ ...base, priority: 'force' }).map((s) => s.id);
-    expect(ids).toEqual(['style', 'rope', 'morning', 'priority', 'pains', 'days', 'minutes', 'slot', 'sleep', 'quit', 'tests']);
+    expect(ids).toEqual(['style', 'rope', 'morning', 'priority', 'pains', 'days', 'minutes', 'slot', 'sleep', 'quit']);
   });
 
-  it('ajoute course et objectif de course pour un objectif hybride', () => {
-    const ids = buildSteps({ ...base, priority: 'hybride' }).map((s) => s.id);
-    expect(ids).toContain('runs');
-    expect(ids).toContain('runGoal');
-    expect(ids.at(-1)).toBe('runGoal');
+  it('ajoute la course pour un objectif hybride, et l’objectif de course seulement s’il y a des sorties', () => {
+    const withoutRuns = buildSteps({ ...base, priority: 'hybride' }).map((s) => s.id);
+    expect(withoutRuns).toContain('runs');
+    expect(withoutRuns).not.toContain('runGoal');
+    const withRuns = buildSteps({ ...base, priority: 'hybride', runsPerWeek: 2 }).map((s) => s.id);
+    expect(withRuns).toContain('runGoal');
   });
 
   it('demande les jours de boxe quand le style est boxe', () => {
