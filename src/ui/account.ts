@@ -44,3 +44,11 @@ export async function signOut(): Promise<void> {
   const sb = getSupabase();
   if (sb) await sb.auth.signOut();
 }
+
+
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Backend non configuré.');
+  const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+  if (error) throw new Error(error.message);
+}

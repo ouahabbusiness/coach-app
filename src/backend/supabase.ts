@@ -18,7 +18,9 @@ export function getSupabase(): SupabaseClient | null {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        flowType: 'pkce',
+        // Implicite : le lien email fonctionne même s'il est ouvert dans un autre onglet
+        // (le flux PKCE exige le verifier du navigateur d'origine et échoue sinon).
+        flowType: 'implicit',
       },
     });
   }

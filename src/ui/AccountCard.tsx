@@ -5,7 +5,7 @@ import { LogOut, Mail, RefreshCw } from 'lucide-react';
 import type { Repository } from '../storage/db';
 import { backendConfigured } from '../backend/supabase';
 import { syncAll, type SyncState } from '../backend/sync';
-import { sendMagicLink, signOut, useSession } from './account';
+import { sendMagicLink, signInWithPassword, signOut, useSession } from './account';
 
 type Message = { tone: 'info' | 'danger'; text: string } | null;
 
@@ -15,6 +15,7 @@ const fmtTime = (at: number) =>
 export function AccountCard({ repo }: { repo: Repository }) {
   const { session, ready, configured } = useSession();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
@@ -23,8 +24,13 @@ export function AccountCard({ repo }: { repo: Repository }) {
   useEffect(() => {
     repo.getKv<SyncState>('sync.last').then((v) => v && setLast(v));
     const params = new URLSearchParams(window.location.search);
-    const authError = params.get('error_description') ?? params.get('error');
-    if (authError) setMessage({ tone: 'danger', text: decodeURIComponent(authError) });
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const authError =
+      params.get('error_description') ??
+      hash.get('error_description') ??
+      params.get('error') ??
+      hash.get('error');
+    if (authError) setMessage({ tone: 'danger', text: decodeURIComponent(authError.replace(/\+/g, ' ')) });
   }, [repo]);
 
   const requestLink = useCallback(async () => {
@@ -59,6 +65,20 @@ export function AccountCard({ repo }: { repo: Repository }) {
       setBusy(false);
     }
   }, [busy, repo]);
+
+  const loginPassword = useCallback(async () => {
+    if (!email.trim() || !password || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await signInWithPassword(email, password);
+      setMessage({ tone: 'info', text: 'Connecté. Tu peux synchroniser.' });
+    } catch (err) {
+      setMessage({ tone: 'danger', text: err instanceof Error ? err.message : 'Connexion impossible.' });
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, email, password]);
 
   const logout = useCallback(async () => {
     await signOut();
@@ -126,7 +146,26 @@ export function AccountCard({ repo }: { repo: Repository }) {
               <Mail size={16} aria-hidden="true" /> {busy ? 'Envoi…' : 'Recevoir le lien'}
             </button>
           </div>
-          {sent && <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>Pense à vérifier les indésirables.</p>}
+          {sent && <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>Pense à vérifier les indésirables. Sur iPhone, ouvre le lien dans Safari (pas dans l’aperçu de l’app mail).</p>}
+          <details className="stack" style={{ marginTop: 4 }}>
+            <summary className="muted" style={{ cursor: 'pointer' }}>J’ai déjà un mot de passe</summary>
+            <div className="row" style={{ flexWrap: 'nowrap', marginTop: 8 }}>
+              <input
+                type="password"
+                autoComplete="current-password"
+                aria-label="Mot de passe"
+                placeholder="Mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void loginPassword();
+                }}
+              />
+              <button className="btn" onClick={() => void loginPassword()} disabled={busy || !email.trim() || !password}>
+                Se connecter
+              </button>
+            </div>
+          </details>
         </>
       )}
 
