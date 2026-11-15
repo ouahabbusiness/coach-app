@@ -62,6 +62,10 @@ export interface ProgramAnswers {
   rope?: boolean;
   /** Séances calées le matin après Fajr. */
   morningAnchor?: boolean;
+  /** Boxe au club ou à la maison (conditionnement). */
+  boxingPlace?: 'club' | 'maison';
+  /** Éviter le développement des fessiers (remplace la séance jambes). */
+  flatGlutes?: boolean;
 }
 
 export interface Rec<T> {
@@ -400,5 +404,5 @@ export function buildProgram(a: ProgramAnswers, loads: number[], kettlebells: nu
   rules.push('La difficulté monte quand tes résultats le justifient, pas parce que la séance est terminée');
 
   const label: Record<Priority, string> = { force: 'Force', muscle: 'Muscle', seche: 'Sèche', course: 'Course', hybride: 'Hybride' };
-  return { title: `Winter Arc · ${label[a.priority ?? 'hybride']}`, weeks: weeksN, templates, week, weekly, rules, notes };
+  return { title: `Bloc · ${label[a.priority ?? 'hybride']}`, weeks: weeksN, templates, week, weekly, rules, notes };
 }

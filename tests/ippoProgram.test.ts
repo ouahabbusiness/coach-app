@@ -9,7 +9,7 @@ const base: ProgramAnswers = { pains: [] };
 describe('buildSteps', () => {
   it('pose les questions de base, sans course quand l’objectif est la force', () => {
     const ids = buildSteps({ ...base, priority: 'force' }).map((s) => s.id);
-    expect(ids).toEqual(['style', 'rope', 'morning', 'priority', 'pains', 'days', 'minutes', 'slot', 'sleep', 'quit']);
+    expect(ids).toEqual(['style', 'rope', 'morning', 'priority', 'pains', 'flatGlutes', 'days', 'minutes', 'slot', 'sleep', 'quit', 'weeks']);
   });
 
   it('ajoute la course pour un objectif hybride, et l’objectif de course seulement s’il y a des sorties', () => {
@@ -20,10 +20,11 @@ describe('buildSteps', () => {
     expect(withRuns).toContain('runGoal');
   });
 
-  it('demande les jours de boxe quand le style est boxe', () => {
+  it('demande les jours et le lieu de boxe quand le style est boxe', () => {
     const ids = buildSteps({ ...base, style: 'boxe', boxingPerWeek: 2 }).map((s) => s.id);
     expect(ids).toContain('boxingPerWeek');
     expect(ids).toContain('boxingDays');
+    expect(ids).toContain('boxingPlace');
   });
 
   it('saute la question du créneau quand le matin est choisi', () => {
@@ -50,6 +51,12 @@ describe('applyAnswer', () => {
     expect(a.maxPullups).toBe(12);
     expect(a.maxDips).toBeNull();
     expect(a.maxPushups).toBe(30);
+  });
+
+  it('mappe fessiers évités, lieu de boxe et durée du bloc', () => {
+    expect(applyAnswer(base, 'flatGlutes', 'oui').flatGlutes).toBe(true);
+    expect(applyAnswer(base, 'boxingPlace', 'maison').boxingPlace).toBe('maison');
+    expect(applyAnswer(base, 'weeks', '8').weeks).toBe(8);
   });
 
   it('mappe le style, la boxe, la corde et le matin', () => {

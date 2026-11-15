@@ -27,7 +27,7 @@ type Option = { value: string; label: string; sub?: string };
 
 type Step =
   | { id: 'priority'; kind: 'single'; prompt: string; options: Option[] }
-  | { id: 'style' | 'boxingPerWeek' | 'rope' | 'morning'; kind: 'single'; prompt: string; options: Option[] }
+  | { id: 'style' | 'boxingPerWeek' | 'boxingPlace' | 'rope' | 'morning' | 'flatGlutes' | 'weeks'; kind: 'single'; prompt: string; options: Option[] }
   | { id: 'boxingDays'; kind: 'multi'; prompt: string; options: Option[] }
   | { id: 'pains'; kind: 'multi'; prompt: string; options: Option[] }
   | { id: 'days' | 'minutes' | 'slot' | 'sleep' | 'quit' | 'runs' | 'runGoal'; kind: 'single'; prompt: string; options: Option[] }
@@ -44,6 +44,16 @@ const BOXING: Option[] = [
   { value: '1', label: '1 séance' },
   { value: '2', label: '2 séances' },
   { value: '3', label: '3 séances' },
+];
+
+const BOXING_PLACES: Option[] = [
+  { value: 'maison', label: 'À la maison', sub: 'Corde, ombres, sac' },
+  { value: 'club', label: 'En club', sub: 'Cours collectifs' },
+];
+
+const BLOCKS: Option[] = [
+  { value: '8', label: '8 semaines', sub: 'Camp, deload semaine 4' },
+  { value: '4', label: '4 semaines', sub: 'Bloc classique' },
 ];
 
 const WEEKDAYS: Option[] = [
@@ -133,7 +143,8 @@ export function buildSteps(a: ProgramAnswers): Step[] {
   if (a.style === 'boxe' || a.style === 'hybride') {
     steps.push({ id: 'boxingPerWeek', kind: 'single', prompt: 'Combien de séances de boxe par semaine ?', options: BOXING });
     if ((a.boxingPerWeek ?? 0) > 0) {
-      steps.push({ id: 'boxingDays', kind: 'multi', prompt: 'Quels jours tu vas à la boxe ? Je placerai la force autour.', options: WEEKDAYS });
+      steps.push({ id: 'boxingDays', kind: 'multi', prompt: 'Quels jours tu fais la boxe ? Je placerai la force autour.', options: WEEKDAYS });
+      steps.push({ id: 'boxingPlace', kind: 'single', prompt: 'Tu la fais où, pour l’instant ?', options: BOXING_PLACES });
     }
   }
   steps.push(
@@ -141,6 +152,7 @@ export function buildSteps(a: ProgramAnswers): Step[] {
     { id: 'morning', kind: 'single', prompt: 'Tu veux caler tes séances le matin, après Fajr ?', options: YES_NO },
     { id: 'priority', kind: 'single', prompt: 'Quel est ton objectif principal pour ce bloc ?', options: PRIORITIES },
     { id: 'pains', kind: 'multi', prompt: 'As-tu une douleur ou une gêne à signaler ? Je retirerai les mouvements concernés.', options: PAINS },
+    { id: 'flatGlutes', kind: 'single', prompt: 'Tu veux éviter de prendre des fesses ? Je remplace la séance jambes par du sissy squat et du curl nordique.', options: YES_NO },
     {
       id: 'days',
       kind: 'single',
@@ -157,6 +169,7 @@ export function buildSteps(a: ProgramAnswers): Step[] {
   steps.push(
     { id: 'sleep', kind: 'single', prompt: 'Combien d’heures de sommeil, en moyenne ?', options: SLEEP },
     { id: 'quit', kind: 'single', prompt: 'Quand tu arrêtes un programme, c’est plutôt à cause de quoi ?', options: QUIT },
+    { id: 'weeks', kind: 'single', prompt: 'Quelle durée de bloc ?', options: BLOCKS },
   );
   const p = a.priority;
   if (p === 'course' || p === 'hybride' || p === 'seche') {
@@ -190,6 +203,12 @@ export function applyAnswer(a: ProgramAnswers, id: Step['id'], value: string | s
       return { ...a, boxingPerWeek: Number(value) };
     case 'boxingDays':
       return { ...a, boxingDays: (value as string[]).map(Number) };
+    case 'boxingPlace':
+      return { ...a, boxingPlace: value as ProgramAnswers['boxingPlace'] };
+    case 'flatGlutes':
+      return { ...a, flatGlutes: value === 'oui' };
+    case 'weeks':
+      return { ...a, weeks: Number(value) };
     case 'rope':
       return { ...a, rope: value === 'oui' };
     case 'morning': {
@@ -382,7 +401,10 @@ export function IppoProgram({ repo, onBack, onDone }: { repo: Repository; onBack
                 {program.weeks} semaines · {program.week.filter((w) => w.kind === 'seance').length} séances de force ·{' '}
                 {program.week.filter((w) => w.kind === 'course').length} course(s) · démarrage le {fmtDate(startDay)}
                 {answers.boxingPerWeek ? ` · boxe ${answers.boxingPerWeek}×/semaine` : ''}
+                {answers.boxingPlace ? ` (${answers.boxingPlace})` : ''}
                 {answers.rope ? ' · corde' : ''}
+                {answers.flatGlutes ? ' · fessiers évités' : ''}
+                {answers.priority === 'seche' ? ' · déficit' : ''}
               </p>
               <ul className="ippo-rules">
                 {program.rules.slice(0, 3).map((r) => (

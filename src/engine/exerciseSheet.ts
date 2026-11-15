@@ -73,6 +73,18 @@ export function exerciseSheet(variantId: string, rx: SheetRx = {}): ExerciseShee
     if (other) alternatives.push({ variantId: other.id, name: other.name, why: `même muscle principal (${(MUSCLE_MAP[other.id]?.direct ?? []).filter((m) => mine.includes(m)).join(', ')})` });
   }
 
+  if (alternatives.length === 0) {
+    const fallback: Record<string, string[]> = {
+      'jump-rope-basic': ['shadow-boxing'],
+      'shadow-boxing': ['jump-rope-basic'],
+      'bag-rounds': ['shadow-boxing'],
+    };
+    for (const id of fallback[variantId] ?? []) {
+      const fv = findVariant(id);
+      if (fv) alternatives.push({ variantId: id, name: fv.variant.name, why: 'même famille cardio, sans matériel différent' });
+    }
+  }
+
   const progression = timed
     ? 'Toutes les séries tenues avec la réserve demandée sur 2 séances comparables → +5 à 10 s. Sinon on garde.'
     : loaded

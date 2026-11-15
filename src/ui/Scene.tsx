@@ -1,7 +1,7 @@
 // Décors simples en SVG (salle, extérieur) avec une icône d'exercice. Aucun personnage.
 
 import type { LucideIcon } from 'lucide-react';
-import { Dumbbell, Footprints, PersonStanding, Timer, Weight } from 'lucide-react';
+import { Activity, Dumbbell, Footprints, PersonStanding, Timer, Weight } from 'lucide-react';
 import type { Exercise } from '../catalog/exercises';
 
 export const CATEGORY_ICON: Record<Exercise['category'], LucideIcon> = {
@@ -9,6 +9,7 @@ export const CATEGORY_ICON: Record<Exercise['category'], LucideIcon> = {
   kettlebell: Weight,
   jambes: Footprints,
   gainage: Timer,
+  cardio: Activity,
 };
 
 export function Scene({ kind, icon: Icon = Dumbbell, iconSize = 28 }: { kind: 'gym' | 'outdoor'; icon?: LucideIcon; iconSize?: number }) {

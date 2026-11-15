@@ -32,7 +32,7 @@ export interface Variant {
 export interface Exercise {
   id: string;
   name: string;
-  category: 'street_workout' | 'kettlebell' | 'jambes' | 'gainage';
+  category: 'street_workout' | 'kettlebell' | 'jambes' | 'gainage' | 'cardio';
   variants: Variant[];
   reviewStatus: ReviewStatus;
 }
@@ -396,6 +396,88 @@ export const EXERCISES: Exercise[] = [
         equipment: ['kettlebell', 'tapis'],
         cues: ['Kettlebell sur les hanches, tenue à deux mains', 'Pousser par les talons, serrer les fessiers en haut 1 s'],
         commonErrors: ['Cambrer le bas du dos au lieu de monter avec les hanches'],
+        media: [],
+      },
+    ],
+  },
+  {
+    id: 'sissy-squat',
+    name: 'Sissy squat',
+    category: 'jambes',
+    reviewStatus: 'non_relu',
+    variants: [
+      {
+        id: 'sissy-squat-bw',
+        name: 'Sissy squat au poids du corps',
+        kind: 'reps',
+        level: 2,
+        equipment: [],
+        cues: ['Genoux vers l’avant, hanches hautes', 'Descente lente, remonter sans casser le buste'],
+        commonErrors: ['Descendre trop vite', 'Décoller les talons sans le noter'],
+        media: [],
+      },
+    ],
+  },
+  {
+    id: 'nordic-curl',
+    name: 'Curl nordique',
+    category: 'jambes',
+    reviewStatus: 'non_relu',
+    variants: [
+      {
+        id: 'nordic-curl-bw',
+        name: 'Curl nordique (poids du corps)',
+        kind: 'reps',
+        level: 3,
+        equipment: [],
+        cues: ['Corps gainé, descente la plus lente possible', 'Freiner avec les ischios, pousser des mains pour remonter'],
+        commonErrors: ['Casser au niveau des hanches', 'Descendre sans contrôle'],
+        media: [],
+      },
+    ],
+  },
+  {
+    id: 'jump-rope',
+    name: 'Corde à sauter',
+    category: 'cardio',
+    reviewStatus: 'non_relu',
+    variants: [
+      {
+        id: 'jump-rope-basic',
+        name: 'Corde à sauter',
+        kind: 'hold',
+        level: 1,
+        equipment: ['corde à sauter'],
+        cues: ['Petits sauts, poignets qui tournent', 'Rythme 110–130 bpm : tu peux encore parler'],
+        commonErrors: ['Sauter trop haut', 'Tendre les bras'],
+        media: [],
+      },
+    ],
+  },
+  {
+    id: 'boxing',
+    name: 'Boxe (ombres / sac)',
+    category: 'cardio',
+    reviewStatus: 'non_relu',
+    variants: [
+      {
+        id: 'shadow-boxing',
+        name: 'Ombres',
+        kind: 'hold',
+        level: 1,
+        equipment: [],
+        cues: ['Garde haute, pieds légers', 'Jab, cross, retour en garde'],
+        commonErrors: ['Bras qui tombent', 'Pieds collés au sol'],
+        media: [],
+      },
+      {
+        id: 'bag-rounds',
+        name: 'Sac de frappe',
+        kind: 'hold',
+        level: 1,
+        equipment: ['sac de frappe'],
+        cues: ['Puissance par les jambes, respiration', 'Retour en garde après chaque combo'],
+        commonErrors: ['Frapper avec les poings sans protéger les poignets', 'S’essouffler en 30 s'],
         media: [],
       },
     ],

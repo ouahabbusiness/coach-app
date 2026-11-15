@@ -13,6 +13,8 @@ import { weekStart } from '../src/engine/challenge';
 import { shiftWeek } from '../src/engine/planning';
 import { deviceTimeZone } from '../src/ui/support';
 import { loadRecurring } from '../src/ui/agenda';
+import { saveOwned } from '../src/ui/equipment';
+import { DEFAULT_OWNED } from '../src/engine/gear';
 
 if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
 
@@ -27,6 +29,7 @@ const boxingAnswers: ProgramAnswers = {
   style: 'boxe',
   boxingPerWeek: 2,
   boxingDays: [1, 3],
+  boxingPlace: 'club',
 };
 
 const answers: ProgramAnswers = {
@@ -72,10 +75,52 @@ describe('boxe dans le programme', () => {
     const recurring = await loadRecurring(repo);
     const boxe = recurring.find((e) => e.id === 'boxe');
     expect(boxe?.days).toEqual([1, 3]);
-    expect(boxe?.label).toBe('Boxe');
+    expect(boxe?.label).toBe('Boxe (club)');
 
     const saved = await repo.getKv<SavedProgramRow>('program.current');
     expect(saved?.program.rules[0]).toContain('Boxe 2×/semaine');
     expect(saved?.program.rules[0]).toContain('48 h');
+  });
+});
+
+describe('camp fessiers évités + boxe maison', () => {
+  it('remplace la séance jambes, ajoute le conditionnement et les règles', async () => {
+    const repo = new Repository(new CoachDb(`save-camp-${Date.now()}`));
+    await saveOwned(repo, [...DEFAULT_OWNED, 'corde à sauter', 'sac de frappe']);
+    const campAnswers: ProgramAnswers = {
+      pains: [],
+      priority: 'seche',
+      style: 'boxe',
+      boxingPerWeek: 2,
+      boxingDays: [1, 3],
+      boxingPlace: 'maison',
+      flatGlutes: true,
+      weeks: 8,
+      days: 3,
+      minutes: 60,
+      rope: true,
+      sleepH: 7.5,
+      quitReason: 'motivation',
+    };
+    const program = buildProgram(campAnswers, [5, 6, 12], [6, 12], []);
+    await saveProgram(repo, program, campAnswers);
+
+    const templates = await loadTemplates(repo);
+    const legs = templates.find((t) => t.id === 'prog-B');
+    expect(legs?.lines.map((l) => l.variantId)).toEqual(['sissy-squat-bw', 'nordic-curl-bw', 'hollow-hold']);
+    expect(legs?.lines.some((l) => /squat-goblet|kb-rdl|kb-swing|split-squat|glute-bridge/.test(l.variantId))).toBe(false);
+
+    const cond = templates.find((t) => t.id === 'camp-cond');
+    expect(cond?.lines.map((l) => l.variantId)).toContain('jump-rope-basic');
+
+    const planning = await loadPlanning(repo);
+    expect(planning.some((i) => i.title === 'Conditionnement boxe')).toBe(true);
+    expect(planning.filter((i) => i.kind === 'seance').length).toBeGreaterThan(20);
+
+    const saved = await repo.getKv<SavedProgramRow>('program.current');
+    expect(saved?.program.weeks).toBe(8);
+    expect(saved?.program.rules.join(' ')).toContain('Fessiers');
+    expect(saved?.program.rules.join(' ')).toContain('Déficit léger');
+    expect(saved?.program.rules.join(' ')).toContain('Boxe maison');
   });
 });

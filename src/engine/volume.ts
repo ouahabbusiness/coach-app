@@ -37,6 +37,11 @@ export const MUSCLE_MAP: Record<string, { direct: Muscle[]; indirect: Muscle[] }
   'leg-raise-hanging': { direct: ['abdominaux'], indirect: [] },
   'plank-forearm': { direct: ['abdominaux'], indirect: [] },
   'hollow-hold': { direct: ['abdominaux'], indirect: [] },
+  'sissy-squat-bw': { direct: ['quadriceps'], indirect: ['abdominaux'] },
+  'nordic-curl-bw': { direct: ['ischios'], indirect: [] },
+  'jump-rope-basic': { direct: [], indirect: ['abdominaux'] },
+  'shadow-boxing': { direct: [], indirect: ['abdominaux'] },
+  'bag-rounds': { direct: [], indirect: ['abdominaux'] },
 };
 
 export interface SetCount {
