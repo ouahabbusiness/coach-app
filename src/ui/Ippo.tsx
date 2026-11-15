@@ -322,6 +322,7 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
       {settingsOpen && config && (
         <IppoSettings
           initial={config}
+          serverMode={proxy}
           onClose={() => setSettingsOpen(false)}
           onSave={saveSettings}
         />
@@ -330,7 +331,17 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
   );
 }
 
-function IppoSettings({ initial, onClose, onSave }: { initial: IppoConfig; onClose: () => void; onSave: (c: IppoConfig) => void }) {
+function IppoSettings({
+  initial,
+  serverMode,
+  onClose,
+  onSave,
+}: {
+  initial: IppoConfig;
+  serverMode: boolean;
+  onClose: () => void;
+  onSave: (c: IppoConfig) => void;
+}) {
   const [draft, setDraft] = useState<IppoConfig>({ ...initial });
   const [test, setTest] = useState<{ state: 'idle' | 'busy' | 'ok' | 'ko'; msg?: string }>({ state: 'idle' });
 
@@ -354,7 +365,9 @@ function IppoSettings({ initial, onClose, onSave }: { initial: IppoConfig; onClo
           </button>
         </div>
         <p className="ippo-note">
-          Ippo utilise une API compatible OpenAI. Ta clé reste dans la base locale de cet appareil et est retirée des exports JSON. Elle n’est envoyée qu’au fournisseur choisi.
+          {serverMode
+            ? 'Tu es connecté : Ippo passe par le serveur Supabase, la clé du fournisseur reste côté serveur. Les champs ci-dessous ne servent qu’en secours local, hors connexion.'
+            : 'Ippo utilise une API compatible OpenAI. Ta clé reste dans la base locale de cet appareil et est retirée des exports JSON. Elle n’est envoyée qu’au fournisseur choisi.'}
         </p>
         <label className="ippo-field">
           <span>Adresse du fournisseur</span>
@@ -386,8 +399,9 @@ function IppoSettings({ initial, onClose, onSave }: { initial: IppoConfig; onClo
         {test.state === 'ok' && <p className="ippo-test ok">{test.msg}</p>}
         {test.state === 'ko' && <p className="ippo-test ko">{test.msg}</p>}
         <p className="ippo-note small">
-          Sans clé, Ippo reste en mode démo : il répond à partir de tes données, sans modèle de langage. Aucun serveur Ippo n’existe encore :
-          la synchronisation et le proxy sécurisé arrivent avec le backend Supabase.
+          {serverMode
+            ? 'Le serveur Ippo (Edge Function Supabase) est actif tant que tu es connecté. Quota : 60 messages par jour.'
+            : 'Sans clé, Ippo reste en mode démo : il répond à partir de tes données, sans modèle de langage. Connecte-toi pour utiliser le serveur Ippo.'}
         </p>
       </div>
     </div>
