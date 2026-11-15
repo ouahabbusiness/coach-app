@@ -7,10 +7,12 @@ import { shiftWeek, type PlannedItem } from '../engine/planning';
 import { weekStart } from '../engine/challenge';
 import { buildProgram, type Program, type ProgramAnswers } from '../engine/programBuilder';
 import { adaptToEquipment } from '../engine/trip';
+import type { FixedEvent } from '../engine/planning';
 import type { Repository } from '../storage/db';
 import { fitPlanning } from './agenda';
 import { loadKettlebells, loadOwned, loadPieces } from './equipment';
 import { loadPlanning } from './Planning';
+import { loadRecurring, saveRecurring } from './agenda';
 import { loadTemplates, saveTemplates, type SessionTemplate } from './templates';
 import { deviceTimeZone, newId } from './support';
 import { availableLoads } from '../engine/progression';
@@ -21,6 +23,25 @@ export interface SavedProgramRow {
   answers: ProgramAnswers;
   startWeek: string;
   at: number;
+}
+
+const DAY_LABELS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+
+/** Règles affichées : boxe, corde, style. Le moteur de séries n'est pas modifié. */
+export function extraRules(base: string[], answers: ProgramAnswers): string[] {
+  const rules = [...base];
+  const boxingDays = answers.boxingDays ?? [];
+  if ((answers.boxingPerWeek ?? 0) > 0 && boxingDays.length) {
+    const days = boxingDays.map((d) => DAY_LABELS[d] ?? `j${d}`).join(', ');
+    rules.unshift(
+      `Boxe ${answers.boxingPerWeek}×/semaine (${days}) : garde 48 h entre une séance lourde du haut du corps et la boxe.`,
+    );
+  }
+  if (answers.rope) rules.push('Corde à sauter : 3 × 2 min en fin de séance, ou 15 min un jour léger.');
+  if (answers.style === 'calisthenics') {
+    rules.push('Style calisthenics : priorité aux tractions, dips et gainage ; ajoute du lest quand les répétitions deviennent faciles.');
+  }
+  return rules;
 }
 
 export interface SaveProgramResult {
@@ -53,6 +74,20 @@ export async function saveProgram(repo: Repository, program: Program, answers: P
   }));
   await saveTemplates(repo, [...templates.filter((t) => !t.id.startsWith('prog-')), ...progTemplates]);
 
+  // La boxe devient un engagement récurrent : le planning de force se place autour.
+  if ((answers.boxingPerWeek ?? 0) > 0 && (answers.boxingDays ?? []).length) {
+    const recurring = await loadRecurring(repo);
+    const boxing: FixedEvent = {
+      id: 'boxe',
+      kind: 'autre',
+      label: 'Boxe',
+      days: answers.boxingDays ?? [],
+      start: '19:00',
+      end: '20:30',
+    };
+    await saveRecurring(repo, [...recurring.filter((e) => e.id !== 'boxe'), boxing]);
+  }
+
   const items = await loadPlanning(repo);
   const kept = items.filter((i) => !(i.programId && !i.sessionId && i.weekStart >= start));
   const added: PlannedItem[] = [];
@@ -77,7 +112,8 @@ export async function saveProgram(repo: Repository, program: Program, answers: P
   }
   const fit = await fitPlanning(repo, [...kept, ...added], today);
   await repo.setKv('planning.items', fit.items);
+  const finalProgram: Program = { ...program, rules: extraRules(program.rules, answers) };
   await repo.setKv('program.answers', answers);
-  await repo.setKv('program.current', { id, program, answers, startWeek: start, at: Date.now() } satisfies SavedProgramRow);
+  await repo.setKv('program.current', { id, program: finalProgram, answers, startWeek: start, at: Date.now() } satisfies SavedProgramRow);
   return { id, startWeek: start, notes: fit.notes };
 }

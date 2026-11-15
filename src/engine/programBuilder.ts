@@ -53,6 +53,15 @@ export interface ProgramAnswers {
   weeks?: number;
   /** Échec technique autorisé (assistance au poids du corps uniquement). */
   failureOk?: boolean;
+  /** Style déclaré : oriente les règles et le ton, pas la génération des séries. */
+  style?: 'musculation' | 'calisthenics' | 'boxe' | 'hybride';
+  /** Séances de boxe par semaine (0 = aucune) et jours choisis (0 = lundi). */
+  boxingPerWeek?: number;
+  boxingDays?: number[];
+  /** Corde à sauter disponible / souhaitée comme conditionnement. */
+  rope?: boolean;
+  /** Séances calées le matin après Fajr. */
+  morningAnchor?: boolean;
 }
 
 export interface Rec<T> {

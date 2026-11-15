@@ -12,8 +12,22 @@ import { localDay } from '../src/engine/derive';
 import { weekStart } from '../src/engine/challenge';
 import { shiftWeek } from '../src/engine/planning';
 import { deviceTimeZone } from '../src/ui/support';
+import { loadRecurring } from '../src/ui/agenda';
 
 if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
+
+const boxingAnswers: ProgramAnswers = {
+  pains: [],
+  priority: 'muscle',
+  days: 3,
+  minutes: 45,
+  slot: 'midi',
+  sleepH: 7.5,
+  quitReason: 'temps',
+  style: 'boxe',
+  boxingPerWeek: 2,
+  boxingDays: [1, 3],
+};
 
 const answers: ProgramAnswers = {
   pains: [],
@@ -46,5 +60,22 @@ describe('saveProgram', () => {
 
     const today = localDay(Date.now(), deviceTimeZone());
     expect(result.startWeek).toBe(shiftWeek(weekStart(today), 1));
+  });
+});
+
+describe('boxe dans le programme', () => {
+  it('ajoute la boxe comme engagement récurrent et une règle de récupération', async () => {
+    const repo = new Repository(new CoachDb(`save-boxing-${Date.now()}`));
+    const program = buildProgram(boxingAnswers, [5, 6, 12], [6, 12], []);
+    await saveProgram(repo, program, boxingAnswers);
+
+    const recurring = await loadRecurring(repo);
+    const boxe = recurring.find((e) => e.id === 'boxe');
+    expect(boxe?.days).toEqual([1, 3]);
+    expect(boxe?.label).toBe('Boxe');
+
+    const saved = await repo.getKv<SavedProgramRow>('program.current');
+    expect(saved?.program.rules[0]).toContain('Boxe 2×/semaine');
+    expect(saved?.program.rules[0]).toContain('48 h');
   });
 });

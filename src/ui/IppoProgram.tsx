@@ -18,7 +18,7 @@ import {
   type Slot,
 } from '../engine/programBuilder';
 import { loadKettlebells, loadPieces } from './equipment';
-import { saveProgram, type SaveProgramResult } from './saveProgram';
+import { extraRules, saveProgram, type SaveProgramResult } from './saveProgram';
 import { deviceTimeZone } from './support';
 import type { IppoMessage } from '../ippo/types';
 import './ippo.css';
@@ -27,9 +27,39 @@ type Option = { value: string; label: string; sub?: string };
 
 type Step =
   | { id: 'priority'; kind: 'single'; prompt: string; options: Option[] }
+  | { id: 'style' | 'boxingPerWeek' | 'rope' | 'morning'; kind: 'single'; prompt: string; options: Option[] }
+  | { id: 'boxingDays'; kind: 'multi'; prompt: string; options: Option[] }
   | { id: 'pains'; kind: 'multi'; prompt: string; options: Option[] }
   | { id: 'days' | 'minutes' | 'slot' | 'sleep' | 'quit' | 'runs' | 'runGoal'; kind: 'single'; prompt: string; options: Option[] }
   | { id: 'tests'; kind: 'tests'; prompt: string };
+
+const STYLES: Option[] = [
+  { value: 'musculation', label: 'Musculation', sub: 'Salle ou matériel à la maison' },
+  { value: 'calisthenics', label: 'Calisthenics / street workout', sub: 'Barre, anneaux, poids du corps' },
+  { value: 'boxe', label: 'Boxe & conditionnement', sub: 'Club, corde, sac' },
+  { value: 'hybride', label: 'Hybride', sub: 'Force + boxe / cardio' },
+];
+
+const BOXING: Option[] = [
+  { value: '1', label: '1 séance' },
+  { value: '2', label: '2 séances' },
+  { value: '3', label: '3 séances' },
+];
+
+const WEEKDAYS: Option[] = [
+  { value: '0', label: 'Lundi' },
+  { value: '1', label: 'Mardi' },
+  { value: '2', label: 'Mercredi' },
+  { value: '3', label: 'Jeudi' },
+  { value: '4', label: 'Vendredi' },
+  { value: '5', label: 'Samedi' },
+  { value: '6', label: 'Dimanche' },
+];
+
+const YES_NO: Option[] = [
+  { value: 'oui', label: 'Oui' },
+  { value: 'non', label: 'Non' },
+];
 
 const PRIORITIES: Option[] = [
   { value: 'muscle', label: 'Prendre du muscle', sub: 'Volume, progression de charge' },
@@ -98,15 +128,30 @@ const RUN_GOALS: Option[] = [
 
 export function buildSteps(a: ProgramAnswers): Step[] {
   const steps: Step[] = [
+    { id: 'style', kind: 'single', prompt: 'Quel style d’entraînement tu veux pour ce bloc ?', options: STYLES },
+  ];
+  if (a.style === 'boxe' || a.style === 'hybride') {
+    steps.push({ id: 'boxingPerWeek', kind: 'single', prompt: 'Combien de séances de boxe par semaine ?', options: BOXING });
+    if ((a.boxingPerWeek ?? 0) > 0) {
+      steps.push({ id: 'boxingDays', kind: 'multi', prompt: 'Quels jours tu vas à la boxe ? Je placerai la force autour.', options: WEEKDAYS });
+    }
+  }
+  steps.push(
+    { id: 'rope', kind: 'single', prompt: 'Tu as une corde à sauter et tu veux l’utiliser ?', options: YES_NO },
+    { id: 'morning', kind: 'single', prompt: 'Tu veux caler tes séances le matin, après Fajr ?', options: YES_NO },
     { id: 'priority', kind: 'single', prompt: 'Quel est ton objectif principal pour ce bloc ?', options: PRIORITIES },
     { id: 'pains', kind: 'multi', prompt: 'As-tu une douleur ou une gêne à signaler ? Je retirerai les mouvements concernés.', options: PAINS },
     { id: 'days', kind: 'single', prompt: 'Combien de séances de musculation par semaine, réalistement ?', options: DAYS },
     { id: 'minutes', kind: 'single', prompt: 'Combien de temps par séance ?', options: MINUTES },
-    { id: 'slot', kind: 'single', prompt: 'Tu t’entraînes plutôt quand ?', options: SLOTS },
+  );
+  if (!a.morningAnchor) {
+    steps.push({ id: 'slot', kind: 'single', prompt: 'Tu t’entraînes plutôt quand ?', options: SLOTS });
+  }
+  steps.push(
     { id: 'sleep', kind: 'single', prompt: 'Combien d’heures de sommeil, en moyenne ?', options: SLEEP },
     { id: 'quit', kind: 'single', prompt: 'Quand tu arrêtes un programme, c’est plutôt à cause de quoi ?', options: QUIT },
     { id: 'tests', kind: 'tests', prompt: 'Si tu les connais : ton max de tractions, de dips et de pompes strictes. Laisse vide si tu ne sais pas — je testerai en semaine 1.' },
-  ];
+  );
   const p = a.priority;
   if (p === 'course' || p === 'hybride' || p === 'seche') {
     steps.push({ id: 'runs', kind: 'single', prompt: 'Combien de sorties de course par semaine ?', options: RUNS });
@@ -125,6 +170,24 @@ function labelFor(step: Step, value: string | string[] | null): string {
 
 export function applyAnswer(a: ProgramAnswers, id: Step['id'], value: string | string[] | { pullups: number | null; dips: number | null; pushups: number | null }): ProgramAnswers {
   switch (id) {
+    case 'style': {
+      const style = value as ProgramAnswers['style'];
+      return {
+        ...a,
+        style,
+        ...(style === 'boxe' || style === 'hybride' ? {} : { boxingPerWeek: 0, boxingDays: [] }),
+      };
+    }
+    case 'boxingPerWeek':
+      return { ...a, boxingPerWeek: Number(value) };
+    case 'boxingDays':
+      return { ...a, boxingDays: (value as string[]).map(Number) };
+    case 'rope':
+      return { ...a, rope: value === 'oui' };
+    case 'morning': {
+      const yes = value === 'oui';
+      return { ...a, morningAnchor: yes, slot: yes ? 'matin' : a.slot };
+    }
     case 'priority':
       return { ...a, priority: value as ProgramAnswers['priority'] };
     case 'pains':
@@ -201,7 +264,7 @@ export function IppoProgram({ repo, onBack, onDone }: { repo: Repository; onBack
         const loads = availableLoads(await loadPieces(repo));
         const kbs = await loadKettlebells(repo);
         const p = buildProgram(a, loads, kbs, []);
-        setProgram(p);
+        setProgram({ ...p, rules: extraRules(p.rules, a) });
         push('assistant', `Voilà ce que je te propose : ${p.title}, ${p.weeks} semaines. Tu peux encore relire et créer.`);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Je n’ai pas pu construire le programme.');
@@ -310,6 +373,8 @@ export function IppoProgram({ repo, onBack, onDone }: { repo: Repository; onBack
               <p className="ippo-note" style={{ margin: '4px 0 8px' }}>
                 {program.weeks} semaines · {program.week.filter((w) => w.kind === 'seance').length} séances de force ·{' '}
                 {program.week.filter((w) => w.kind === 'course').length} course(s) · démarrage le {fmtDate(startDay)}
+                {answers.boxingPerWeek ? ` · boxe ${answers.boxingPerWeek}×/semaine` : ''}
+                {answers.rope ? ' · corde' : ''}
               </p>
               <ul className="ippo-rules">
                 {program.rules.slice(0, 3).map((r) => (
