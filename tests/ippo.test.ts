@@ -169,6 +169,7 @@ describe('prompt Ippo', () => {
     expect(turns[0]?.content).toContain(IPPO_SYSTEM);
     expect(turns[0]?.content).toContain('CONTEXTE');
     expect(turns[0]?.content).toContain('épaule droite');
+    expect(turns[0]?.content).toContain('"equipment"');
     expect(turns.at(-1)).toEqual({ role: 'user', content: 'Analyse ma semaine' });
     expect(turns.map((t) => t.content).join(' ')).not.toMatch(/sk-[a-z0-9]/i);
   });

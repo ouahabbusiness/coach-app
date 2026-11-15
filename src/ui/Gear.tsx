@@ -59,6 +59,10 @@ export function GearPage({ repo, go }: { repo: Repository; go: (r: Route) => voi
         <ChevronLeft size={20} aria-hidden="true" /> Coach
       </button>
       <h1 style={{ marginTop: 8 }}>Matériel</h1>
+      <p className="muted" style={{ marginTop: -6 }}>
+        Ippo voit ce matériel et s’en sert pour te conseiller. Coche ce que tu possèdes et ajoute ce que tu achètes :
+        ses réponses s’améliorent.
+      </p>
 
       <section className="ui-card stack" aria-label="Mon matériel">
         <p className="eyebrow" style={{ margin: 0 }}>Mon matériel</p>

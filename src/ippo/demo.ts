@@ -41,6 +41,12 @@ export function demoAnswer(question: string, ctx: IppoContext): string {
     return `${head}\n\nAujourd’hui : ${ctx.nutrition.todayKcal} kcal documentées${complete}${ctx.nutrition.todayProteinG !== null ? `, ${ctx.nutrition.todayProteinG} g de protéines documentées` : ''}. Règle simple : une source de protéines à chaque repas, des légumes, et un féculent autour de la séance. Si tu veux un ajustement précis, il me manque le détail des repas.`;
   }
 
+  if (/materiel|achete|equipement|kettlebell|haltere|barre/.test(q)) {
+    const eq = ctx.equipment;
+    const items = eq.items.length ? eq.items.join(', ') : 'aucun matériel renseigné';
+    return `${head}\n\nMatériel connu : ${items}. Kettlebells : ${eq.kettlebells.length ? eq.kettlebells.join(', ') + ' kg' : 'inconnues'}. Lest : ${eq.loadPieces.length ? eq.loadPieces.join(' + ') + ' kg' : 'inconnu'}. Dis-moi ce que tu viens d'acheter et je l'intègre ; Ippo s'en sert pour te conseiller sans te faire racheter ce que tu as déjà.`;
+  }
+
   if (/seance|entrainement|programme|muscle|traction|stagn|progres|repos/.test(q)) {
     const last = ctx.sessions[0];
     if (!last) return `${head}\n\nAucune séance enregistrée : je ne peux pas analyser ta progression. Lance la première séance, puis reviens.`;

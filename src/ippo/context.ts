@@ -6,6 +6,7 @@ import { emptyAnswers, GOAL_LABELS, type GoalVersion, type OnboardingState } fro
 import { project } from '../engine/session';
 import { dailyWeights, trend, type WeighIn } from '../engine/weight';
 import type { Repository } from '../storage/db';
+import { loadBoughtGear, loadKettlebells, loadOwned, loadPieces } from '../ui/equipment';
 import { deviceTimeZone } from '../ui/support';
 import type { IppoContext, IppoDay, IppoProgram, IppoSession } from './types';
 
@@ -126,6 +127,14 @@ export async function buildCoachContext(repo: Repository, now: number = Date.now
 
   const goalLabels = goal?.secondary?.map((g) => GOAL_LABELS[g] ?? g) ?? [];
 
+  const equipment = {
+    items: await loadOwned(repo),
+    kettlebells: await loadKettlebells(repo),
+    loadPieces: await loadPieces(repo),
+    bought: await loadBoughtGear(repo),
+  };
+  if (equipment.items.length === 0) gaps.push('matériel non renseigné');
+
   return {
     generatedAt: now,
     day: today,
@@ -138,6 +147,7 @@ export async function buildCoachContext(repo: Repository, now: number = Date.now
       sex: answers.body.formulaSex ?? null,
       tone: answers.coaching.tone ?? null,
     },
+    equipment,
     goal: goal
       ? {
           main: goal.main ? (GOAL_LABELS[goal.main] ?? goal.main) : null,

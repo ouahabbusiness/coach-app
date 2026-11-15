@@ -843,16 +843,6 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
         </div>
         <ChevronRight size={18} aria-hidden="true" />
       </button>
-      <button className="ui-card list-row" onClick={() => go({ name: 'spots' })} style={{ marginTop: 10 }}>
-        <span className="icon-chip accent">
-          <MapPin size={16} aria-hidden="true" />
-        </span>
-        <div className="grow">
-          <p className="eyebrow">Autour de moi · vacances</p>
-          <p className="row-title">Spots : street workout, pistes, parcs</p>
-        </div>
-        <ChevronRight size={18} aria-hidden="true" />
-      </button>
       <button className="ui-card list-row" onClick={() => go({ name: 'gear' })} style={{ marginTop: 10 }}>
         <span className="icon-chip accent">
           <Dumbbell size={16} aria-hidden="true" />

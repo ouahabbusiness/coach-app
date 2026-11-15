@@ -69,10 +69,18 @@ export interface IppoDay {
   steps: number | null;
 }
 
+export interface IppoEquipment {
+  items: string[];
+  kettlebells: number[];
+  loadPieces: number[];
+  bought: string[];
+}
+
 export interface IppoContext {
   generatedAt: number;
   day: string;
   profile: IppoProfile;
+  equipment: IppoEquipment;
   goal: IppoGoal | null;
   program: IppoProgram | null;
   sessions: IppoSession[];
