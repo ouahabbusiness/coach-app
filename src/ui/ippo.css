@@ -355,3 +355,32 @@
 @media (max-width: 520px) {
   .ippo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Parcours programme guidé */
+.ippo-progress { height: 4px; background: #1e1e21; border-radius: 999px; margin: 0 0 14px; overflow: hidden; }
+.ippo-progress i { display: block; height: 100%; background: #ff5a1f; border-radius: 999px; transition: width 250ms ease; }
+.ippo-flow { max-height: 48vh; overflow-y: auto; }
+.ippo-options { display: flex; flex-direction: column; gap: 8px; }
+.ippo-option {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  border: 1px solid #2c2c32; background: #131315; color: #ece7de;
+  border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 14px; cursor: pointer;
+}
+.ippo-option small { color: #8d877d; font-size: 12px; }
+.ippo-option.sel { border-color: #ff5a1f; background: #241610; color: #ffd0b8; }
+.ippo-option:disabled { opacity: 0.5; cursor: default; }
+.ippo-summary { border: 1px solid #2c2c32; background: #151517; border-radius: 14px; padding: 12px; }
+.ippo-summary-title { margin: 2px 0; font-size: 17px; font-weight: 700; color: #fff; }
+.ippo-rules { margin: 6px 0 0; padding-left: 16px; font-size: 12.5px; color: #b8b2a8; }
+.ippo-rules li { margin: 2px 0; }
+.ippo-tests { display: grid; gap: 8px; }
+.ippo-test-field {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: #151517; border: 1px solid #2c2c32; border-radius: 12px; padding: 8px 12px;
+}
+.ippo-test-field span { font-size: 13px; color: #c9c3b9; }
+.ippo-test-field input {
+  width: 64px; background: none; border: 0; color: #fff; font: inherit; font-size: 18px; font-weight: 700;
+  text-align: right; outline: none;
+}

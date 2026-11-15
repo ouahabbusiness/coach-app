@@ -218,3 +218,11 @@ ull.
 - Ippo bascule sur l’Edge Function dès qu’une session existe (mode « Serveur ») ; clé locale en secours, démo sinon.
 - Schéma Supabase appliqué et tables vérifiées via l’API le 15/11. **Fonction `ippo-chat` non déployée** : à faire depuis le dashboard, avec les secrets LLM.
 - 381 tests passent, build OK. Chunk principal ~1 Mo à cause de `@supabase/supabase-js` : à découper plus tard.
+
+
+## Programme guidé par Ippo (15/11/2026, soir)
+
+- Parcours conversationnel `ippoProgram` : 8 à 10 questions, réponses en puces, puis construction par le moteur existant.
+- Réinitialisation complète (appareil + cloud) disponible dans Compte & synchro, avec confirmation.
+- `saveProgram` installe modèles, planning de 4 semaines et programme courant ; testé sur base simulée.
+- 388 tests passent, build OK. Non testé : parcours complet à l'écran sur iPhone, cohérence du programme proposé pour tous les profils.

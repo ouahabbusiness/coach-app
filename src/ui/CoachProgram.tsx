@@ -765,16 +765,28 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
           </div>
         </section>
       ) : (
-        <button className="ui-card list-row" onClick={() => go({ name: 'coachProgram' })}>
-          <span className="icon-chip accent">
-            <Dumbbell size={16} aria-hidden="true" />
-          </span>
-          <div className="grow">
-            <p className="eyebrow">Entretien · {STEPS.length} questions</p>
-            <p className="row-title">Construire mon programme</p>
-          </div>
-          <ChevronRight size={18} aria-hidden="true" />
-        </button>
+        <>
+          <button className="ui-card list-row" onClick={() => go({ name: 'ippoProgram' })}>
+            <span className="icon-chip accent">
+              <MessageSquare size={16} aria-hidden="true" />
+            </span>
+            <div className="grow">
+              <p className="eyebrow">Guidé par Ippo · 2 min</p>
+              <p className="row-title">Créer mon programme</p>
+            </div>
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+          <button className="ui-card list-row" onClick={() => go({ name: 'coachProgram' })}>
+            <span className="icon-chip">
+              <Dumbbell size={16} aria-hidden="true" />
+            </span>
+            <div className="grow">
+              <p className="eyebrow">Entretien détaillé · {STEPS.length} questions</p>
+              <p className="row-title">Construire mon programme</p>
+            </div>
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </>
       )}
       {proposals.map((e) => (
         <section key={e.id} className="ui-card stack light-card" aria-label="Proposition à valider" style={{ marginTop: 10 }}>

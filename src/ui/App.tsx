@@ -35,6 +35,7 @@ import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
 import { Ippo } from './Ippo';
 import { AccountScreen } from './AccountScreen';
+import { IppoProgram } from './IppoProgram';
 import { Today } from './Today';
 import { deviceTimeZone, fmtDateTime } from './support';
 
@@ -61,7 +62,8 @@ export type Route =
   | { name: 'session'; id: string }
   | { name: 'summary'; id: string }
   | { name: 'ippo' }
-  | { name: 'account' };
+  | { name: 'account' }
+  | { name: 'ippoProgram' };
 
 // `to` : écran ouvert par l'onglet.
 const TABS = [
@@ -123,6 +125,7 @@ export function App() {
   function render() {
   if (route.name === 'ippo') return <Ippo repo={repo} onBack={() => go({ name: 'coach' })} />;
   if (route.name === 'account') return <AccountScreen repo={repo} onBack={() => go({ name: 'today' })} />;
+  if (route.name === 'ippoProgram') return <IppoProgram repo={repo} onBack={() => go({ name: 'coach' })} onDone={() => go({ name: 'program' })} />;
   if (route.name === 'onboarding') return <Onboarding repo={repo} startAt={route.step} onExit={() => go({ name: 'today' })} />;
 
   if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;

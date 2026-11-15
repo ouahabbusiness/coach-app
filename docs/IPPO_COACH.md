@@ -90,3 +90,12 @@ Le moteur de séance, le stockage et les règles existantes ne sont pas modifié
 - **Proxy IA** : dès qu’une session existe, Ippo appelle l’Edge Function `ippo-chat` (JWT, quota serveur, clé LLM côté serveur). La clé locale ne sert plus que de secours hors connexion ; sans session ni clé, mode démo.
 - **Schéma appliqué** sur le projet `ngkbccpwciwhcmkinwub` le 15/11 : tables et RLS vérifiées via l’API (réponses `[]` avec la clé publishable). **Fonction non encore déployée** au moment de l’écriture.
 - Vérifié : 381 tests passent, `tsc` propre, build OK.
+
+
+## Programme guidé (15/11/2026, soir)
+
+- Nouveau parcours `ippoProgram` : Ippo pose 8 à 10 questions courtes (objectif, douleurs, jours, durée, créneau, sommeil, raison d'abandon, tests, course si pertinent).
+- Les réponses remplissent `ProgramAnswers`, puis le **moteur existant** `buildProgram` construit le programme. Aucune règle d'entraînement n'est inventée par le modèle.
+- `src/ui/saveProgram.ts` installe le programme : modèles `prog-*`, planning des 4 semaines à partir du lundi suivant, `program.current`.
+- Entrée : Coach → « Créer mon programme » (guidé par Ippo) ; l'entretien détaillé reste disponible.
+- Tests : `tests/ippoProgram.test.ts` (questions/mapping) et `tests/saveProgram.test.ts` (modèles + planning + programme courant). Total : **388 tests**.
