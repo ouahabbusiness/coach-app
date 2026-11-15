@@ -5,6 +5,7 @@ import { LogOut, Mail, RefreshCw } from 'lucide-react';
 import type { Repository } from '../storage/db';
 import { backendConfigured } from '../backend/supabase';
 import { syncAll, type SyncState } from '../backend/sync';
+import { resetEverything } from '../backend/reset';
 import { sendMagicLink, signInWithPassword, signOut, useSession } from './account';
 
 type Message = { tone: 'info' | 'danger'; text: string } | null;
@@ -79,6 +80,22 @@ export function AccountCard({ repo }: { repo: Repository }) {
       setBusy(false);
     }
   }, [busy, email, password]);
+
+  const resetAll = useCallback(async () => {
+    const ok = window.confirm(
+      'Effacer toutes tes données ? Séances, réglages, profil, poids et historique Ippo seront supprimés sur cet appareil et dans Supabase. Cette action est définitive.',
+    );
+    if (!ok) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await resetEverything(repo);
+      window.location.reload();
+    } catch (err) {
+      setMessage({ tone: 'danger', text: err instanceof Error ? err.message : 'Réinitialisation impossible.' });
+      setBusy(false);
+    }
+  }, [repo]);
 
   const logout = useCallback(async () => {
     await signOut();
@@ -179,6 +196,16 @@ export function AccountCard({ repo }: { repo: Repository }) {
         Envoyés à ton projet Supabase : séances, réglages, profil, poids, nutrition, historique Ippo. La clé API Ippo
         n’est jamais synchronisée. L’e-mail sert uniquement à la connexion.
       </p>
+
+      <details className="stack" style={{ marginTop: 4 }}>
+        <summary className="muted" style={{ cursor: 'pointer' }}>Tout recommencer</summary>
+        <p className="muted" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>
+          Efface séances, réglages, profil et historique Ippo — sur cet appareil{session ? ' et dans Supabase' : ''}. Définitif.
+        </p>
+        <button className="btn danger" style={{ marginTop: 8, alignSelf: 'flex-start' }} onClick={() => void resetAll()} disabled={busy}>
+          Repartir de zéro
+        </button>
+      </details>
     </div>
   );
 }
