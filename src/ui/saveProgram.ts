@@ -38,6 +38,12 @@ export function extraRules(base: string[], answers: ProgramAnswers): string[] {
     );
   }
   if (answers.rope) rules.push('Corde à sauter : 3 × 2 min en fin de séance, ou 15 min un jour léger.');
+  if (answers.fatZones?.length) {
+    rules.push('Zones de stockage déclarées : la perte de gras reste globale, aucune zone ne fond sur commande.');
+  }
+  if (answers.visibleAbs) {
+    rules.push('Abdos visibles : déficit léger + gainage 3×/semaine ; la visibilité dépend du gras global, pas d’un exercice localisé.');
+  }
   if (answers.flatGlutes) {
     rules.push('Fessiers : pas de hip thrust, RDL lourd, fentes ni swings. Sissy squat et curl nordique les remplacent.');
   }

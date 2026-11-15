@@ -17,6 +17,11 @@ interface IntakeRow {
   documentedKcal?: number;
 }
 
+interface MeasureRow {
+  day: string;
+  values: Partial<Record<string, number>>;
+}
+
 interface DailyRow {
   sleepH?: number;
   steps?: number;
@@ -127,6 +132,17 @@ export async function buildCoachContext(repo: Repository, now: number = Date.now
 
   const goalLabels = goal?.secondary?.map((g) => GOAL_LABELS[g] ?? g) ?? [];
 
+  const measureLog = (await repo.getKv<MeasureRow[]>('measures.log')) ?? [];
+  const lastMeasure = measureLog.length ? measureLog[measureLog.length - 1] : null;
+  const measurements = {
+    waistCm: num(lastMeasure?.values.taille) ?? waistCm,
+    hipsCm: num(lastMeasure?.values.hanches),
+    chestCm: num(lastMeasure?.values.poitrine),
+    armCm: num(lastMeasure?.values.bras),
+    thighCm: num(lastMeasure?.values.cuisse),
+  };
+  if (measurements.hipsCm === null) gaps.push('tour de hanches non renseigné');
+
   const equipment = {
     items: await loadOwned(repo),
     kettlebells: await loadKettlebells(repo),
@@ -147,6 +163,7 @@ export async function buildCoachContext(repo: Repository, now: number = Date.now
       sex: answers.body.formulaSex ?? null,
       tone: answers.coaching.tone ?? null,
     },
+    measurements,
     equipment,
     goal: goal
       ? {

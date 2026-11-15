@@ -27,8 +27,8 @@ type Option = { value: string; label: string; sub?: string };
 
 type Step =
   | { id: 'priority'; kind: 'single'; prompt: string; options: Option[] }
-  | { id: 'style' | 'boxingPerWeek' | 'boxingPlace' | 'rope' | 'morning' | 'flatGlutes' | 'weeks'; kind: 'single'; prompt: string; options: Option[] }
-  | { id: 'boxingDays'; kind: 'multi'; prompt: string; options: Option[] }
+  | { id: 'style' | 'boxingPerWeek' | 'boxingPlace' | 'rope' | 'morning' | 'flatGlutes' | 'visibleAbs' | 'weeks'; kind: 'single'; prompt: string; options: Option[] }
+  | { id: 'boxingDays' | 'fatZones'; kind: 'multi'; prompt: string; options: Option[] }
   | { id: 'pains'; kind: 'multi'; prompt: string; options: Option[] }
   | { id: 'days' | 'minutes' | 'slot' | 'sleep' | 'quit' | 'runs' | 'runGoal'; kind: 'single'; prompt: string; options: Option[] }
   | { id: 'tests'; kind: 'tests'; prompt: string };
@@ -44,6 +44,14 @@ const BOXING: Option[] = [
   { value: '1', label: '1 séance' },
   { value: '2', label: '2 séances' },
   { value: '3', label: '3 séances' },
+];
+
+const FAT_ZONES: Option[] = [
+  { value: 'fessiers', label: 'Fessiers' },
+  { value: 'ventre', label: 'Ventre' },
+  { value: 'hanches', label: 'Hanches / poignées' },
+  { value: 'cuisses', label: 'Cuisses' },
+  { value: 'aucune', label: 'Aucune en particulier' },
 ];
 
 const BOXING_PLACES: Option[] = [
@@ -153,6 +161,8 @@ export function buildSteps(a: ProgramAnswers): Step[] {
     { id: 'priority', kind: 'single', prompt: 'Quel est ton objectif principal pour ce bloc ?', options: PRIORITIES },
     { id: 'pains', kind: 'multi', prompt: 'As-tu une douleur ou une gêne à signaler ? Je retirerai les mouvements concernés.', options: PAINS },
     { id: 'flatGlutes', kind: 'single', prompt: 'Tu veux éviter de prendre des fesses ? Je remplace la séance jambes par du sissy squat et du curl nordique.', options: YES_NO },
+    { id: 'fatZones', kind: 'multi', prompt: 'Où est-ce que tu prends du gras en premier ? (Information : la perte reste globale.)', options: FAT_ZONES },
+    { id: 'visibleAbs', kind: 'single', prompt: 'Tu veux voir tes abdos ? La visibilité dépend du gras global ; je mets le déficit et le gainage en conséquence.', options: YES_NO },
     {
       id: 'days',
       kind: 'single',
@@ -203,6 +213,12 @@ export function applyAnswer(a: ProgramAnswers, id: Step['id'], value: string | s
       return { ...a, boxingPerWeek: Number(value) };
     case 'boxingDays':
       return { ...a, boxingDays: (value as string[]).map(Number) };
+    case 'fatZones': {
+      const zones = (value as string[]).filter((z) => z !== 'aucune');
+      return { ...a, fatZones: zones as ProgramAnswers['fatZones'] };
+    }
+    case 'visibleAbs':
+      return { ...a, visibleAbs: value === 'oui' };
     case 'boxingPlace':
       return { ...a, boxingPlace: value as ProgramAnswers['boxingPlace'] };
     case 'flatGlutes':
@@ -404,6 +420,7 @@ export function IppoProgram({ repo, onBack, onDone }: { repo: Repository; onBack
                 {answers.boxingPlace ? ` (${answers.boxingPlace})` : ''}
                 {answers.rope ? ' · corde' : ''}
                 {answers.flatGlutes ? ' · fessiers évités' : ''}
+                {answers.visibleAbs ? ' · objectif abdos' : ''}
                 {answers.priority === 'seche' ? ' · déficit' : ''}
               </p>
               <ul className="ippo-rules">

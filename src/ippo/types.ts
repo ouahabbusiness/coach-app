@@ -69,6 +69,14 @@ export interface IppoDay {
   steps: number | null;
 }
 
+export interface IppoMeasurements {
+  waistCm: number | null;
+  hipsCm: number | null;
+  chestCm: number | null;
+  armCm: number | null;
+  thighCm: number | null;
+}
+
 export interface IppoEquipment {
   items: string[];
   kettlebells: number[];
@@ -80,6 +88,7 @@ export interface IppoContext {
   generatedAt: number;
   day: string;
   profile: IppoProfile;
+  measurements: IppoMeasurements;
   equipment: IppoEquipment;
   goal: IppoGoal | null;
   program: IppoProgram | null;

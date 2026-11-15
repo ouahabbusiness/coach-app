@@ -66,6 +66,8 @@ export interface ProgramAnswers {
   boxingPlace?: 'club' | 'maison';
   /** Éviter le développement des fessiers (remplace la séance jambes). */
   flatGlutes?: boolean;
+  /** Objectif abdos visibles (déficit + gainage, pas de réduction localisée). */
+  visibleAbs?: boolean;
 }
 
 export interface Rec<T> {

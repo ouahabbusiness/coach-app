@@ -9,7 +9,7 @@ const base: ProgramAnswers = { pains: [] };
 describe('buildSteps', () => {
   it('pose les questions de base, sans course quand l’objectif est la force', () => {
     const ids = buildSteps({ ...base, priority: 'force' }).map((s) => s.id);
-    expect(ids).toEqual(['style', 'rope', 'morning', 'priority', 'pains', 'flatGlutes', 'days', 'minutes', 'slot', 'sleep', 'quit', 'weeks']);
+    expect(ids).toEqual(['style', 'rope', 'morning', 'priority', 'pains', 'flatGlutes', 'fatZones', 'visibleAbs', 'days', 'minutes', 'slot', 'sleep', 'quit', 'weeks']);
   });
 
   it('ajoute la course pour un objectif hybride, et l’objectif de course seulement s’il y a des sorties', () => {
@@ -51,6 +51,12 @@ describe('applyAnswer', () => {
     expect(a.maxPullups).toBe(12);
     expect(a.maxDips).toBeNull();
     expect(a.maxPushups).toBe(30);
+  });
+
+  it('mappe les zones de gras et l’objectif abdos', () => {
+    expect(applyAnswer(base, 'fatZones', ['fessiers', 'ventre']).fatZones).toEqual(['fessiers', 'ventre']);
+    expect(applyAnswer(base, 'fatZones', ['aucune']).fatZones).toEqual([]);
+    expect(applyAnswer(base, 'visibleAbs', 'oui').visibleAbs).toBe(true);
   });
 
   it('mappe fessiers évités, lieu de boxe et durée du bloc', () => {
