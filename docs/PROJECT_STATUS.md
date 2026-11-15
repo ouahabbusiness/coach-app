@@ -200,3 +200,12 @@ ull.
 - La clé API est retirée des exports JSON et n'est jamais importée (src/storage/db.ts).
 - Vérifié : 	sc propre, **375 tests passent** (7 nouveaux), build OK. Non vérifié : rendu iPhone, vrai appel réseau, coût/qualité du modèle.
 - Détail : docs/IPPO_COACH.md. Suite : backend Supabase (auth, synchro, proxy Edge Function).
+
+
+## Backend Supabase — socle (15/11/2026, non déployé)
+
+- Migration supabase/migrations/202611150001_ippo_core.sql : profiles, session_events (append-only), kv_docs (LWW), ippo_messages, ippo_usage, RLS complète, trigger de profil, quota atomique.
+- Edge Function supabase/functions/ippo-chat/index.ts : JWT vérifié, quota quotidien, prompt serveur, clé LLM côté serveur, CORS restreint, aucun log de contenu.
+- supabase/config.toml, .env.example, guide docs/SUPABASE_SETUP.md.
+- **Non testé** : aucun projet Supabase accessible dans cette session. À appliquer puis tester avec un JWT réel.
+- Prochaine étape : auth magic link + adaptateur de synchro côté PWA, puis bascule d'Ippo vers la fonction.

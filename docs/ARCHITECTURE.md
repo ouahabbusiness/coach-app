@@ -11,7 +11,7 @@ xtool : SwiftData ne compile pas (issue xtool-org/xtool#149) → prévoir SQLite
 ## Couches
 1. **Données** : journal d'événements append-only (`events`), index recalculable (`sessions`), clé-valeur (`kv`).
 2. **Règles déterministes** : `src/engine` — projection, validation des commandes, durées, bilans. Aucune IA.
-3. **IA** : absente. Prévue en phase 4, jamais nécessaire pour faire une séance.
+3. **IA** : Ippo v0 (15/11/2026) — contexte réel + fournisseur compatible OpenAI, clé locale en attendant le proxy Supabase. Jamais nécessaire pour faire une séance.
 
 ## Chronométrage
 Chaque action stocke un instant UTC (ms). Les durées sont des différences d'instants : insensibles au verrouillage,
@@ -21,4 +21,5 @@ L'instant est capturé au moment de l'appui, avant toute écriture.
 ## Limites connues de la PWA
 - Pas d'accès Santé / Apple Watch.
 - Pas de son ni de vibration fiables sur iOS ; pas de notifications programmées sans serveur.
+- Coach IA : en v0 la clé API vit dans l’appareil ; le proxy Supabase (supabase/functions/ippo-chat) est prêt mais pas encore branché côté client.
 - Safari peut effacer le stockage d'un site peu utilisé → export régulier ; `navigator.storage.persist()` est demandé.

@@ -1,0 +1,5 @@
+project_id = "coach-app"
+
+[functions.ippo-chat]
+enabled = true
+verify_jwt = true
