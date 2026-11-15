@@ -2,7 +2,7 @@
 // Chaque valeur vient de données enregistrées ; « — » signifie inconnu, jamais zéro.
 
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { BookOpen, Sunset, Pencil, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy } from 'lucide-react';
+import { BookOpen, Sunset, Pencil, Snowflake, Camera, ChevronRight, Mountain, Watch, ClipboardList, Droplet, Dumbbell, Flame, Footprints, Minus, Moon, Play, Plus, Scale, Target, Trophy, User } from 'lucide-react';
 import { trend, type WeighIn } from '../engine/weight';
 import { useWinterMode, winterForced, winterInfo, type WinterInfo } from './winterArc';
 import { useWeightLog, WeightModal } from './Weight';
@@ -301,6 +301,18 @@ export function Today({ repo, go, night }: { repo: Repository; go: (r: Route) =>
         ]}
         winter={winter}
       />
+
+      <button className="ui-card list-row" onClick={() => go({ name: 'account' })}>
+        <span className="icon-chip accent">
+          <User size={16} aria-hidden="true" />
+        </span>
+        <div className="grow">
+          <p className="eyebrow">Nouveau · version {__APP_VERSION__}</p>
+          <p className="row-title">Compte &amp; synchro</p>
+          <p className="row-meta">Sauvegarde Supabase · coach Ippo</p>
+        </div>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
 
       {night.pastBed && night.bedtime && (
         <div className="bed-banner" role="status">
