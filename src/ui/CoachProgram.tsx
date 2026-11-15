@@ -2,7 +2,7 @@
 // Ton ferme « Winter Arc » ; le coach n'est pas une vraie personne et ne se présente pas comme telle.
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { CalendarCheck, ChevronLeft, ChevronRight, Dumbbell, Footprints, MapPin, ShieldAlert } from 'lucide-react';
+import { CalendarCheck, ChevronLeft, ChevronRight, Dumbbell, Footprints, MapPin, MessageSquare, ShieldAlert } from 'lucide-react';
 import { findVariant } from '../catalog/exercises';
 import { localDay } from '../engine/derive';
 import { DAY_NAMES, shiftWeek, type PlannedItem } from '../engine/planning';
@@ -715,6 +715,14 @@ export function CoachHome({ repo, go }: { repo: Repository; go: (r: Route) => vo
   return (
     <>
       <h1>Coach</h1>
+      <button className="ui-card list-row" onClick={() => go({ name: 'ippo' })}>
+        <span className="icon-chip accent"><MessageSquare size={16} aria-hidden="true" /></span>
+        <div className="grow">
+          <p className="eyebrow">Coach IA</p>
+          <p className="row-title">Parler à Ippo</p>
+        </div>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
       <section className="coach-today" aria-label="Message du coach">
         <p className="cq-who">Aujourd’hui</p>
         {todayItems.length ? (

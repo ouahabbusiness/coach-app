@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { applyRedistribution, refitTripSessions } from './programMigration';
-import { CalendarDays, ChartLine, Dumbbell, House, MessageSquare, Settings as SettingsIcon, Utensils } from 'lucide-react';
+import { CalendarDays, ChartLine, Dumbbell, House, MessageCircle, MessageSquare, Settings as SettingsIcon, Utensils } from 'lucide-react';
 import { CoachDb, Repository, type SessionSummaryRow } from '../storage/db';
 import { OutcomeBadge } from './common';
 import { Program } from './Program';
@@ -33,6 +33,7 @@ import { SpotsPage } from './Spots';
 import { FreeWorkPage } from './FreeWork';
 import { BackgroundProvider } from './backgrounds';
 import { Summary } from './Summary';
+import { Ippo } from './Ippo';
 import { Today } from './Today';
 import { deviceTimeZone, fmtDateTime } from './support';
 
@@ -57,7 +58,8 @@ export type Route =
   | { name: 'spots' }
   | { name: 'free' }
   | { name: 'session'; id: string }
-  | { name: 'summary'; id: string };
+  | { name: 'summary'; id: string }
+  | { name: 'ippo' };
 
 // `to` : écran ouvert par l'onglet.
 const TABS = [
@@ -117,6 +119,7 @@ export function App() {
   );
 
   function render() {
+  if (route.name === 'ippo') return <Ippo repo={repo} onBack={() => go({ name: 'coach' })} />;
   if (route.name === 'onboarding') return <Onboarding repo={repo} startAt={route.step} onExit={() => go({ name: 'today' })} />;
 
   if (route.name === 'arc') return <ArcPage repo={repo} go={go} />;
@@ -147,9 +150,14 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <span />
-        <button className="round" aria-label="Réglages et données" onClick={() => go({ name: 'settings' })}>
-          <SettingsIcon size={20} aria-hidden="true" />
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="round" aria-label="Parler à Ippo" onClick={() => go({ name: 'ippo' })}>
+            <MessageCircle size={20} aria-hidden="true" />
+          </button>
+          <button className="round" aria-label="Réglages et données" onClick={() => go({ name: 'settings' })}>
+            <SettingsIcon size={20} aria-hidden="true" />
+          </button>
+        </div>
       </header>
       <main className="content" key={route.name}>
         {route.name === 'today' && <Today repo={repo} go={go} night={day} />}

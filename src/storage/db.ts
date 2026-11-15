@@ -120,7 +120,12 @@ export class Repository {
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
       events: rows.map((r) => r.event),
-      kv: await this.db.kv.toArray(),
+      // La clé API Ippo est un secret d'appareil : elle ne doit jamais partir dans un export JSON.
+      kv: (await this.db.kv.toArray()).map((row) =>
+        row.key === 'ippo.config'
+          ? { ...row, value: { ...(row.value as Record<string, unknown>), apiKey: '' } }
+          : row,
+      ),
     };
   }
 
@@ -141,6 +146,8 @@ export class Repository {
     const added = await this.append(data.events);
     await this.db.transaction('rw', this.db.kv, async () => {
       for (const row of data.kv) {
+        // La configuration Ippo (clé API) reste propre à chaque appareil : jamais importée.
+        if (row.key === 'ippo.config') continue;
         const existing = await this.db.kv.get(row.key);
         if (!existing || existing.updatedAt < row.updatedAt) await this.db.kv.put(row);
       }

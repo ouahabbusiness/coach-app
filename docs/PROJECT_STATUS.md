@@ -187,3 +187,16 @@ Défauts connus corrigés, testés sur base fictive (tests/arbitrage.test.ts, pa
 - Durées : la fiche et la séance du planning utilisent la même estimation (A 46, B 38, C 50) ; une séance déjà planifiée garde sa durée stockée jusqu'au recalcul.
 - Douleur signalée sur un mouvement : trois états d'après TES réponses du lendemain — non renseignée (demande le retour, pas de hausse, charge « non validée »), encore présente (« À REVOIR avant d'être prescrit », avis conseillé, charge non validée), disparue (rien le lendemain : pas de hausse, reprise proposée à confirmer en séance). Aucun pourcentage de baisse inventé, aucun remplacement supposé sûr. La fiche affiche « à revoir · charge non validée ». Si la gêne d'épaule dure ou revient : médecin ou kiné. Tests : tests/cards.test.ts.
 - Liaison contrôle avant séance : douleur nouvelle ou aggravée du jour = les mouvements liés à une douleur signalée sont retirés (décision du coach, pas un abandon), même après un ancien « rien le lendemain » ; « À REVOIR » reste retiré même avec « aucune » aujourd'hui ; absence de réponse jamais lue comme « aucune douleur ». Sans réponse du jour, la fiche reste une proposition provisoire. Code : src/ui/painHold.ts, SessionScreen.applyReadiness. Test : tests/cards.test.ts.
+
+
+## Ippo — coach IA (15/11/2026, non publié)
+
+- Nouvel écran **Ippo** (route ippo, accès par l'en-tête et l'onglet Coach) : chat, profil repliable, réglages fournisseur, mode démo.
+- Contexte réel construit à chaque message (src/ippo/context.ts) : profil, objectif, programme, 8 dernières séances, poids/tendance, apports du jour, sommeil, douleurs, manques. Une valeur absente reste 
+ull.
+- Prompt avec garde-fous (src/ippo/prompt.ts) : aucune donnée inventée, pas de diagnostic, pas de prescription, pas de punition.
+- Fournisseur **compatible OpenAI** (DeepSeek par défaut), clé locale, timeout et erreurs lisibles (src/ippo/provider.ts). Sans clé : mode démo déterministe, étiqueté « démo ».
+- Nouveau flux de confidentialité i : accord explicite avant le premier envoi, hôte déclaré (pi.deepseek.com), révocable.
+- La clé API est retirée des exports JSON et n'est jamais importée (src/storage/db.ts).
+- Vérifié : 	sc propre, **375 tests passent** (7 nouveaux), build OK. Non vérifié : rendu iPhone, vrai appel réseau, coût/qualité du modèle.
+- Détail : docs/IPPO_COACH.md. Suite : backend Supabase (auth, synchro, proxy Edge Function).

@@ -1,7 +1,7 @@
 // Où vont les données : registre exhaustif des flux (vérifié par un test qui scanne les URL du code).
 // Tout ce qui quitte l'appareil demande un accord explicite AVANT le premier envoi, révocable dans Réglages.
 
-export type ConsentKey = 'health' | 'location' | 'spots' | 'map' | 'food';
+export type ConsentKey = 'health' | 'location' | 'spots' | 'map' | 'food' | 'ai';
 
 /** Change si le texte d'un accord change : l'accord est alors redemandé. */
 export const CONSENT_VERSION = 1;
@@ -64,6 +64,15 @@ export const FLOWS: Record<ConsentKey, Flow> = {
     destination: 'world.openfoodfacts.org',
     hosts: ['world.openfoodfacts.org'],
     when: 'Quand tu scannes ou tapes un code-barres.',
+    consent: true,
+  },
+  ai: {
+    key: 'ai',
+    title: 'Coach IA Ippo',
+    data: 'Ta question, l’historique du chat et un résumé de tes données (profil, objectif, séances récentes, poids, apports du jour, douleurs déclarées).',
+    destination: 'Le fournisseur compatible OpenAI que tu configures (par défaut api.deepseek.com). Ta clé API reste sur l’appareil.',
+    hosts: ['api.deepseek.com'],
+    when: 'Uniquement quand tu envoies un message à Ippo avec une clé configurée. Jamais en mode démo.',
     consent: true,
   },
 };

@@ -1,0 +1,357 @@
+/* Ippo — écran coach IA. Palette propre, scoped sous .ippo-screen. */
+
+.ippo-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(900px 420px at 50% -160px, #241a14 0%, rgba(11, 11, 12, 0) 70%),
+    #0b0b0c;
+  color: #f4f0e9;
+  font-family: var(--font-body);
+  overscroll-behavior: contain;
+}
+
+.ippo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px 10px;
+  border-bottom: 1px solid #1e1e21;
+}
+
+.ippo-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid #26262a;
+  background: #141416;
+  color: #cfc9bf;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ippo-icon:hover { color: #fff; border-color: #3a3a40; }
+.ippo-icon:focus-visible { outline: 2px solid #ff5a1f; outline-offset: 2px; }
+
+.ippo-brand { display: flex; align-items: center; gap: 10px; }
+.ippo-logo {
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  font-size: 15px;
+  color: #fff;
+}
+.ippo-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid #2c2c31;
+  color: #a9a39a;
+}
+.ippo-status.on { color: #ffb08a; border-color: #4a2a1c; background: #1d120d; }
+.ippo-dot { width: 6px; height: 6px; border-radius: 50%; background: #6b6b70; }
+.ippo-status.on .ippo-dot { background: #ff5a1f; box-shadow: 0 0 0 3px rgb(255 90 31 / 0.15); }
+
+.ippo-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.ippo-profile {
+  border: 1px solid #25252a;
+  background: linear-gradient(180deg, #141416 0%, #101012 100%);
+  border-radius: 16px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.ippo-profile-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  padding: 14px 16px;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ippo-kicker {
+  grid-column: 1 / -1;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #8d877d;
+  font-weight: 700;
+}
+.ippo-profile-line { font-size: 15px; font-weight: 600; color: #f4f0e9; }
+.ippo-chevron { grid-row: 2; grid-column: 2; color: #8d877d; transition: transform 160ms ease; }
+.ippo-profile.open .ippo-chevron { transform: rotate(180deg); }
+.ippo-profile-body { padding: 0 16px 16px; border-top: 1px solid #202024; }
+
+.ippo-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.ippo-metrics > div { background: #161619; border: 1px solid #232328; border-radius: 12px; padding: 10px; }
+.ippo-metrics span { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d877d; margin-bottom: 4px; }
+.ippo-metrics strong { display: block; font-size: 16px; font-weight: 700; color: #fff; }
+.ippo-metrics small { display: block; font-size: 10.5px; color: #6f6a62; margin-top: 2px; }
+.ippo-goal { margin: 12px 0 0; font-size: 13.5px; color: #c9c3b9; }
+.ippo-gaps { margin: 10px 0 0; font-size: 12px; color: #a8743f; }
+
+.ippo-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #4a2c1a;
+  background: #1c120c;
+  color: #e8d4c4;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ippo-banner strong { color: #ffb08a; }
+.ippo-link {
+  display: block;
+  margin-top: 4px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #ff7a3d;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ippo-thread { display: flex; flex-direction: column; gap: 14px; }
+
+.ippo-msg { display: flex; gap: 10px; align-items: flex-end; }
+.ippo-msg.user { justify-content: flex-end; }
+.ippo-msg.assistant { justify-content: flex-start; }
+
+.ippo-avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #ff5a1f;
+  color: #170b06;
+  font-weight: 800;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  letter-spacing: 0.02em;
+}
+
+.ippo-bubble {
+  position: relative;
+  max-width: min(85%, 560px);
+  border-radius: 16px;
+  padding: 12px 14px 22px;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.ippo-msg.assistant .ippo-bubble {
+  background: #161619;
+  border: 1px solid #24242a;
+  color: #ece7de;
+  border-bottom-left-radius: 6px;
+}
+.ippo-msg.user .ippo-bubble {
+  background: linear-gradient(180deg, #ff6a33 0%, #f2541c 100%);
+  color: #1a0d06;
+  border-bottom-right-radius: 6px;
+  font-weight: 500;
+}
+.ippo-msg.error .ippo-bubble { border-color: #6a2a22; background: #1d1010; color: #f0c9c2; }
+.ippo-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ippo-time {
+  position: absolute;
+  right: 12px;
+  bottom: 7px;
+  font-size: 10.5px;
+  opacity: 0.55;
+}
+.ippo-tag {
+  display: inline-block;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #2a2119;
+  color: #ffb08a;
+}
+.ippo-tag.err { background: #3a1c17; color: #ff9c8b; }
+
+.ippo-typing { display: flex; gap: 4px; align-items: center; padding: 16px 18px; }
+.ippo-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff8a5c;
+  animation: ippo-blink 1.2s infinite ease-in-out;
+}
+.ippo-typing span:nth-child(2) { animation-delay: 0.15s; }
+.ippo-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ippo-blink { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+
+.ippo-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.ippo-suggestion {
+  border: 1px solid #2c2c32;
+  background: #131315;
+  color: #d9d3c9;
+  border-radius: 999px;
+  padding: 9px 13px;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 40px;
+}
+.ippo-suggestion:hover { border-color: #ff5a1f; color: #fff; }
+.ippo-suggestion:disabled { opacity: 0.5; cursor: default; }
+
+.ippo-error { color: #ff9c8b; font-size: 13px; margin: 12px 2px 0; }
+
+.ippo-composer {
+  border-top: 1px solid #1e1e21;
+  background: #0d0d0f;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.ippo-inputwrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: #151517;
+  border: 1px solid #2a2a30;
+  border-radius: 16px;
+  padding: 6px 6px 6px 14px;
+}
+.ippo-inputwrap:focus-within { border-color: #ff5a1f; }
+.ippo-inputwrap textarea {
+  flex: 1;
+  resize: none;
+  border: 0;
+  background: none;
+  color: #f4f0e9;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 9px 0;
+  max-height: 132px;
+  min-height: 40px;
+  outline: none;
+}
+.ippo-inputwrap textarea::placeholder { color: #6f6a62; }
+.ippo-send {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 0;
+  background: #ff5a1f;
+  color: #180b06;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.ippo-send:disabled { background: #2b2b30; color: #6f6a62; cursor: default; }
+.ippo-disclaimer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  color: #6f6a62;
+}
+
+.ippo-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgb(0 0 0 / 0.65);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+}
+.ippo-sheet {
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #141416;
+  border: 1px solid #2a2a30;
+  border-radius: 20px;
+  padding: 18px;
+  color: #ece7de;
+}
+@supports (padding: env(safe-area-inset-bottom)) {
+  .ippo-modal { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
+.ippo-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ippo-sheet h2 { margin: 0; font-size: 18px; color: #fff; }
+.ippo-note { font-size: 12.5px; line-height: 1.5; color: #a9a39a; margin: 0 0 14px; }
+.ippo-note.small { font-size: 11.5px; margin-top: 14px; }
+.ippo-field { display: block; margin-bottom: 12px; }
+.ippo-field span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #8d877d; margin-bottom: 5px; }
+.ippo-field input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #2c2c32;
+  background: #0f0f11;
+  color: #f4f0e9;
+  padding: 11px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+.ippo-field input:focus { outline: 2px solid #ff5a1f; outline-offset: 1px; }
+.ippo-sheet-actions { display: flex; gap: 8px; margin-top: 6px; }
+.ippo-btn {
+  flex: 1;
+  min-height: 44px;
+  border-radius: 11px;
+  border: 1px solid #ff5a1f;
+  background: #ff5a1f;
+  color: #180b06;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ippo-btn.ghost { background: transparent; color: #ffb08a; }
+.ippo-btn:disabled { opacity: 0.5; cursor: default; }
+.ippo-test { font-size: 12.5px; margin: 10px 0 0; }
+.ippo-test.ok { color: #7fd6a4; }
+.ippo-test.ko { color: #ff9c8b; }
+
+@media (max-width: 520px) {
+  .ippo-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
