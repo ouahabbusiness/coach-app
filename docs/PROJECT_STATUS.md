@@ -209,3 +209,12 @@ ull.
 - supabase/config.toml, .env.example, guide docs/SUPABASE_SETUP.md.
 - **Non testé** : aucun projet Supabase accessible dans cette session. À appliquer puis tester avec un JWT réel.
 - Prochaine étape : auth magic link + adaptateur de synchro côté PWA, puis bascule d'Ippo vers la fonction.
+
+
+## Compte, synchro et proxy Ippo (15/11/2026, soir)
+
+- Connexion magic link Supabase, carte Compte & synchro dans Réglages, déconnexion, synchro manuelle.
+- Synchro : `session_events` (idempotent) + `kv_docs` (last-write-wins), pagination 500, fusion pure testée. Secrets locaux exclus (`ippo.config`, `sync.last`).
+- Ippo bascule sur l’Edge Function dès qu’une session existe (mode « Serveur ») ; clé locale en secours, démo sinon.
+- Schéma Supabase appliqué et tables vérifiées via l’API le 15/11. **Fonction `ippo-chat` non déployée** : à faire depuis le dashboard, avec les secrets LLM.
+- 381 tests passent, build OK. Chunk principal ~1 Mo à cause de `@supabase/supabase-js` : à découper plus tard.

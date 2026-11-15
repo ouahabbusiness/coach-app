@@ -8,9 +8,10 @@ import { newId } from './support';
 import { buildCoachContext } from '../ippo/context';
 import { buildChatTurns } from '../ippo/prompt';
 import { demoAnswer, welcomeMessage } from '../ippo/demo';
-import { askIppo, hasApiKey, IppoError, loadIppoConfig, saveIppoConfig, testIppoConfig } from '../ippo/provider';
+import { askIppo, askIppoProxy, hasApiKey, IppoError, loadIppoConfig, saveIppoConfig, testIppoConfig } from '../ippo/provider';
 import { DEFAULT_IPPO_CONFIG, type IppoConfig, type IppoContext, type IppoMessage } from '../ippo/types';
 import { CONSENTS, isGranted, withConsent, type Consents } from '../engine/privacy';
+import { useSession } from './account';
 import './ippo.css';
 
 const CHAT_KEY = 'ippo.chat';
@@ -45,6 +46,8 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
   const [pending, setPending] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const { session } = useSession();
+  const proxy = Boolean(session);
 
   useEffect(() => {
     let alive = true;
@@ -78,7 +81,7 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
 
   const doSend = useCallback(
     async (question: string) => {
-      if (!config) return;
+      if (!config && !proxy) return;
       setError(null);
       const user: IppoMessage = { id: newId(), role: 'user', content: question, at: Date.now(), origin: 'local' };
       const history = [...messages, user];
@@ -89,7 +92,13 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
         setCtx(fresh);
         let answer: string;
         let origin: IppoMessage['origin'];
-        if (hasApiKey(config)) {
+        if (proxy) {
+          const past = messages
+            .filter((m) => m.origin !== 'error')
+            .map((m) => ({ role: m.role, content: m.content }));
+          answer = await askIppoProxy(question, fresh, past);
+          origin = 'llm';
+        } else if (config && hasApiKey(config)) {
           answer = await askIppo(config, buildChatTurns(fresh, question, messages));
           origin = 'llm';
         } else {
@@ -108,22 +117,23 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
         setBusy(false);
       }
     },
-    [config, messages, repo],
+    [config, messages, proxy, repo],
   );
 
   const send = useCallback(
     (raw?: string) => {
       const question = (raw ?? input).trim();
-      if (!question || busy || !config) return;
+      if (!question || busy || (!config && !proxy)) return;
       setInput('');
+      const remote = proxy || (config ? hasApiKey(config) : false);
       // Un envoi vers un fournisseur d'IA demande un accord explicite (données de santé).
-      if (hasApiKey(config) && (!consents || !isGranted(consents, 'ai'))) {
+      if (remote && (!consents || !isGranted(consents, 'ai'))) {
         setPending(question);
         return;
       }
       void doSend(question);
     },
-    [busy, config, consents, doSend, input],
+    [busy, config, consents, doSend, input, proxy],
   );
 
   const acceptAi = useCallback(async () => {
@@ -160,9 +170,9 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
         </button>
         <div className="ippo-brand">
           <span className="ippo-logo">IPPO</span>
-          <span className={`ippo-status ${live ? 'on' : 'off'}`}>
+          <span className={`ippo-status ${proxy || live ? 'on' : 'off'}`}>
             <span className="ippo-dot" aria-hidden="true" />
-            {live ? 'Clé locale' : 'Démo'}
+            {proxy ? 'Serveur' : live ? 'Clé locale' : 'Démo'}
           </span>
         </div>
         <button className="ippo-icon" aria-label="Réglages Ippo" onClick={() => setSettingsOpen(true)}>
@@ -215,7 +225,7 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
           </section>
         )}
 
-        {!live && (
+        {!proxy && !live && (
           <div className="ippo-banner">
             <WifiOff size={16} aria-hidden="true" />
             <div>
@@ -289,13 +299,14 @@ export function Ippo({ repo, onBack }: { repo: Repository; onBack: () => void })
         </p>
       </div>
 
-      {pending && config && (
+      {pending && (
         <div className="ippo-modal" role="dialog" aria-modal="true" aria-label="Accord avant envoi" onClick={(e) => e.target === e.currentTarget && setPending(null)}>
           <div className="ippo-sheet">
             <h2>Avant d’envoyer à Ippo</h2>
             <p className="ippo-note">
-              Pour répondre, Ippo envoie à <strong>{(() => { try { return new URL(config.baseUrl).host; } catch { return 'ton fournisseur'; } })()}</strong> :
-              ta question, l’historique du chat et un résumé de tes données (profil, objectif, séances récentes, poids, apports du jour, douleurs déclarées).
+              Pour répondre, Ippo envoie {proxy ? 'au proxy Supabase d’Ippo, qui le transmet au fournisseur configuré' : (
+                <strong>{(() => { try { return new URL(config?.baseUrl ?? '').host || 'ton fournisseur'; } catch { return 'ton fournisseur'; } })()}</strong>
+              )} : ta question, l’historique du chat et un résumé de tes données (profil, objectif, séances récentes, poids, apports du jour, douleurs déclarées).
             </p>
             <p className="ippo-note">
               Ta clé API reste sur cet appareil et n’est pas incluse dans les exports. Rien n’est envoyé en mode démo. Tu peux retirer cet accord dans les réglages.

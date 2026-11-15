@@ -2,6 +2,7 @@
 // La clé est stockée uniquement dans IndexedDB sur cet appareil et n'est envoyée qu'au fournisseur choisi.
 
 import type { Repository } from '../storage/db';
+import { getSupabase } from '../backend/supabase';
 import { DEFAULT_IPPO_CONFIG, type ChatTurn, type IppoConfig } from './types';
 
 const KEY = 'ippo.config';
@@ -108,3 +109,38 @@ export async function testIppoConfig(config: IppoConfig): Promise<string> {
     { maxTokens: 5, timeoutMs: 20_000 },
   );
 }
+
+/** Appelle l'Edge Function Supabase (JWT utilisateur, clé LLM côté serveur). */
+export async function askIppoProxy(
+  question: string,
+  context: unknown,
+  history: { role: 'user' | 'assistant'; content: string }[],
+): Promise<string> {
+  const sb = getSupabase();
+  if (!sb) throw new IppoError('Backend non configuré.');
+  const {
+    data: { session },
+  } = await sb.auth.getSession();
+  if (!session) throw new IppoError('Connecte-toi pour utiliser le coach côté serveur.');
+
+  const { data, error } = await sb.functions.invoke('ippo-chat', {
+    body: { question, context, history: history.slice(-10) },
+  });
+  if (error) {
+    let detail = '';
+    const response = (error as { context?: Response }).context;
+    if (response && typeof response.json === 'function') {
+      try {
+        const body = (await response.json()) as { error?: unknown };
+        if (typeof body.error === 'string') detail = body.error;
+      } catch {
+        // corps illisible : on garde le message générique
+      }
+    }
+    throw new IppoError(detail || 'Le serveur Ippo a refusé la requête. Vérifie que la fonction est déployée.');
+  }
+  const answer = (data as { answer?: unknown } | null)?.answer;
+  if (typeof answer !== 'string' || !answer.trim()) throw new IppoError('Réponse vide du serveur Ippo.');
+  return answer.trim();
+}
+

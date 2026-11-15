@@ -1,5 +1,7 @@
 # Backend Supabase — mise en route
 
+> **État au 15/11/2026** : projet `ngkbccpwciwhcmkinwub` créé, schéma appliqué et vérifié via l’API. La fonction `ippo-chat` n’est **pas encore déployée**. La PWA contient la connexion magic link et la synchro manuelle.
+
 Objectif : comptes, synchro multi-appareil et proxy du coach IA **sans jamais mettre la clé du fournisseur LLM dans la PWA**.
 
 ## 1. Créer le projet
@@ -8,7 +10,7 @@ Objectif : comptes, synchro multi-appareil et proxy du coach IA **sans jamais me
 2. Note : **Project URL**, **anon public key**, **service_role key** (Réglages → API).
 3. Authentication → URL Configuration :
    - Site URL : `https://ouahabbusiness.github.io/coach-app/`
-   - Redirect URLs : `https://ouahabbusiness.github.io/coach-app/**` et `http://localhost:5173/**`
+   - Redirect URLs : `https://ouahabbusiness.github.io/coach-app/`, `https://ouahabbusiness.github.io/coach-app/**` et `http://localhost:5173/**`
 4. Authentication → Providers → **Email** activé (magic link). Désactiver l'inscription publique si tu veux un seul compte.
 
 ## 2. Schéma

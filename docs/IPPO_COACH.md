@@ -81,3 +81,12 @@ Le moteur de séance, le stockage et les règles existantes ne sont pas modifié
 2. Synchro idempotente : `events.id` = clé primaire ; `kv` en last-write-wins ; conflits signalés, jamais écrasés en silence.
 3. Edge Function `ippo-chat` : la clé du fournisseur reste côté serveur, vérification du JWT, quota par utilisateur, aucun log de contenu.
 4. L'écran Ippo bascule sur l'Edge Function quand `VITE_SUPABASE_URL` est configurée ; le mode clé locale reste en secours.
+
+
+## Compte, synchro et proxy (15/11/2026, soir)
+
+- **Connexion** : magic link Supabase (aucun mot de passe). `src/backend/supabase.ts`, `src/ui/account.ts`, carte « Compte & synchro » dans Réglages (`src/ui/AccountCard.tsx`).
+- **Synchro manuelle** (`src/backend/sync.ts`) : événements de séance (append-only, UUID = idempotence) et réglages (last-write-wins sur `updatedAt`). Fusion pure testée (`src/backend/syncCore.ts`, `tests/sync.test.ts`). La clé API Ippo et `sync.last` ne quittent jamais l’appareil.
+- **Proxy IA** : dès qu’une session existe, Ippo appelle l’Edge Function `ippo-chat` (JWT, quota serveur, clé LLM côté serveur). La clé locale ne sert plus que de secours hors connexion ; sans session ni clé, mode démo.
+- **Schéma appliqué** sur le projet `ngkbccpwciwhcmkinwub` le 15/11 : tables et RLS vérifiées via l’API (réponses `[]` avec la clé publishable). **Fonction non encore déployée** au moment de l’écriture.
+- Vérifié : 381 tests passent, `tsc` propre, build OK.

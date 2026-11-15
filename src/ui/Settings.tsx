@@ -16,6 +16,7 @@ import { useBackgrounds, type BgSlot } from './backgrounds';
 import { useWinterMode, type WinterMode } from './winterArc';
 import { loadGoals, loadOnboarding } from './profileStore';
 import { ComplementModal } from './Complement';
+import { AccountCard } from './AccountCard';
 
 type Status = 'testé' | 'non testé sur iPhone' | 'non implémenté' | 'à valider';
 
@@ -35,7 +36,8 @@ const FEATURES: { name: string; status: Status; note?: string }[] = [
   { name: 'Nutrition', status: 'non implémenté' },
   { name: 'Course à pied', status: 'non implémenté' },
   { name: 'Apple Santé / Apple Watch', status: 'non implémenté', note: 'Impossible dans une app web ; prévu dans l’app native.' },
-  { name: 'Coach IA', status: 'non implémenté' },
+  { name: 'Coach IA', status: 'à valider', note: 'Écran, contexte et garde-fous testés ; appel réel et iPhone non testés.' },
+  { name: 'Synchro Supabase (manuelle)', status: 'non testé sur iPhone', note: 'Schéma, RLS et fusion testés localement ; premier test réel à faire.' },
   { name: 'Notifications', status: 'non implémenté' },
 ];
 
@@ -66,6 +68,8 @@ export function Settings({ repo, onBack, onEditProfile }: { repo: Repository; on
       <h1 style={{ marginTop: 12 }}>Réglages et données</h1>
 
       <ProfileCard repo={repo} onEdit={onEditProfile} />
+
+      <AccountCard repo={repo} />
 
       <BackgroundCard />
 
