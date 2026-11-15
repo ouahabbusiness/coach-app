@@ -8,7 +8,7 @@ import { Modal } from './common';
 import { deviceTimeZone } from './support';
 
 const KEY = 'measures.log';
-type Part = 'taille' | 'hanches' | 'cuisse' | 'bras' | 'poitrine' | 'epaules';
+type Part = 'taille' | 'hanches' | 'cuisse' | 'bras' | 'poitrine' | 'epaules' | 'cou' | 'mollet' | 'avantbras' | 'pli';
 const PARTS: { id: Part; label: string; how: string; optional?: boolean }[] = [
   { id: 'taille', label: 'Tour de taille', how: 'Au niveau du nombril, ventre relâché' },
   { id: 'hanches', label: 'Hanches', how: 'Au plus large des fessiers, pieds joints' },
@@ -17,6 +17,10 @@ const PARTS: { id: Part; label: string; how: string; optional?: boolean }[] = [
   { id: 'bras', label: 'Bras', how: 'Bras relâché, au plus large du biceps, même bras à chaque fois', optional: true },
   { id: 'poitrine', label: 'Poitrine', how: 'Sous les aisselles, ruban horizontal, à la fin d’une expiration normale', optional: true },
   { id: 'epaules', label: 'Épaules', how: 'Au plus large des épaules, pieds joints, bras relâchés', optional: true },
+  { id: 'cou', label: 'Tour de cou', how: 'Au plus étroit, sous la pomme d’Adam', optional: true },
+  { id: 'mollet', label: 'Mollet', how: 'Au plus large, debout, même jambe', optional: true },
+  { id: 'avantbras', label: 'Avant-bras', how: 'Au plus large, bras tendu', optional: true },
+  { id: 'pli', label: 'Pli abdominal', how: 'Pince verticale à 2 cm à droite du nombril, en mm', optional: true },
 ];
 
 interface Measure {
@@ -42,7 +46,10 @@ export function MeasuresCard({ repo }: { repo: Repository }) {
     const values: Measure['values'] = {};
     for (const p of PARTS) {
       const n = Number((draft[p.id] ?? '').replace(',', '.'));
-      if (draft[p.id]?.trim() && n > 20 && n < 250) values[p.id] = Math.round(n * 10) / 10;
+      const pli = p.id === 'pli';
+      const min = pli ? 2 : 20;
+      const max = pli ? 80 : 250;
+      if (draft[p.id]?.trim() && n >= min && n <= max) values[p.id] = Math.round(n * 10) / 10;
     }
     if (!Object.keys(values).length) return;
     const next = [...log.filter((m) => m.day !== today), { day: today, values }].sort((a, b) => (a.day < b.day ? -1 : 1));
@@ -69,7 +76,7 @@ export function MeasuresCard({ repo }: { repo: Repository }) {
           return (
             <div key={p.id} className="measure">
               <span className="kpi-label">{p.label}</span>
-              <span className="kpi-value num">{l !== undefined ? fmt(l) : '—'}<span className="kpi-sub"> cm</span></span>
+              <span className="kpi-value num">{l !== undefined ? fmt(l) : '—'}<span className="kpi-sub"> {p.id === 'pli' ? 'mm' : 'cm'}</span></span>
               {d !== undefined && d !== 0 && <span className={`pill num ${d < 0 ? 'ok' : ''}`}>{d > 0 ? '+' : ''}{fmt(d)} cm</span>}
             </div>
           );
@@ -85,7 +92,7 @@ export function MeasuresCard({ repo }: { repo: Repository }) {
               <span className="hint">{p.how}</span>
               <div className="row" style={{ flexWrap: 'nowrap' }}>
                 <input type="text" inputMode="decimal" value={draft[p.id] ?? ''} onChange={(e) => setDraft({ ...draft, [p.id]: e.target.value })} />
-                <span className="muted">cm</span>
+                <span className="muted">{p.id === 'pli' ? 'mm' : 'cm'}</span>
               </div>
             </label>
           ))}

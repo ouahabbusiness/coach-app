@@ -134,12 +134,28 @@ export async function buildCoachContext(repo: Repository, now: number = Date.now
 
   const measureLog = (await repo.getKv<MeasureRow[]>('measures.log')) ?? [];
   const lastMeasure = measureLog.length ? measureLog[measureLog.length - 1] : null;
+  const neckCm = num(lastMeasure?.values.cou);
+  const waistMeasure = num(lastMeasure?.values.taille) ?? waistCm;
+  // Estimation Navy (hommes) : repère, jamais une mesure de laboratoire.
+  const bodyFatPct = (() => {
+    if (waistMeasure === null || neckCm === null || heightCm === null || waistMeasure <= neckCm) return null;
+    const waistIn = waistMeasure / 2.54;
+    const neckIn = neckCm / 2.54;
+    const heightIn = heightCm / 2.54;
+    const pct = 86.01 * Math.log10(waistIn - neckIn) - 70.041 * Math.log10(heightIn) + 36.76;
+    return Math.round(pct * 10) / 10;
+  })();
   const measurements = {
-    waistCm: num(lastMeasure?.values.taille) ?? waistCm,
+    waistCm: waistMeasure,
     hipsCm: num(lastMeasure?.values.hanches),
     chestCm: num(lastMeasure?.values.poitrine),
     armCm: num(lastMeasure?.values.bras),
     thighCm: num(lastMeasure?.values.cuisse),
+    neckCm,
+    calfCm: num(lastMeasure?.values.mollet),
+    forearmCm: num(lastMeasure?.values.avantbras),
+    skinfoldMm: num(lastMeasure?.values.pli),
+    bodyFatPct,
   };
   if (measurements.hipsCm === null) gaps.push('tour de hanches non renseigné');
 

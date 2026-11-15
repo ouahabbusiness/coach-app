@@ -75,6 +75,11 @@ export interface IppoMeasurements {
   chestCm: number | null;
   armCm: number | null;
   thighCm: number | null;
+  neckCm: number | null;
+  calfCm: number | null;
+  forearmCm: number | null;
+  skinfoldMm: number | null;
+  bodyFatPct: number | null;
 }
 
 export interface IppoEquipment {
